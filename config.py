@@ -1,6 +1,8 @@
 """
 Ladowanie i zapisywanie konfiguracji programu.
-Config trzyma sie w pliku config.json obok programu (albo obok .exe po zbudowaniu).
+Config (config.json, media/, overlay.html) trzyma sie w folderze
+Dokumenty/Nagrody Vivi uzytkownika - niezaleznie od tego, gdzie polozony
+jest sam plik .exe.
 """
 import json
 import sys
@@ -23,11 +25,62 @@ DEFAULT_CONFIG = {
 }
 
 
+def _documents_dir() -> Path:
+    """Zwraca prawdziwy folder Dokumenty uzytkownika (dziala tez z polskim
+    Windowsem, gdzie widoczna nazwa to "Dokumenty" ale to samo co "Documents")."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            CSIDL_PERSONAL = 5  # Dokumenty / My Documents
+            SHGFP_TYPE_CURRENT = 0
+            buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+            ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
+            if buf.value:
+                return Path(buf.value)
+        except Exception:
+            pass
+    return Path.home() / "Documents"
+
+
 def base_dir() -> Path:
-    """Folder obok .exe (po spakowaniu PyInstallerem) albo obok skryptu (w trakcie developmentu)."""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).parent
+    """Folder z danymi programu: Dokumenty/Nagrody Vivi. Tworzony automatycznie,
+    jesli jeszcze nie istnieje."""
+    d = _documents_dir() / "Nagrody Vivi"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def resource_path(name: str) -> Path:
+    """Sciezka do pliku zaszytego WEWNATRZ .exe (np. overlay.html, icon.png).
+
+    Przy onefile PyInstaller w trakcie startu rozpakowuje takie pliki do
+    tymczasowego folderu sys._MEIPASS. W trybie deweloperskim to po prostu
+    plik obok skryptu.
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / name
+    return Path(__file__).parent / name
+
+
+def ensure_bundled_files() -> None:
+    """Przy pierwszym uruchomieniu .exe kopiuje overlay.html/icon.png (zaszyte
+    w exe) obok niego, zeby OverlayServer i ikona okna mialy skad je wziac.
+    Dzieki temu wystarczy wyslac SAM plik .exe - reszta tworzy sie sama."""
+    if not getattr(sys, "frozen", False):
+        return
+    import shutil
+    target_dir = base_dir()
+    for name in ("overlay.html", "icon.png"):
+        target = target_dir / name
+        if target.exists():
+            continue
+        src = resource_path(name)
+        if src.exists():
+            try:
+                shutil.copyfile(src, target)
+            except OSError:
+                pass
 
 
 def config_path() -> Path:

@@ -49,9 +49,11 @@ bez ikony.
 build_exe.bat
 ```
 
-Po zbudowaniu w folderze `dist\` znajdziesz `TwitchRewardAlerts.exe` oraz skopiowany
-`overlay.html`. Uruchamiaj program z tego folderu - obok stworzy sobie `config.json`
-oraz folder `media\` na twoje GIF-y i dzwieki.
+Po zbudowaniu w folderze `dist\` znajdziesz **tylko jeden plik**: `Nagrody Vivi.exe`.
+To jedyny plik, ktory trzeba wyslac / przeniesc na inny komputer - nic wiecej.
+Przy pierwszym uruchomieniu program sam utworzy folder `Dokumenty\Nagrody Vivi`
+(w nim `config.json`, `overlay.html` oraz folder `media\` na Twoje GIF-y i dzwieki).
+Mozesz wiec uruchamiac .exe z dowolnego miejsca (Pulpit, Pobrane itp.).
 
 ## 4. Pierwsze uruchomienie programu
 

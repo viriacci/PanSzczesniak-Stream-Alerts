@@ -99,17 +99,17 @@ class SetupInterface(QWidget):
         self.client_id_edit = LineEdit()
         self.client_id_edit.setText(cfg.get("client_id", ""))
         self.client_id_edit.setPlaceholderText("Client ID z dev.twitch.tv/console")
-        form.addRow("Client ID:", self.client_id_edit)
+        form.addRow(BodyLabel("Client ID:"), self.client_id_edit)
 
         self.client_secret_edit = LineEdit()
         self.client_secret_edit.setText(cfg.get("client_secret", ""))
         self.client_secret_edit.setEchoMode(QLineEdit.Password)
         self.client_secret_edit.setPlaceholderText("Client Secret")
-        form.addRow("Client Secret:", self.client_secret_edit)
+        form.addRow(BodyLabel("Client Secret:"), self.client_secret_edit)
 
         self.redirect_uri_edit = LineEdit()
         self.redirect_uri_edit.setText(cfg.get("redirect_uri", "http://localhost:3000"))
-        form.addRow("Redirect URI:", self.redirect_uri_edit)
+        form.addRow(BodyLabel("Redirect URI:"), self.redirect_uri_edit)
 
         layout.addWidget(card)
 
@@ -196,7 +196,7 @@ class RewardsInterface(QWidget):
         gif_btn.clicked.connect(self.on_pick_gif)
         gif_row.addWidget(self.gif_label, 1)
         gif_row.addWidget(gif_btn)
-        form.addRow("GIF:", gif_row)
+        form.addRow(BodyLabel("GIF:"), gif_row)
 
         sound_row = QHBoxLayout()
         self.sound_label = CaptionLabel("(nie wybrano)")
@@ -205,12 +205,12 @@ class RewardsInterface(QWidget):
         sound_btn.clicked.connect(self.on_pick_sound)
         sound_row.addWidget(self.sound_label, 1)
         sound_row.addWidget(sound_btn)
-        form.addRow("Dzwiek:", sound_row)
+        form.addRow(BodyLabel("Dzwiek:"), sound_row)
 
         self.duration_edit = LineEdit()
         self.duration_edit.setText(str(app.cfg.get("default_duration_seconds", 5)))
         self.duration_edit.setFixedWidth(80)
-        form.addRow("Czas wyswietlania (s):", self.duration_edit)
+        form.addRow(BodyLabel("Czas wyswietlania (s):"), self.duration_edit)
 
         layout.addWidget(card)
 
@@ -471,6 +471,11 @@ class MainWindow(FluentWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        # Uwaga: super().__init__() (frameless window na Windowsie) potrafi wywolac
+        # resizeEvent zanim self.watermark zdazy powstac - bez tego guardu program
+        # wywala sie przy starcie na niektorych komputerach.
+        if not hasattr(self, "watermark"):
+            return
         margin = 10
         self.watermark.move(self.width() - self.watermark.width() - margin,
                              self.height() - self.watermark.height() - margin)
@@ -584,6 +589,8 @@ def main():
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
+    cfgmod.ensure_bundled_files()
+
     app = QApplication(sys.argv)
     setTheme(Theme.DARK)
     setThemeColor(ACCENT)
