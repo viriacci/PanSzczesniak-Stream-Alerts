@@ -32,7 +32,7 @@ python main.py
 
 ## Ikona programu i nazwa .exe
 
-Program buduje się teraz jako **`Nagrody Vivi.exe`**, z Twoja wlasna ikona. Zeby to zadzialalo:
+Program buduje się jako **`Nagrody Vivi.exe`**, z Twoja wlasna ikona. Zeby to zadzialalo:
 
 1. Skopiuj swoj plik obrazka (np. `47.png`) do folderu z projektem (tam gdzie jest `main.py`).
 2. Zmien mu nazwe na dokladnie **`icon.png`**.
@@ -49,11 +49,24 @@ bez ikony.
 build_exe.bat
 ```
 
-Po zbudowaniu w folderze `dist\` znajdziesz **tylko jeden plik**: `Nagrody Vivi.exe`.
-To jedyny plik, ktory trzeba wyslac / przeniesc na inny komputer - nic wiecej.
+Program buduje sie w trybie **--onedir** (folder, nie pojedynczy plik) - dzieki
+temu startuje od razu, bez kilkusekundowego rozpakowywania sie do folderu
+tymczasowego przy kazdym uruchomieniu (jak mialo to miejsce przy poprzednim
+trybie --onefile).
+
+Po zbudowaniu w folderze `dist\Nagrody Vivi\` znajdziesz caly program:
+- **`Nagrody Vivi.exe`** - ten plik uruchamiasz
+- folder **`_internal\`** - biblioteki (Qt, Python itp.), musi zostac obok .exe
+
+Zeby przeniesc program na inny komputer (np. z laptopa deweloperskiego na
+komputer do streamowania), wyslij/przenies **caly folder** `dist\Nagrody Vivi`
+(najlatwiej spakowany do ZIP) - sam plik .exe bez folderu `_internal` obok
+nie uruchomi sie.
+
 Przy pierwszym uruchomieniu program sam utworzy folder `Dokumenty\Nagrody Vivi`
-(w nim `config.json`, `overlay.html` oraz folder `media\` na Twoje GIF-y i dzwieki).
-Mozesz wiec uruchamiac .exe z dowolnego miejsca (Pulpit, Pobrane itp.).
+(w nim `config.json`, `overlay.html` oraz folder `media\` na Twoje GIF-y i dzwieki) -
+to dziala tak samo jak wczesniej, niezaleznie od tego, gdzie polozony jest sam
+folder programu (Pulpit, Pobrane itp.).
 
 ## 4. Pierwsze uruchomienie programu
 
@@ -98,13 +111,13 @@ Patrz punkt 5 powyzej - zaznacz checkbox LAN. Upewnij sie dodatkowo, ze:
 
 ## Pliki w projekcie
 
-- `main.py` - GUI (Tkinter), spina wszystko w calosc
+- `main.py` - GUI (PySide6 + QFluentWidgets), spina wszystko w calosc
 - `twitch_client.py` - logowanie OAuth + polaczenie EventSub (WebSocket)
 - `overlay_server.py` - lokalny serwer HTTP + WebSocket dla nakladki
 - `overlay.html` - strona wyswietlana w OBS jako Browser Source
 - `config.py` / `config.json` - zapis ustawien, tokenow i przypisan nagrod
 - `media/` - tu program kopiuje wgrane przez ciebie GIF-y/dzwieki
-- `build_exe.bat` - budowanie samodzielnego .exe (odpalac na Windowsie)
+- `build_exe.bat` - budowanie samodzielnego programu (folder --onedir, odpalac na Windowsie)
 
 ## Typowe problemy
 
@@ -115,3 +128,6 @@ Patrz punkt 5 powyzej - zaznacz checkbox LAN. Upewnij sie dodatkowo, ze:
 - **GIF/dzwiek sie nie pokazuje w OBS** - sprawdz w logu programu, czy pisze
   "Nakladka podlaczona do WebSocketu" - jesli nie, adres URL w Browser Source
   jest zly albo firewall blokuje polaczenie.
+- **Program nie startuje po przeniesieniu na inny komputer** - upewnij sie, ze
+  przeniosles/wypakowales CALY folder `Nagrody Vivi` (z `_internal\` w srodku),
+  a nie sam plik `.exe`.

@@ -1,11 +1,12 @@
 """
 Ladowanie i zapisywanie konfiguracji programu.
-Config (config.json, media/, overlay.html) trzyma sie w folderze
-Dokumenty/Nagrody Vivi uzytkownika - niezaleznie od tego, gdzie polozony
-jest sam plik .exe.
+Config (config.json, media/, overlay.html, instructions.txt, owo.png) trzyma
+sie w folderze Dokumenty/Shiroe Twitch Alerts uzytkownika - niezaleznie
+od tego, gdzie polozony jest sam plik .exe.
 """
 import json
 import sys
+import shutil
 from pathlib import Path
 
 DEFAULT_CONFIG = {
@@ -20,61 +21,50 @@ DEFAULT_CONFIG = {
     "overlay_http_port": 8766,
     "lan_access": False,
     "default_duration_seconds": 5,
-    # rewards: { "<reward_id>": {"title": "...", "gif": "media/xxx.gif", "sound": "media/xxx.mp3", "duration": 5} }
-    "rewards": {}
+    "rewards": {},
+    "instructions_completed": False,
+    "completed_steps": [],
 }
 
-
 def _documents_dir() -> Path:
-    """Zwraca prawdziwy folder Dokumenty uzytkownika (dziala tez z polskim
-    Windowsem, gdzie widoczna nazwa to "Dokumenty" ale to samo co "Documents")."""
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            from ctypes import wintypes
-            CSIDL_PERSONAL = 5  # Dokumenty / My Documents
-            SHGFP_TYPE_CURRENT = 0
-            buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
-            ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
-            if buf.value:
-                return Path(buf.value)
-        except Exception:
-            pass
+    """Zwraca prawdziwy folder Dokumenty uzytkownika."""
+    # Używamy standardowej biblioteki do znalezienia folderu użytkownika
     return Path.home() / "Documents"
 
-
 def base_dir() -> Path:
-    """Folder z danymi programu: Dokumenty/Nagrody Vivi. Tworzony automatycznie,
-    jesli jeszcze nie istnieje."""
-    d = _documents_dir() / "Nagrody Vivi"
+    """Folder, w ktorym trzymamy dane (config.json, media/ itd.)."""
+    d = _documents_dir() / "Shiroe Twitch Alerts"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
-
 def resource_path(name: str) -> Path:
-    """Sciezka do pliku zaszytego WEWNATRZ .exe (np. overlay.html, icon.png).
-
-    Przy onefile PyInstaller w trakcie startu rozpakowuje takie pliki do
-    tymczasowego folderu sys._MEIPASS. W trybie deweloperskim to po prostu
-    plik obok skryptu.
+    """
+    Pobiera ścieżkę do zasobów:
+    1. W trybie spakowanym (PyInstaller) szuka wewnątrz folderu tymczasowego.
+    2. W trybie developerskim szuka w katalogu ze skryptem.
     """
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         return Path(sys._MEIPASS) / name
     return Path(__file__).parent / name
 
-
 def ensure_bundled_files() -> None:
-    """Przy pierwszym uruchomieniu .exe kopiuje overlay.html/icon.png (zaszyte
-    w exe) obok niego, zeby OverlayServer i ikona okna mialy skad je wziac.
-    Dzieki temu wystarczy wyslac SAM plik .exe - reszta tworzy sie sama."""
+    """
+    Przy pierwszym uruchomieniu .exe kopiuje pliki zaszyte w exe 
+    (overlay.html, icon.png, instructions.txt, owo.png) obok siebie w Dokumentach.
+    """
     if not getattr(sys, "frozen", False):
         return
-    import shutil
+        
     target_dir = base_dir()
-    for name in ("overlay.html", "icon.png"):
+    # Lista wszystkich plików, które muszą zostać wypakowane do Dokumentów
+    files_to_copy = ("overlay.html", "icon.png", "instructions.txt", "owo.png")
+    
+    for name in files_to_copy:
         target = target_dir / name
+        # Jeśli plik już istnieje, nie nadpisujemy go, żeby nie zepsuć ustawień użytkownika
         if target.exists():
             continue
+            
         src = resource_path(name)
         if src.exists():
             try:
@@ -82,16 +72,13 @@ def ensure_bundled_files() -> None:
             except OSError:
                 pass
 
-
 def config_path() -> Path:
     return base_dir() / "config.json"
-
 
 def media_dir() -> Path:
     d = base_dir() / "media"
     d.mkdir(exist_ok=True)
     return d
-
 
 def load_config() -> dict:
     path = config_path()
@@ -103,12 +90,17 @@ def load_config() -> dict:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         data = {}
-    # dopelnij brakujace klucze domyslnymi wartosciami (np. po update programu)
-    merged = dict(DEFAULT_CONFIG)
-    merged.update(data)
-    return merged
+    
+    # Dopełnienie brakujących kluczy domyślnymi wartościami (np. po aktualizacji programu)
+    updated = False
+    for k, v in DEFAULT_CONFIG.items():
+        if k not in data:
+            data[k] = v
+            updated = True
+    if updated:
+        save_config(data)
+    return data
 
-
-def save_config(cfg: dict) -> None:
+def save_config(config_dict: dict) -> None:
     with open(config_path(), "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
+        json.dump(config_dict, f, indent=4, ensure_ascii=False)

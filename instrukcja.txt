@@ -1,0 +1,49 @@
+<flat text><align=center>
+<H2>Twitch Rewards Event Alerts by PanSzczesniak</H2>
+
+<H1>Instrukcja obsługi</H1>
+</align></flat text>
+
+<h2> 1. Rejestracja aplikacji na Twitchu (jednorazowo, kilka minut, bez oczekiwania) </h2>
+
+{checkbox} Wejdź na https://dev.twitch.tv/console/apps <w tym miejscu klikalny link> i zaloguj się swoim kontem Twitcha. /{checkbox}
+{checkbox} Jeśli konto nie ma jeszcze włączonego 2FA - Twitch Cię o to poprosi *(Security and Privacy -> 2FA)*. {/checkbox}
+{checkbox} Kliknij *Register Your Application*. {/checkbox}
+{checkbox} Wypełnij: 
+   - *Name*: dowolna unikalna nazwa, np. `Moje Alerty Nagród {nick}`
+   - *OAuth Redirect URLs*: `http://localhost:3000` (musi być identyczne jak w programie)
+   - *Category*: `Application Integration` {/checkbox}
+{checkbox} 5. Zaznacz captche, kliknij *Create*. {/checkbox}
+{checkbox} 6. Wejdź w *Manage* przy nowo utworzonej appce - zobaczysz *Client ID*. {/checkbox}
+{checkbox} 7. Kliknij *New Secret*, żeby wygenerować *Client Secret* **(pokazuje sie tylko raz - zapisz go)**. {/checkbox}
+
+<H2> 2. Pierwsze uruchomienie programu </H2>
+
+{checkbox}Zakładka *1. Autoryzacja*: wklej Client ID i Client Secret z kroku 1, zostaw Redirect URL jako `http://localhost:3000`, kliknij **Zapisz i autoryzuj w przeglądarce**. {/checkbox}
+{checkbox}Otworzy się przeglądarka z logowaniem Twitcha - zaloguj się i zatwierdź dostęp. Wrócisz do programu z komunikatem "zalogowano jako [twoj login]". {/checkbox}
+{checkbox}Zakładka *2. Nagrody*: kliknij *Odśwież listę nagród z Twitcha* - zobaczysz swoje aktywne nagrody za punkty kanału (musisz miec je juz utworzone w Creator Dashboard<na słowach Creator Dashboard, klikalny odnośnik do https://dashboard.twitch.tv>). {/checkbox}
+{checkbox}Zaznacz nagrodę na liście, wybierz plik GIF i plik dźwiękowy, ustaw czas wyświetlania (w sekundach), kliknij *Zapisz przypisanie*. Powtórz dla każdej nagrody, ktora ma mieć alert. {/checkbox}
+{checkbox}Zakładka *3. Uruchomienie*: 
+   - jeśli OBS jest na TYM SAMYM komputerze co program - zostaw checkbox LAN odznaczony
+   - jeśli OBS jest na INNYM komputerze w tej samej sieci - zaznacz *"Zezwól na dostęp z sieci LAN"*
+   - kliknij *Uruchom* {/checkbox}
+<flat text> Program pokaze adres w stylu `http://192.168.x.x:8766/overlay.html` - to jest adres do wklejenia w OBS. </flat text>
+
+<h2> 3. Konfiguracja OBS </h2>
+
+{checkbox} Dodaj źródło *Browser Source* (źródło przegladarki). {/checkbox}
+{checkbox} W polu *URL* wklej adres pokazany w programie. {/checkbox}
+{checkbox} Ustaw rozdzielczość {/checkbox}
+{checkbox} Zaznacz *"Shutdown source when not visible"* = odznaczone (zeby dzwiek/GIF działał nawet gdy scena akurat nie jest aktywna, w zależnosci od potrzeb). {/checkbox}
+<flat text> Upewnij sie, ze źródło NIE jest wyciszone (Twitch Studio/OBS domyślnie przechwytuje dzwiek z Browser Source do miksera audio).</flat text>
+
+<align=center> [button - gotowe \ po wciśnięciu button znika i pojawia się owo.png]
+
+<flat text> Od tej pory: odpalasz program, klikasz Uruchom, wlaczasz OBS - i dziala.
+
+**Wyjątek: jeśli Twój modem ma zmienne IP, po jego restarcie IP może się zmienić. W tym wypadku w programie dostaniesz zmienione IP, które należy podmienić w źródle w OBS**
+
+
+Wszelki feedback kieruj na priv na DC: viriacci </flat text></align>
+
+*Miłego streamowania Myszeczko <3* </flat text>
