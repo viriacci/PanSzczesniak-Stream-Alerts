@@ -18,7 +18,7 @@ from PySide6.QtCore import Qt, QObject, Signal, QSize
 from PySide6.QtGui import QIcon, QColor
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QFileDialog, QMessageBox, QLineEdit, QSizePolicy, QLabel,
+    QFileDialog, QMessageBox, QLineEdit, QSizePolicy, QLabel, QListWidgetItem,
 )
 from qfluentwidgets import (
     FluentWindow, FluentIcon, NavigationItemPosition,
@@ -247,7 +247,9 @@ class RewardsInterface(QWidget):
         self.rewards_cache = {}
         for r in rewards:
             self.rewards_cache[r["id"]] = r
-            self.rewards_list.addItem(f"{r['title']}  ({r['cost']} pkt)")
+            item = QListWidgetItem(f"{r['title']}  ({r['cost']} pkt)")
+            item.setForeground(QColor("#f2f2f2"))
+            self.rewards_list.addItem(item)
         self.app.bridge.log.emit(f"Pobrano {len(rewards)} nagrod.")
 
     def on_select_reward(self, row: int):
@@ -474,6 +476,21 @@ class MainWindow(FluentWindow):
                              self.height() - self.watermark.height() - margin)
         self.watermark.raise_()
 
+    def closeEvent(self, event):
+        try:
+            if self.engine_running:
+                if self.eventsub_client:
+                    self.eventsub_client.stop()
+                if self.overlay_server:
+                    self.async_loop.run(self.overlay_server.stop()).result(timeout=3)
+        except Exception:
+            pass
+        try:
+            self.async_loop.loop.call_soon_threadsafe(self.async_loop.loop.stop)
+        except Exception:
+            pass
+        super().closeEvent(event)
+
     def _log(self, msg: str):
         self.bridge.log.emit(msg)
 
@@ -568,7 +585,7 @@ def main():
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
     app = QApplication(sys.argv)
-    setTheme(Theme.AUTO)
+    setTheme(Theme.DARK)
     setThemeColor(ACCENT)
 
     window = MainWindow()
