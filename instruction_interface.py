@@ -46,15 +46,15 @@ def _resolve_data_file(name: str) -> Path:
 
 
 def _linkify(escaped: str) -> str:
-    # Podmiana specyficznego opisu Creator Dashboard na link (kolor zmieniony na beżowy akcent Shiroe: #d4b499)
+    # Podmiana specyficznego opisu Creator Dashboard na link (kolor zmieniony na akcent PanSzczesniak: #E3C048)
     escaped = escaped.replace(
         "Creator Dashboard&lt;na słowach Creator Dashboard, klikalny odnośnik do https://dashboard.twitch.tv&gt;",
-        '<a href="https://dashboard.twitch.tv" style="color:#d4b499; text-decoration: none;">Creator Dashboard</a>'
+        '<a href="https://dashboard.twitch.tv" style="color:#E3C048; text-decoration: none;">Creator Dashboard</a>'
     )
     # Podmiana opisu klikalnego linku dla Twitch dev
     escaped = escaped.replace(
         "https://dev.twitch.tv/console/apps &lt;w tym miejscu klikalny link&gt;",
-        '<a href="https://dev.twitch.tv/console/apps" style="color:#d4b499; text-decoration: none;">https://dev.twitch.tv/console/apps</a>'
+        '<a href="https://dev.twitch.tv/console/apps" style="color:#E3C048; text-decoration: none;">https://dev.twitch.tv/console/apps</a>'
     )
 
     def repl(match: "re.Match") -> str:
@@ -63,7 +63,7 @@ def _linkify(escaped: str) -> str:
         if f'href="{url}"' in escaped or f'href="https://{url}"' in escaped:
             return url
         href = url if url.startswith("http") else f"https://{url}"
-        return f'<a href="{href}" style="color:#d4b499; text-decoration: none;">{url}</a>'
+        return f'<a href="{href}" style="color:#E3C048; text-decoration: none;">{url}</a>'
 
     return _URL_RE.sub(repl, escaped)
 
@@ -88,9 +88,9 @@ def _format_line(raw_line: str) -> str:
                     .strip())
     escaped = html.escape(cleaned_line)
     escaped = _BOLD_RE.sub(r"<b>\1</b>", escaped)
-    # Kolor kodu w tle dostosowany do #d4b499
+    # Kolor kodu w tle dostosowany do #E3C048
     escaped = _CODE_RE.sub(
-        r'<code style="background:rgba(255,255,255,0.10); padding:2px 5px; border-radius:4px; color:#d4b499;">\1</code>',
+        r'<code style="background:rgba(255,255,255,0.10); padding:2px 5px; border-radius:4px; color:#E3C048;">\1</code>',
         escaped,
     )
     escaped = _ITALIC_RE.sub(r"<i>\1</i>", escaped)
@@ -172,7 +172,7 @@ class InstructionInterface(QWidget):
 
         lines = text.splitlines()
         items = []
-        
+
         current_mode = "normal"
         current_block = []
         is_centered = False
@@ -189,7 +189,7 @@ class InstructionInterface(QWidget):
 
             if "<align=center>" in stripped:
                 is_centered = True
-            
+
             # Wykrywanie przycisku
             if "[" in stripped and "button" in stripped and "]" in stripped:
                 if current_block:
@@ -205,7 +205,7 @@ class InstructionInterface(QWidget):
             has_cb_end = "{/checkbox}" in stripped
             has_flat_start = "<flat text>" in stripped
             has_flat_end = "</flat text>" in stripped
-            
+
             # Obsluga naglowkow H1 i H2 (zarowno tagi html jak i markdownowe # oraz ##)
             has_h1 = "<H1>" in stripped or "</H1>" in stripped or "<h1>" in stripped or "</h1>" in stripped or (stripped.startswith("#") and not stripped.startswith("##"))
             has_h2 = "<H2>" in stripped or "</H2>" in stripped or "<h2>" in stripped or "</h2>" in stripped or stripped.startswith("##")
@@ -343,7 +343,7 @@ class InstructionInterface(QWidget):
         align_style = "text-align: center;" if centered else "text-align: left;"
         if centered:
             label.setAlignment(Qt.AlignCenter)
-        
+
         label.setText(
             f'<div style="{align_style}"><span style="font-size:18px; font-weight:700; color:#f2f2f2;">{content_html}</span></div>'
         )
@@ -351,7 +351,7 @@ class InstructionInterface(QWidget):
         self.steps_layout.addWidget(label)
 
     def _add_h2_row(self, text: str, centered: bool) -> None:
-        """Podnaglowek (H2). Kolor dostosowany do #d4b499."""
+        """Podnaglowek (H2). Kolor dostosowany do #E3C048."""
         label = self._make_rich_label()
         content_html = _format_line(text)
         align_style = "text-align: center;" if centered else "text-align: left;"
@@ -359,7 +359,7 @@ class InstructionInterface(QWidget):
             label.setAlignment(Qt.AlignCenter)
 
         label.setText(
-            f'<div style="{align_style}"><span style="font-size:15px; font-weight:600; color:#d4b499;">{content_html}</span></div>'
+            f'<div style="{align_style}"><span style="font-size:15px; font-weight:600; color:#E3C048;">{content_html}</span></div>'
         )
         label.setContentsMargins(2, 14, 2, 4)
         self.steps_layout.addWidget(label)
@@ -375,7 +375,7 @@ class InstructionInterface(QWidget):
         for line in text.splitlines():
             if line.strip():
                 formatted_paragraphs.append(f'<div style="{align_style}">{_format_line(line)}</div>')
-        
+
         content_html = "".join(formatted_paragraphs)
         label.setText(
             f'<span style="font-size:13px; color:#f2f2f2; line-height: 1.4;">{content_html}</span>'
@@ -401,12 +401,12 @@ class InstructionInterface(QWidget):
         checkbox.setChecked(done)
 
         label = self._make_rich_label()
-        
+
         formatted_lines = []
         for line in text.splitlines():
             formatted_lines.append(_format_line(line))
         content_html = "<br>".join(formatted_lines)
-        
+
         label.setText(self._styled_html(content_html, done))
 
         checkbox.toggled.connect(
@@ -450,7 +450,7 @@ class InstructionInterface(QWidget):
         btn_layout.addWidget(self.done_button, alignment=alignment)
         btn_layout.addWidget(self.done_image, alignment=alignment)
         btn_layout.addStretch(1)
-        
+
         self.steps_layout.addWidget(container)
 
         # Na starcie, jesli konfiguracja wskazuje na ukonczenie checklisty:

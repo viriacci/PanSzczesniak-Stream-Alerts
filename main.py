@@ -1,8 +1,9 @@
 """
-Nagrody Shiroe - GUI (PySide6 + QFluentWidgets)
+PanSzczesniak Stream Alerts - GUI (PySide6 + QFluentWidgets)
 
-Okno w stylu Windows 11 Fluent (boczna nawigacja, Mica, zaokraglone karty).
-Glowny kolor: #5c4f47, Akcent: #d4b499.
+Okno w stylu Windows 11 Fluent (boczna nawigacja, zaokraglone karty).
+Wersja uniwersalna (personal brand PanSzczesniak): tlo czarne, akcent
+#E3C048, hover #43fbff.
 
 Logika Twitcha (OAuth/EventSub) i lokalnego serwera nakladki jest w osobnych
 plikach (twitch_client.py, overlay_server.py) i nie zostala tu ruszona -
@@ -16,8 +17,8 @@ import threading
 from pathlib import Path
 
 import aiohttp
-from PySide6.QtCore import Qt, QObject, Signal, QTimer
-from PySide6.QtGui import QIcon, QColor
+from PySide6.QtCore import Qt, QObject, Signal, QTimer, QUrl
+from PySide6.QtGui import QIcon, QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QFileDialog, QMessageBox, QLineEdit, QSizePolicy, QLabel, QListWidgetItem,
@@ -36,8 +37,11 @@ import twitch_client as tc
 from overlay_server import OverlayServer
 from instruction_interface import InstructionInterface
 
-# Glowna paleta barw Shiroe
-ACCENT = "#d4b499"
+# --- Branding PanSzczesniak Stream Alerts ---
+APP_NAME = "PanSzczesniak Stream Alerts"
+ACCENT = "#E3C048"
+HOVER_ACCENT = "#43fbff"
+DISCORD_URL = "https://discord.com/users/306526909062447105"
 
 
 def get_lan_ip() -> str:
@@ -50,6 +54,41 @@ def get_lan_ip() -> str:
         return "127.0.0.1"
     finally:
         s.close()
+
+
+class LinkWatermark(QLabel):
+    """Maly klikalny napis w rogu okna, z osobnym kolorem na hover. Uzywa
+    sygnalu QLabel.linkHovered (dziala od razu, bez recznego mouseTracking)
+    do przelaczania koloru miedzy ACCENT a HOVER_ACCENT."""
+
+    def __init__(self, text: str, url: str, normal_color: str, hover_color: str, parent=None):
+        super().__init__(parent)
+        self._text = text
+        self._url = url
+        self._normal_color = normal_color
+        self._hover_color = hover_color
+
+        self.setTextFormat(Qt.RichText)
+        self.setOpenExternalLinks(False)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setStyleSheet("background: transparent;")
+        self._render(self._normal_color)
+
+        self.linkActivated.connect(self._on_activated)
+        self.linkHovered.connect(self._on_hovered)
+
+    def _render(self, color: str) -> None:
+        self.setText(
+            f'<a href="{self._url}" style="color:{color}; text-decoration:none; '
+            f'font-size:11px;">{self._text}</a>'
+        )
+        self.adjustSize()
+
+    def _on_hovered(self, link: str) -> None:
+        self._render(self._hover_color if link else self._normal_color)
+
+    def _on_activated(self, url: str) -> None:
+        QDesktopServices.openUrl(QUrl(url))
 
 
 class AsyncLoopThread:
@@ -434,7 +473,7 @@ class ControlInterface(QWidget):
 
 
 class MainWindow(FluentWindow):
-    WATERMARK_TEXT = "PanSzczesniak Development"
+    WATERMARK_TEXT = "PanSzczesniak"
 
     def __init__(self):
         super().__init__()
@@ -446,18 +485,21 @@ class MainWindow(FluentWindow):
         self.eventsub_client: tc.EventSubClient | None = None
         self.engine_running = False
 
-        self.setWindowTitle("Nagrody Shiroe")
+        self.setWindowTitle(APP_NAME)
         self.resize(880, 640)
         self.setMinimumSize(560, 420)
+
+        # Czarne tlo jest czescia brandingu (uniwersalny produkt wysylany do
+        # roznych osob) - dlatego NIE wlaczamy tu Mica: to przezroczysty,
+        # rozmyty efekt Windows 11, ktory przebija tapeta/motyw pulpitu
+        # kazdego uzytkownika z osobna, wiec zamiast spojnego czarnego tla
+        # kazdy widzialby cos innego. Plaski kolor daje pewny, powtarzalny
+        # wyglad niezaleznie od komputera.
+        self.setStyleSheet("FluentWindow { background-color: #000000; }")
 
         icon_path = cfgmod.base_dir() / "icon.png"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
-
-        try:
-            self.setMicaEffectEnabled(True)
-        except Exception:
-            pass  # dziala tylko na Win11 - na innych systemach po prostu zostaje plaskie tlo
 
         self.setup_interface = SetupInterface(self)
         self.rewards_interface = RewardsInterface(self)
@@ -469,9 +511,9 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.control_interface, FluentIcon.PLAY, "Uruchomienie", NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.instruction_interface, FluentIcon.QUESTION, "Instrukcja (?)", NavigationItemPosition.BOTTOM)
 
-        self.watermark = QLabel(self.WATERMARK_TEXT, self)
-        self.watermark.setStyleSheet("color: rgba(128, 128, 128, 140); font-size: 11px; background: transparent;")
-        self.watermark.adjustSize()
+        self.watermark = LinkWatermark(
+            self.WATERMARK_TEXT, DISCORD_URL, ACCENT, HOVER_ACCENT, self
+        )
         self.watermark.raise_()
 
         self.bridge.log.connect(self._log_stdout)

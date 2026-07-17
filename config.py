@@ -1,8 +1,8 @@
 """
 Ladowanie i zapisywanie konfiguracji programu.
 Config (config.json, media/, overlay.html, instrukcja.txt, owo.png) trzyma
-sie w folderze Dokumenty/Shiroe Twitch Alerts uzytkownika - niezaleznie
-od tego, gdzie polozony jest sam plik .exe.
+sie w folderze Dokumenty/PanSzczesniak Stream Alerts uzytkownika -
+niezaleznie od tego, gdzie polozony jest sam plik .exe.
 """
 import json
 import sys
@@ -26,6 +26,16 @@ DEFAULT_CONFIG = {
     "completed_steps": [],
 }
 
+# Nazwy folderow danych uzywane przez wczesniejsze wersje/rebrandy programu
+# (Nagrody Vivi -> PanSzczesniak Twitch Alerts -> Shiroe Twitch Alerts).
+# Trzymane tu wylacznie do jednorazowej migracji danych - patrz
+# _migrate_legacy_data() nizej.
+_LEGACY_FOLDER_NAMES = (
+    "Shiroe Twitch Alerts",
+    "Nagrody Vivi",
+    "PanSzczesniak Twitch Alerts",
+)
+
 def _documents_dir() -> Path:
     """Zwraca prawdziwy folder Dokumenty uzytkownika (dziala tez gdy jest
     przekierowany np. przez OneDrive Backup - bardzo czeste na Windows)."""
@@ -43,10 +53,45 @@ def _documents_dir() -> Path:
             pass
     return Path.home() / "Documents"
 
+def _migrate_legacy_data(target_dir: Path) -> None:
+    """Jednorazowa migracja danych ze starszych nazw folderu programu (z
+    czasow zanim nazywal sie "PanSzczesniak Stream Alerts"). Dzieki temu
+    ktokolwiek juz z niego korzystal (config.json, media/, autoryzacja
+    Twitcha, przypisania nagrod) nie musi ustawiac wszystkiego od nowa po
+    aktualizacji do nowej wersji/nazwy. Bezpieczne: nic nie robi, jesli w
+    nowym folderze juz jest config.json (np. druga migracja albo zwykle
+    kolejne uruchomienie)."""
+    if (target_dir / "config.json").exists():
+        return
+
+    docs_dir = _documents_dir()
+    candidates = [
+        docs_dir / name for name in _LEGACY_FOLDER_NAMES
+        if (docs_dir / name / "config.json").exists()
+    ]
+    if not candidates:
+        return
+
+    # Jesli istnieje kilka starych folderow (kolejne rebrandy), bierzemy
+    # ten z najnowiej zmienianym config.json - najprawdopodobniej ten,
+    # z ktorego uzytkownik faktycznie korzystal ostatnio.
+    source = max(candidates, key=lambda p: (p / "config.json").stat().st_mtime)
+
+    try:
+        for item in source.iterdir():
+            dest = target_dir / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest, dirs_exist_ok=True)
+            else:
+                shutil.copyfile(item, dest)
+    except OSError:
+        pass  # migracja to "best effort" - w najgorszym razie uzytkownik configuruje od nowa
+
 def base_dir() -> Path:
     """Folder, w ktorym trzymamy dane (config.json, media/ itd.)."""
-    d = _documents_dir() / "Shiroe Twitch Alerts"
+    d = _documents_dir() / "PanSzczesniak Stream Alerts"
     d.mkdir(parents=True, exist_ok=True)
+    _migrate_legacy_data(d)
     return d
 
 def resource_path(name: str) -> Path:
