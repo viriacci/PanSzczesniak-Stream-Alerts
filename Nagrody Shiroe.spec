@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('overlay.html', '.'), ('icon.png', '.'), ('instructions.txt', '.'), ('owo.png', '.')]
+datas = [('overlay.html', '.'), ('icon.png', '.'), ('instrukcja.txt', '.'), ('instructions.txt', '.'), ('owo.png', '.')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('qfluentwidgets')

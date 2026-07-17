@@ -1,6 +1,6 @@
 """
 Ladowanie i zapisywanie konfiguracji programu.
-Config (config.json, media/, overlay.html, instructions.txt, owo.png) trzyma
+Config (config.json, media/, overlay.html, instrukcja.txt, owo.png) trzyma
 sie w folderze Dokumenty/Shiroe Twitch Alerts uzytkownika - niezaleznie
 od tego, gdzie polozony jest sam plik .exe.
 """
@@ -27,8 +27,20 @@ DEFAULT_CONFIG = {
 }
 
 def _documents_dir() -> Path:
-    """Zwraca prawdziwy folder Dokumenty uzytkownika."""
-    # Używamy standardowej biblioteki do znalezienia folderu użytkownika
+    """Zwraca prawdziwy folder Dokumenty uzytkownika (dziala tez gdy jest
+    przekierowany np. przez OneDrive Backup - bardzo czeste na Windows)."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            CSIDL_PERSONAL = 5  # Dokumenty / My Documents
+            SHGFP_TYPE_CURRENT = 0
+            buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+            ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
+            if buf.value:
+                return Path(buf.value)
+        except Exception:
+            pass
     return Path.home() / "Documents"
 
 def base_dir() -> Path:
@@ -49,22 +61,26 @@ def resource_path(name: str) -> Path:
 
 def ensure_bundled_files() -> None:
     """
-    Przy pierwszym uruchomieniu .exe kopiuje pliki zaszyte w exe 
-    (overlay.html, icon.png, instructions.txt, owo.png) obok siebie w Dokumentach.
+    Przy pierwszym uruchomieniu .exe kopiuje pliki zaszyte w exe
+    (overlay.html, icon.png, instrukcja.txt, instructions.txt, owo.png)
+    obok siebie w Dokumentach.
     """
     if not getattr(sys, "frozen", False):
         return
-        
+
     target_dir = base_dir()
-    # Lista wszystkich plików, które muszą zostać wypakowane do Dokumentów
-    files_to_copy = ("overlay.html", "icon.png", "instructions.txt", "owo.png")
-    
+    # Lista wszystkich plików, które muszą zostać wypakowane do Dokumentów.
+    # UWAGA: "instrukcja.txt" to aktualny format tresci zakladki Instrukcja
+    # (z tagami {checkbox}/<H1>/<H2>); "instructions.txt" zostaje jako
+    # zapasowy fallback dla starszego, prostszego formatu.
+    files_to_copy = ("overlay.html", "icon.png", "instrukcja.txt", "instructions.txt", "owo.png")
+
     for name in files_to_copy:
         target = target_dir / name
         # Jeśli plik już istnieje, nie nadpisujemy go, żeby nie zepsuć ustawień użytkownika
         if target.exists():
             continue
-            
+
         src = resource_path(name)
         if src.exists():
             try:
@@ -90,7 +106,7 @@ def load_config() -> dict:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         data = {}
-    
+
     # Dopełnienie brakujących kluczy domyślnymi wartościami (np. po aktualizacji programu)
     updated = False
     for k, v in DEFAULT_CONFIG.items():
