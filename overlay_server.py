@@ -1,7 +1,8 @@
 """
 Lokalny serwer dla nakladki (overlay) w OBS:
 - HTTP: serwuje overlay.html i pliki z folderu media/ (zeby OBS Browser Source mogl je wczytac)
-- WebSocket: broadcastuje info "pokaz GIF X + zagraj dzwiek Y" do wszystkich podlaczonych nakladek
+- WebSocket: broadcastuje info "pokaz GIF X + zagraj dzwiek Y, z takim layoutem" do
+  wszystkich podlaczonych nakladek
 """
 import asyncio
 import json
@@ -67,7 +68,25 @@ class OverlayServer:
         content_type, _ = mimetypes.guess_type(str(path))
         return web.FileResponse(path, headers={"Content-Type": content_type or "application/octet-stream"})
 
-    async def broadcast_redemption(self, gif_url: str, sound_url: str, duration: float, title: str, user_name: str = ""):
+    async def broadcast_redemption(
+        self,
+        gif_url: str,
+        sound_url: str,
+        duration: float,
+        variables: dict,
+        layout: dict | None = None,
+    ):
+        """Wysyla alert do wszystkich podlaczonych nakladek.
+
+        `variables` to slownik tokenow do podstawienia w szablonie tekstu
+        (layout["text_template"], np. "{user} odbiera {reward}") - rozne
+        typy alertow maja rozne tokeny, np. redemption: user+reward,
+        raid: user+viewers, sub: user+months+tier.
+
+        `layout` to slownik z pozycjami/rozmiarami/kolorami/obrysem/fontem/
+        animacja z edytora wizualnego (patrz config["layouts"][alert_type]
+        w config.py) - jesli brak (None), nakladka uzyje wbudowanych
+        wartosci domyslnych (patrz overlay.html)."""
         if not self._clients:
             self.log("Uwaga: nikt nie jest podlaczony do nakladki (dodaj Browser Source w OBS).")
             return
@@ -76,8 +95,8 @@ class OverlayServer:
             "gif": gif_url,
             "sound": sound_url,
             "duration": duration,
-            "title": title,
-            "user": user_name,
+            "variables": variables,
+            "layout": layout,
         })
         stale = set()
         for ws in self._clients:

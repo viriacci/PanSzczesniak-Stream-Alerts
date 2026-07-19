@@ -26,16 +26,37 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     FluentWindow, FluentIcon, NavigationItemPosition,
     setTheme, Theme, setThemeColor,
-    LineEdit, PrimaryPushButton, PushButton, CheckBox,
+    LineEdit, PrimaryPushButton, PushButton, CheckBox, ComboBox,
     ListWidget, TextEdit, BodyLabel, CaptionLabel, SubtitleLabel,
     CardWidget, InfoBar, InfoBarPosition,
-    TeachingTip, TeachingTipTailPosition,
+    TeachingTip, TeachingTipTailPosition, MessageBox,
 )
 
 import config as cfgmod
 import twitch_client as tc
 from overlay_server import OverlayServer
 from instruction_interface import InstructionInterface
+from alerts_interface import AlertsInterface
+from layout_editor import LayoutEditorWindow
+
+
+def _safe_fluent_icon(name: str, fallback):
+    """Zwraca FluentIcon.<name>, a jesli taka ikona nie istnieje w danej
+    wersji qfluentwidgets - bezpieczny fallback zamiast crashu programu przy
+    starcie (nie mam mozliwosci przetestowac na zywo kazdej wersji biblioteki)."""
+    return getattr(FluentIcon, name, fallback)
+
+
+def _show_message(parent, title: str, content: str, show_cancel: bool = False) -> bool:
+    """Motywowany odpowiednik QMessageBox - zwykly QMessageBox dziedziczy
+    czarne tlo z globalnego motywu programu, ale NIE dostaje jasnego koloru
+    tekstu (bo to nie jest komponent qfluentwidgets), przez co wyglada jak
+    czarny prostokat bez zadnego tekstu. MessageBox z qfluentwidgets jest
+    poprawnie ostylowany. Zwraca True jesli klikniemy przycisk "OK"/"Tak"."""
+    box = MessageBox(title, content, parent)
+    if not show_cancel:
+        box.cancelButton.hide()
+    return bool(box.exec())
 
 # --- Branding PanSzczesniak Stream Alerts ---
 APP_NAME = "PanSzczesniak Stream Alerts"
@@ -121,11 +142,44 @@ class Bridge(QObject):
     error = Signal(str, str)                 # tytul, tresc
 
 
+class _AuthStatusCard(QWidget):
+    """Ramka statusu logowania - czerwony obrys gdy niezalogowano, zielony
+    gdy zalogowano. Uzywa WA_StyledBackground (jak _DraggableBox w
+    edytorze), bo to jedyny pewny sposob, zeby zwykly QWidget respektowal
+    background-color/border ze stylesheet."""
+
+    def __init__(self):
+        super().__init__()
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setMinimumWidth(220)
+        inner = QVBoxLayout(self)
+        inner.setContentsMargins(18, 16, 18, 16)
+        inner.setSpacing(6)
+        title = BodyLabel("Status logowania")
+        title.setStyleSheet("font-weight: 600; color: #f2f2f2; background: transparent; border: none;")
+        inner.addWidget(title)
+        self.text_label = BodyLabel("Nie zalogowano")
+        self.text_label.setWordWrap(True)
+        self.text_label.setStyleSheet("color: #f2f2f2; background: transparent; border: none;")
+        inner.addWidget(self.text_label)
+        inner.addStretch(1)
+        self.set_status(False, "Nie zalogowano")
+
+    def set_status(self, ok: bool, text: str) -> None:
+        self.text_label.setText(text)
+        color = "#3fbf5f" if ok else "#e0524d"
+        self.setStyleSheet(
+            f"background-color: rgba(255, 255, 255, 0.04); "
+            f"border: 2px solid {color}; border-radius: 8px;"
+        )
+
+
 class SetupInterface(QWidget):
     def __init__(self, app: "MainWindow"):
         super().__init__()
         self.setObjectName("SetupInterface")
         self.app = app
+        self.setStyleSheet("background: transparent;")
         cfg = app.cfg
 
         layout = QVBoxLayout(self)
@@ -133,6 +187,12 @@ class SetupInterface(QWidget):
         layout.setSpacing(16)
 
         layout.addWidget(SubtitleLabel("Autoryzacja"))
+
+        body_row = QHBoxLayout()
+        body_row.setSpacing(20)
+
+        left_col = QVBoxLayout()
+        left_col.setSpacing(16)
 
         card = CardWidget()
         form = QFormLayout(card)
@@ -153,40 +213,42 @@ class SetupInterface(QWidget):
 
         self.redirect_uri_edit = LineEdit()
         self.redirect_uri_edit.setText(cfg.get("redirect_uri", "http://localhost:3000"))
-        form.addRow(BodyLabel("OAuth Redirect URI:"), self.redirect_uri_edit)
+        form.addRow(BodyLabel("OAuth Redirect URL:"), self.redirect_uri_edit)
 
-        layout.addWidget(card)
+        left_col.addWidget(card)
 
         info = CaptionLabel(
-            "Redirect URI musi byc dokladnie taki sam jak w ustawieniach aplikacji "
+            "Redirect URL musi byc dokladnie taki sam jak w ustawieniach aplikacji "
             "na dev.twitch.tv/console (np. http://localhost:3000)."
         )
         info.setWordWrap(True)
-        layout.addWidget(info)
+        left_col.addWidget(info)
 
         self.authorize_button = PrimaryPushButton(FluentIcon.LINK, "Zapisz i autoryzuj w przegladarce")
         self.authorize_button.clicked.connect(self.on_authorize)
-        layout.addWidget(self.authorize_button, alignment=Qt.AlignLeft)
+        left_col.addWidget(self.authorize_button, alignment=Qt.AlignLeft)
+        left_col.addStretch(1)
 
-        self.status_label = BodyLabel("Status: nie zalogowano")
-        self.status_label.setWordWrap(True)
-        layout.addWidget(self.status_label)
+        body_row.addLayout(left_col, 2)
+
+        self.status_card = _AuthStatusCard()
         if cfg.get("access_token"):
-            self.status_label.setText(f"Status: zalogowano jako {cfg.get('broadcaster_login', '?')}")
+            self.status_card.set_status(True, f"Zalogowano jako {cfg.get('broadcaster_login', '?')}")
+        body_row.addWidget(self.status_card, 1, alignment=Qt.AlignTop)
 
-        layout.addStretch(1)
+        layout.addLayout(body_row, 1)
 
         app.bridge.auth_status.connect(self.on_auth_status)
 
-    def on_auth_status(self, text: str, _ok: bool):
-        self.status_label.setText(text)
+    def on_auth_status(self, text: str, ok: bool):
+        self.status_card.set_status(ok, text)
 
     def on_authorize(self):
         client_id = self.client_id_edit.text().strip()
         client_secret = self.client_secret_edit.text().strip()
         redirect_uri = self.redirect_uri_edit.text().strip()
         if not client_id or not client_secret:
-            QMessageBox.critical(self, "Brak danych", "Podaj Client ID i Client Secret.")
+            _show_message(self, "Brak danych", "Podaj Client ID i Client Secret.")
             return
 
         self.app.cfg["client_id"] = client_id
@@ -204,6 +266,7 @@ class RewardsInterface(QWidget):
         super().__init__()
         self.setObjectName("RewardsInterface")
         self.app = app
+        self.setStyleSheet("background: transparent;")
         self.rewards_cache = {}
         self.selected_reward_id = None
         self.selected_gif_path = ""
@@ -267,7 +330,7 @@ class RewardsInterface(QWidget):
     def on_fetch_rewards(self):
         cfg = self.app.cfg
         if not cfg.get("access_token") or not cfg.get("broadcaster_id"):
-            QMessageBox.critical(self, "Brak autoryzacji", "Najpierw autoryzuj sie w zakladce Autoryzacja.")
+            _show_message(self, "Brak autoryzacji", "Najpierw autoryzuj sie w zakladce Autoryzacja.")
             return
         threading.Thread(target=self._fetch_rewards_thread, daemon=True).start()
 
@@ -325,7 +388,7 @@ class RewardsInterface(QWidget):
 
     def on_save_mapping(self):
         if not self.selected_reward_id:
-            QMessageBox.critical(self, "Brak wyboru", "Zaznacz nagrode z listy.")
+            _show_message(self, "Brak wyboru", "Zaznacz nagrode z listy.")
             return
         try:
             duration = float(self.duration_edit.text())
@@ -366,6 +429,7 @@ class ControlInterface(QWidget):
         super().__init__()
         self.setObjectName("ControlInterface")
         self.app = app
+        self.setStyleSheet("background: transparent;")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -431,14 +495,15 @@ class ControlInterface(QWidget):
         if app.engine_running:
             return
         if not cfg.get("access_token") or not cfg.get("broadcaster_id"):
-            QMessageBox.critical(self, "Brak autoryzacji", "Najpierw autoryzuj sie w zakladce Autoryzacja.")
+            _show_message(self, "Brak autoryzacji", "Najpierw autoryzuj sie w zakladce Autoryzacja.")
             return
         if not cfg["rewards"]:
-            reply = QMessageBox.question(
+            proceed = _show_message(
                 self, "Brak przypisan",
                 "Nie przypisales GIF/dzwiekow do zadnej nagrody. Uruchomic mimo to?",
+                show_cancel=True,
             )
-            if reply != QMessageBox.Yes:
+            if not proceed:
                 return
 
         cfg["lan_access"] = self.lan_checkbox.isChecked()
@@ -453,6 +518,7 @@ class ControlInterface(QWidget):
         url = f"http://{host_for_obs}:{cfg['overlay_http_port']}/overlay.html"
         self.url_edit.setText(url)
         self.status_label.setText("Status silnika: dziala")
+        self.app.bridge.engine_status.emit(True, url)
 
     def on_stop(self):
         app = self.app
@@ -467,9 +533,73 @@ class ControlInterface(QWidget):
         self.stop_button.setEnabled(False)
         self.status_label.setText("Status silnika: zatrzymany")
         self.app.bridge.log.emit("Zatrzymano silnik.")
+        self.app.bridge.engine_status.emit(False, "")
 
     def on_engine_status(self, running: bool, _url: str):
         pass
+
+
+class _TitleBarQuickActions(QWidget):
+    """Kompaktowe przyciski przypiete do PASKA TYTULU okna (nie nad trescia
+    zakladek) - dzieki temu strukturalnie nie moga nigdy nic zaslonic,
+    niezaleznie od tego, co akurat pokazuje dana zakladka. Testowy alert
+    wysyla zawsze typ 'redemption' (najprostszy, zawsze dostepny wariant) -
+    jesli potrzebujesz przetestowac inny typ, sluzy do tego przycisk
+    'Wyslij testowy alert' wewnatrz Edytora wygladu (tam jest wybor typu)."""
+
+    def __init__(self, app: "MainWindow", parent=None):
+        super().__init__(parent)
+        self.app = app
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet("background: transparent;")
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+
+        self.test_button = PushButton(_safe_fluent_icon("SEND", FluentIcon.COPY), "Testowy alert")
+        self.test_button.clicked.connect(self.on_send_test)
+        row.addWidget(self.test_button)
+
+        self.dot = BodyLabel("")
+        self.dot.setFixedSize(10, 10)
+        row.addWidget(self.dot)
+
+        self.toggle_button = PrimaryPushButton("Uruchom")
+        self.toggle_button.clicked.connect(self.on_toggle)
+        row.addWidget(self.toggle_button)
+
+        self._set_dot(False)
+        self.adjustSize()
+
+    def _set_dot(self, running: bool) -> None:
+        color = "#3fbf5f" if running else "#e0524d"
+        self.dot.setStyleSheet(f"background-color: {color}; border-radius: 5px;")
+
+    def on_engine_status(self, running: bool, _url: str = "") -> None:
+        self._set_dot(running)
+        self.toggle_button.setText("Zatrzymaj" if running else "Uruchom")
+        self.adjustSize()
+
+    def on_toggle(self) -> None:
+        if self.app.engine_running:
+            self.app.control_interface.on_stop()
+        else:
+            self.app.control_interface.on_start()
+
+    def on_send_test(self) -> None:
+        ok = self.app.send_test_alert("redemption")
+        if ok:
+            InfoBar.info(
+                "Wyslano", "Testowy alert wyslany do nakladki.",
+                parent=self.app, position=InfoBarPosition.TOP, duration=2000,
+            )
+        else:
+            InfoBar.warning(
+                "Silnik nie dziala",
+                "Uruchom silnik (przycisk 'Uruchom' obok), zeby wyslac testowy alert.",
+                parent=self.app, position=InfoBarPosition.TOP, duration=3500,
+            )
 
 
 class MainWindow(FluentWindow):
@@ -503,13 +633,44 @@ class MainWindow(FluentWindow):
 
         self.setup_interface = SetupInterface(self)
         self.rewards_interface = RewardsInterface(self)
+        self.alerts_interface = AlertsInterface(self)
         self.control_interface = ControlInterface(self)
         self.instruction_interface = InstructionInterface(self)
 
         self.addSubInterface(self.setup_interface, FluentIcon.CERTIFICATE, "Autoryzacja")
         self.addSubInterface(self.rewards_interface, FluentIcon.GAME, "Nagrody")
+        self.addSubInterface(self.alerts_interface, _safe_fluent_icon("RINGER", FluentIcon.GAME), "Alerty")
+
+        # Edytor wygladu to OSOBNE okno (nie zakladka) - ten wpis w nawigacji
+        # nie przelacza tresci, tylko otwiera/podnosi to okno (selectable=False).
+        # Zyje w GORNEJ grupie, od razu pod Alertami.
+        self._layout_editor_window = None
+        self.navigationInterface.addItem(
+            routeKey="layout_editor",
+            icon=_safe_fluent_icon("PALETTE", FluentIcon.SETTING),
+            text="Edytor wygladu",
+            onClick=self.open_layout_editor,
+            selectable=False,
+            position=NavigationItemPosition.TOP,
+        )
+
         self.addSubInterface(self.control_interface, FluentIcon.PLAY, "Uruchomienie", NavigationItemPosition.BOTTOM)
         self.addSubInterface(self.instruction_interface, FluentIcon.QUESTION, "Instrukcja (?)", NavigationItemPosition.BOTTOM)
+
+        # Testowy alert i Uruchom/Zatrzymaj silnik NIE sa w nawigacji ani w
+        # zadnej zakladce - to male przyciski przypiete do PASKA TYTULU okna
+        # (patrz _TitleBarQuickActions), zeby byly dostepne wszedzie i zeby
+        # strukturalnie nie mogly nigdy zaslonic zadnej tresci zakladki.
+        # Zabezpieczone try/except: jesli self.titleBar z jakiegos powodu nie
+        # istnieje w tej wersji biblioteki, program i tak wystartuje (bez
+        # tych przyciskow) zamiast sie calkiem wywalic.
+        self.title_bar_actions = None
+        try:
+            self.title_bar_actions = _TitleBarQuickActions(self, parent=self.titleBar)
+            self.bridge.engine_status.connect(self.title_bar_actions.on_engine_status)
+            self.title_bar_actions.raise_()
+        except Exception:
+            self.title_bar_actions = None
 
         self.watermark = LinkWatermark(
             self.WATERMARK_TEXT, DISCORD_URL, ACCENT, HOVER_ACCENT, self
@@ -517,7 +678,7 @@ class MainWindow(FluentWindow):
         self.watermark.raise_()
 
         self.bridge.log.connect(self._log_stdout)
-        self.bridge.error.connect(lambda title, msg: QMessageBox.critical(self, title, msg))
+        self.bridge.error.connect(lambda title, msg: _show_message(self, title, msg))
 
         self._log(f"Config: {cfgmod.config_path()}")
         if self.cfg.get("access_token") and self.cfg.get("broadcaster_id"):
@@ -558,6 +719,22 @@ class MainWindow(FluentWindow):
                              self.height() - self.watermark.height() - margin)
         self.watermark.raise_()
 
+        # Przyciski w pasku tytulu - pozycjonowane wzgledem SZEROKOSCI PASKA
+        # TYTULU (nie calego okna, choc zwykle to ta sama wartosc), z
+        # rezerwa na systemowe przyciski minimalizuj/maksymalizuj/zamknij
+        # (zazwyczaj ok. 3x46px), zeby na pewno ich nie zaslonic.
+        if getattr(self, "title_bar_actions", None) is not None:
+            try:
+                reserve_right = 170
+                bar_width = self.titleBar.width()
+                bar_height = self.titleBar.height()
+                y = max((bar_height - self.title_bar_actions.height()) // 2, 0)
+                x = max(bar_width - reserve_right - self.title_bar_actions.width(), 0)
+                self.title_bar_actions.move(x, y)
+                self.title_bar_actions.raise_()
+            except Exception:
+                pass
+
     def closeEvent(self, event):
         try:
             if self.engine_running:
@@ -571,7 +748,29 @@ class MainWindow(FluentWindow):
             self.async_loop.loop.call_soon_threadsafe(self.async_loop.loop.stop)
         except Exception:
             pass
+        try:
+            if self._layout_editor_window is not None:
+                self._layout_editor_window.close()
+        except Exception:
+            pass
         super().closeEvent(event)
+
+    def open_layout_editor(self):
+        """Otwiera osobne okno edytora wygladu (albo podnosi juz otwarte -
+        trzymamy jedna instancje, zeby nie mnozyc okien przy kazdym kliknieciu).
+        Opakowane w try/except: gdyby konstrukcja okna sie nie powiodla,
+        uzytkownik dostaje WIDOCZNY komunikat bledu zamiast ciszy (klikniecie
+        ktore nic nie robi jest najgorszym mozliwym efektem - nie wiadomo
+        wtedy nawet, czy program to zauwazyl)."""
+        try:
+            if self._layout_editor_window is None:
+                self._layout_editor_window = LayoutEditorWindow(self)
+            self._layout_editor_window.show()
+            self._layout_editor_window.raise_()
+            self._layout_editor_window.activateWindow()
+        except Exception as e:
+            self._layout_editor_window = None
+            _show_message(self, "Nie udalo sie otworzyc edytora", f"Blad: {e}")
 
     def _log(self, msg: str):
         self.bridge.log.emit(msg)
@@ -601,7 +800,7 @@ class MainWindow(FluentWindow):
             cfgmod.save_config(self.cfg)
 
             self._log(f"Zalogowano jako {user['login']}.")
-            self.bridge.auth_status.emit(f"Status: zalogowano jako {user['login']}", True)
+            self.bridge.auth_status.emit(f"Zalogowano jako {user['login']}", True)
         except Exception as e:
             self._log(f"Blad autoryzacji: {e}")
             self.bridge.error.emit("Blad autoryzacji", str(e))
@@ -634,19 +833,44 @@ class MainWindow(FluentWindow):
         )
         await self.overlay_server.start()
 
-        def handle_redemption(reward_id, reward_title, user_name):
-            self._log(f"Odebrano nagrode: {reward_title} (od {user_name})")
-            mapping = self.cfg["rewards"].get(reward_id)
-            if not mapping:
-                self._log(f"(brak przypisanego GIF/dzwieku dla '{reward_title}' - pomijam)")
-                return
+        # Etykiety uzywane w logu (odpowiednik nazwy nagrody, ale dla
+        # eventow ktore nie maja wlasnej nazwy z Twitcha)
+        alert_labels = {
+            "raid": "Raid",
+            "follow": "Nowy follow",
+            "sub": "Nowa subskrypcja",
+            "prime_sub": "Subskrypcja Prime",
+            "bits": "Bity (Cheer)",
+        }
+
+        def handle_alert(alert_type: str, user_name: str, extra: dict):
+            if alert_type == "redemption":
+                reward_id = extra["reward_id"]
+                reward_title = extra["reward_title"]
+                self._log(f"Odebrano nagrode: {reward_title} (od {user_name})")
+                mapping = self.cfg["rewards"].get(reward_id)
+                if not mapping:
+                    self._log(f"(brak przypisanego GIF/dzwieku dla '{reward_title}' - pomijam)")
+                    return
+                variables = {"user": user_name, "reward": reward_title}
+            else:
+                label = alert_labels.get(alert_type, alert_type)
+                self._log(f"{label} (od {user_name})")
+                mapping = self.cfg.get("alerts", {}).get(alert_type)
+                if not mapping or not mapping.get("enabled"):
+                    self._log(f"(alert '{alert_type}' wylaczony lub brak przypisania - pomijam)")
+                    return
+                variables = {"user": user_name, **{k: str(v) for k, v in extra.items()}}
+
+            layout = self.cfg.get("layouts", {}).get(alert_type, {})
+
             asyncio.run_coroutine_threadsafe(
                 self.overlay_server.broadcast_redemption(
                     gif_url=mapping.get("gif_url", ""),
                     sound_url=mapping.get("sound_url", ""),
                     duration=mapping.get("duration", 5),
-                    title=reward_title,
-                    user_name=user_name,
+                    variables=variables,
+                    layout=layout,
                 ),
                 self.async_loop.loop,
             )
@@ -655,11 +879,53 @@ class MainWindow(FluentWindow):
             client_id=self.cfg["client_id"],
             get_access_token=self.get_valid_access_token,
             broadcaster_id=self.cfg["broadcaster_id"],
-            on_redemption=handle_redemption,
+            on_alert=handle_alert,
             on_status=lambda s: self._log(f"[Twitch] {s}"),
             log=self._log,
         )
         asyncio.ensure_future(self.eventsub_client.run_forever(), loop=self.async_loop.loop)
+
+    # ---------------------------------------------------------- testowy alert
+
+    def send_test_alert(self, alert_key: str) -> bool:
+        """Wysyla testowy alert do dzialajacej nakladki - uzywane zarowno
+        przez przycisk w zakladce Uruchomienie, jak i przez okno edytora
+        wygladu. Zwraca False (bez wyjatku) jesli silnik nie dziala, zeby
+        wywolujacy mogl po prostu pokazac komunikat zamiast sie wywalic."""
+        if not self.engine_running or not self.overlay_server:
+            return False
+
+        layout = self.cfg.get("layouts", {}).get(alert_key, {})
+
+        if alert_key == "redemption":
+            sample = next(iter(self.cfg.get("rewards", {}).values()), {})
+            variables = {"user": "TestowyWidz", "reward": sample.get("title", "Testowa nagroda")}
+        else:
+            sample = self.cfg.get("alerts", {}).get(alert_key, {})
+            variables = {"user": "TestowyWidz"}
+            if alert_key == "raid":
+                variables["viewers"] = "42"
+            elif alert_key in ("sub", "prime_sub"):
+                variables["months"] = "3"
+                variables["tier"] = "1000"
+            elif alert_key == "bits":
+                variables["bits"] = "100"
+                variables["message"] = "Testowa wiadomosc"
+
+        duration = max(layout.get("anim_duration_ms", 600) / 1000 + 2, 4)
+
+        self.async_loop.run(
+            self.overlay_server.broadcast_redemption(
+                gif_url=sample.get("gif_url", ""),
+                sound_url=sample.get("sound_url", ""),
+                duration=duration,
+                variables=variables,
+                layout=layout,
+            )
+        )
+        return True
+
+
 
 
 def main():

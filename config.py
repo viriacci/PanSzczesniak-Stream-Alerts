@@ -24,6 +24,83 @@ DEFAULT_CONFIG = {
     "rewards": {},
     "instructions_completed": False,
     "completed_steps": [],
+    # alerty inne niz nagrody za punkty kanalu - kazdy typ ma jedno, stale
+    # przypisanie (nie liste do wyboru jak rewards), bo Twitch nie daje
+    # listy "dostepnych raidow/followow" do pobrania z API
+    "alerts": {
+        "raid": {"enabled": False, "gif_source": "", "sound_source": "", "gif_url": "", "sound_url": "", "duration": 5},
+        "follow": {"enabled": False, "gif_source": "", "sound_source": "", "gif_url": "", "sound_url": "", "duration": 5},
+        "sub": {"enabled": False, "gif_source": "", "sound_source": "", "gif_url": "", "sound_url": "", "duration": 5},
+        "prime_sub": {"enabled": False, "gif_source": "", "sound_source": "", "gif_url": "", "sound_url": "", "duration": 5},
+        "bits": {"enabled": False, "gif_source": "", "sound_source": "", "gif_url": "", "sound_url": "", "duration": 5},
+    },
+    # layouty (wyglad) dla edytora wizualnego - kazdy typ alertu ma wlasny,
+    # niezalezny wyglad. Pozycje/rozmiary w procentach kanwy nakladki (0-100),
+    # x/y to SRODEK elementu (latwiejsze do przeciagania niz rog).
+    # text_template: wzor tresci "tabelki" - dostepne tokeny zaleza od typu
+    # alertu, patrz ALERT_VARIABLES w layout_editor.py (np. {user}, {reward}).
+    "layouts": {
+        "redemption": {
+            "image": {"x": 50, "y": 38, "width": 30, "height": 40,
+                      "border_width": 0, "border_color": "#000000", "border_style": "none"},
+            "caption": {"x": 50, "y": 68, "width": 40, "height": 10,
+                        "font_size": 32, "font_family": "Amatic SC", "font_color": "#ffffff",
+                        "bg_color": "#843935", "bg_opacity": 90,
+                        "border_width": 3, "border_color": "#000000", "border_style": "solid"},
+            "text_template": "{user} odbiera {reward}",
+            "anim_in": "fade", "anim_out": "fade", "anim_duration_ms": 600,
+        },
+        "raid": {
+            "image": {"x": 50, "y": 38, "width": 30, "height": 40,
+                      "border_width": 0, "border_color": "#000000", "border_style": "none"},
+            "caption": {"x": 50, "y": 68, "width": 40, "height": 10,
+                        "font_size": 32, "font_family": "Amatic SC", "font_color": "#ffffff",
+                        "bg_color": "#843935", "bg_opacity": 90,
+                        "border_width": 3, "border_color": "#000000", "border_style": "solid"},
+            "text_template": "{user} najechal z {viewers} widzami!",
+            "anim_in": "fade", "anim_out": "fade", "anim_duration_ms": 600,
+        },
+        "follow": {
+            "image": {"x": 50, "y": 38, "width": 30, "height": 40,
+                      "border_width": 0, "border_color": "#000000", "border_style": "none"},
+            "caption": {"x": 50, "y": 68, "width": 40, "height": 10,
+                        "font_size": 32, "font_family": "Amatic SC", "font_color": "#ffffff",
+                        "bg_color": "#843935", "bg_opacity": 90,
+                        "border_width": 3, "border_color": "#000000", "border_style": "solid"},
+            "text_template": "{user} zaczyna Cie sledzic!",
+            "anim_in": "fade", "anim_out": "fade", "anim_duration_ms": 600,
+        },
+        "sub": {
+            "image": {"x": 50, "y": 38, "width": 30, "height": 40,
+                      "border_width": 0, "border_color": "#000000", "border_style": "none"},
+            "caption": {"x": 50, "y": 68, "width": 40, "height": 10,
+                        "font_size": 32, "font_family": "Amatic SC", "font_color": "#ffffff",
+                        "bg_color": "#843935", "bg_opacity": 90,
+                        "border_width": 3, "border_color": "#000000", "border_style": "solid"},
+            "text_template": "{user} zasubskrybowal!",
+            "anim_in": "fade", "anim_out": "fade", "anim_duration_ms": 600,
+        },
+        "prime_sub": {
+            "image": {"x": 50, "y": 38, "width": 30, "height": 40,
+                      "border_width": 0, "border_color": "#000000", "border_style": "none"},
+            "caption": {"x": 50, "y": 68, "width": 40, "height": 10,
+                        "font_size": 32, "font_family": "Amatic SC", "font_color": "#ffffff",
+                        "bg_color": "#843935", "bg_opacity": 90,
+                        "border_width": 3, "border_color": "#000000", "border_style": "solid"},
+            "text_template": "{user} zasubskrybowal z Prime!",
+            "anim_in": "fade", "anim_out": "fade", "anim_duration_ms": 600,
+        },
+        "bits": {
+            "image": {"x": 50, "y": 38, "width": 30, "height": 40,
+                      "border_width": 0, "border_color": "#000000", "border_style": "none"},
+            "caption": {"x": 50, "y": 68, "width": 40, "height": 10,
+                        "font_size": 32, "font_family": "Amatic SC", "font_color": "#ffffff",
+                        "bg_color": "#843935", "bg_opacity": 90,
+                        "border_width": 3, "border_color": "#000000", "border_style": "solid"},
+            "text_template": "{user} rzucil {bits} bitsow!",
+            "anim_in": "fade", "anim_out": "fade", "anim_duration_ms": 600,
+        },
+    },
 }
 
 # Nazwy folderow danych uzywane przez wczesniejsze wersje/rebrandy programu
@@ -108,7 +185,11 @@ def ensure_bundled_files() -> None:
     """
     Przy pierwszym uruchomieniu .exe kopiuje pliki zaszyte w exe
     (overlay.html, icon.png, instrukcja.txt, instructions.txt, owo.png)
-    obok siebie w Dokumentach.
+    obok siebie w Dokumentach. Zapisuje tez startup_log.txt z informacja co
+    sie udalo/nie udalo skopiowac - przydatne do diagnozowania problemow na
+    komputerach, do ktorych nie mamy bezposredniego dostepu (np. zniknal
+    checkbox w zakladce Instrukcja - ten log pokaze, czy to dlatego, ze
+    instrukcja.txt w ogole nie byla w paczce programu).
     """
     if not getattr(sys, "frozen", False):
         return
@@ -119,19 +200,30 @@ def ensure_bundled_files() -> None:
     # (z tagami {checkbox}/<H1>/<H2>); "instructions.txt" zostaje jako
     # zapasowy fallback dla starszego, prostszego formatu.
     files_to_copy = ("overlay.html", "icon.png", "instrukcja.txt", "instructions.txt", "owo.png")
+    log_lines = [f"ensure_bundled_files() - {target_dir}"]
 
     for name in files_to_copy:
         target = target_dir / name
-        # Jeśli plik już istnieje, nie nadpisujemy go, żeby nie zepsuć ustawień użytkownika
         if target.exists():
+            log_lines.append(f"  {name}: juz jest w folderze danych - pomijam")
             continue
 
         src = resource_path(name)
-        if src.exists():
-            try:
-                shutil.copyfile(src, target)
-            except OSError:
-                pass
+        if not src.exists():
+            log_lines.append(f"  {name}: BRAK w paczce programu ({src}) - NIE skopiowano")
+            continue
+
+        try:
+            shutil.copyfile(src, target)
+            log_lines.append(f"  {name}: skopiowano z paczki programu")
+        except OSError as e:
+            log_lines.append(f"  {name}: BLAD kopiowania - {e}")
+
+    try:
+        with open(target_dir / "startup_log.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(log_lines))
+    except OSError:
+        pass
 
 def config_path() -> Path:
     return base_dir() / "config.json"

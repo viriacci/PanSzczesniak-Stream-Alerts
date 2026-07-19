@@ -3,9 +3,15 @@ Obsluga Twitcha:
 1) TwitchAuth  - jednorazowa autoryzacja w przegladarce (Authorization Code Flow),
    odswiezanie tokena, pobranie danych o kanale i nagrodach.
 2) EventSubClient - podlaczenie do EventSub przez WebSocket i nasluchiwanie
-   na odebranie nagrody za punkty kanalu.
+   na alerty: nagrody za punkty kanalu, raidy, followy, suby (w tym Prime).
 
-Wymagany scope: channel:read:redemptions
+Wymagane scope'y:
+  - channel:read:redemptions  - nagrody za punkty kanalu (podstawa programu)
+  - moderator:read:followers  - alert "nowy follow"
+  - user:read:chat            - alert "sub"/"sub Prime" (przez channel.chat.notification,
+                                 ktore ma bezposrednie pole is_prime - jedyny pewny sposob
+                                 odroznienia Prime od zwyklego platnego Tier 1)
+  channel.raid nie wymaga zadnego dodatkowego scope'a.
 """
 import asyncio
 import json
@@ -22,7 +28,14 @@ TWITCH_AUTH_URL = "https://id.twitch.tv/oauth2/authorize"
 TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 TWITCH_API_BASE = "https://api.twitch.tv/helix"
 EVENTSUB_WS_URL = "wss://eventsub.wss.twitch.tv/ws"
-SCOPE = "channel:read:redemptions"
+
+SCOPES = [
+    "channel:read:redemptions",
+    "moderator:read:followers",
+    "user:read:chat",
+    "bits:read",
+]
+SCOPE = " ".join(SCOPES)
 
 
 class AuthError(Exception):
@@ -150,15 +163,23 @@ async def validate_token(session: aiohttp.ClientSession, access_token: str) -> b
 
 class EventSubClient:
     """
-    Laczy sie do Twitch EventSub przez WebSocket, subskrybuje odbiory nagrod
-    za punkty kanalu i wola on_redemption(reward_id, reward_title, user_name) dla kazdego eventu.
+    Laczy sie do Twitch EventSub przez WebSocket, subskrybuje kilka typow
+    alertow i dla kazdego woła on_alert(alert_type, user_name, extra) z
+    ujednoliconymi danymi:
+
+      alert_type="redemption"  extra={"reward_id": ..., "reward_title": ...}
+      alert_type="raid"        extra={"viewers": <int>}
+      alert_type="follow"      extra={}
+      alert_type="sub"         extra={"tier": "1000"/"2000"/"3000", "months": <int>}
+      alert_type="prime_sub"   extra={"tier": "1000", "months": <int>}
+      alert_type="bits"        extra={"bits": <int>, "message": <str>}
     """
 
-    def __init__(self, client_id, get_access_token, broadcaster_id, on_redemption, on_status, log=print):
+    def __init__(self, client_id, get_access_token, broadcaster_id, on_alert, on_status, log=print):
         self.client_id = client_id
         self.get_access_token = get_access_token  # callable -> zwraca aktualny access_token (moze go odswiezyc)
         self.broadcaster_id = broadcaster_id
-        self.on_redemption = on_redemption
+        self.on_alert = on_alert
         self.on_status = on_status
         self.log = log
         self._stop = False
@@ -194,11 +215,11 @@ class EventSubClient:
 
                         elif msg_type == "notification":
                             event = msg["payload"]["event"]
-                            self.on_redemption(
-                                reward_id=event["reward"]["id"],
-                                reward_title=event["reward"]["title"],
-                                user_name=event.get("user_name", "?"),
+                            sub_type = msg["metadata"].get(
+                                "subscription_type",
+                                msg["payload"].get("subscription", {}).get("type", ""),
                             )
+                            self._dispatch_notification(sub_type, event)
 
                         elif msg_type == "revocation":
                             self.on_status("subskrypcja cofnieta przez Twitch")
@@ -210,6 +231,56 @@ class EventSubClient:
                 ws_url = EVENTSUB_WS_URL
                 await asyncio.sleep(5)
 
+    def _dispatch_notification(self, sub_type: str, event: dict) -> None:
+        """Zamienia surowy payload EventSub na ujednolicone wywolanie on_alert."""
+        try:
+            if sub_type == "channel.channel_points_custom_reward_redemption.add":
+                self.on_alert("redemption", event.get("user_name", "?"), {
+                    "reward_id": event["reward"]["id"],
+                    "reward_title": event["reward"]["title"],
+                })
+
+            elif sub_type == "channel.raid":
+                self.on_alert("raid", event.get("from_broadcaster_user_name", "?"), {
+                    "viewers": event.get("viewers", 0),
+                })
+
+            elif sub_type == "channel.follow":
+                self.on_alert("follow", event.get("user_name", "?"), {})
+
+            elif sub_type == "channel.cheer":
+                # Cheer moze byc anonimowy - wtedy Twitch nie podaje user_name.
+                anon = event.get("is_anonymous", False)
+                user_name = "Anonim" if anon else event.get("user_name", "?")
+                self.on_alert("bits", user_name, {
+                    "bits": event.get("bits", 0),
+                    "message": event.get("message", ""),
+                })
+
+            elif sub_type == "channel.chat.notification":
+                notice_type = event.get("notice_type", "")
+                chatter = event.get("chatter_user_name") or event.get("chatter_user_login", "?")
+
+                if notice_type == "sub":
+                    info = event.get("sub") or {}
+                    alert_type = "prime_sub" if info.get("is_prime") else "sub"
+                    self.on_alert(alert_type, chatter, {
+                        "tier": info.get("sub_tier", "1000"),
+                        "months": 1,
+                    })
+                elif notice_type == "resub":
+                    info = event.get("resub") or {}
+                    alert_type = "prime_sub" if info.get("is_prime") else "sub"
+                    self.on_alert(alert_type, chatter, {
+                        "tier": info.get("sub_tier", "1000"),
+                        "months": info.get("cumulative_months", 1),
+                    })
+                # inne notice_type (sub_gift, community_sub_gift, announcement,
+                # itp.) na razie celowo ignorujemy - poza zakresem Fazy 1.
+
+        except Exception as e:
+            self.log(f"Blad przetwarzania zdarzenia '{sub_type}': {e}")
+
     async def _subscribe(self, session_id):
         access_token = await self.get_access_token()
         headers = {
@@ -217,17 +288,57 @@ class EventSubClient:
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         }
+        async with aiohttp.ClientSession() as session:
+            # Nagrody za punkty kanalu - to byla pierwsza i podstawowa funkcja
+            # programu, wiec jej brak od razu przerywa polaczenie (jak dawniej).
+            await self._create_subscription(
+                session, headers, session_id,
+                "channel.channel_points_custom_reward_redemption.add", "1",
+                {"broadcaster_user_id": self.broadcaster_id},
+                critical=True,
+            )
+            # Nowsze typy alertow wymagaja scope'ow, ktorych starsze
+            # autoryzacje moga nie miec - brak ktoregos z nich NIE przerywa
+            # polaczenia (patrz critical=False w _create_subscription):
+            # po prostu ten jeden typ alertu nie zadziala, dopoki uzytkownik
+            # nie zaloguje sie ponownie (nowy token = nowe scope'y).
+            await self._create_subscription(
+                session, headers, session_id, "channel.raid", "1",
+                {"to_broadcaster_user_id": self.broadcaster_id},
+                critical=False,
+            )
+            await self._create_subscription(
+                session, headers, session_id, "channel.follow", "2",
+                {"broadcaster_user_id": self.broadcaster_id, "moderator_user_id": self.broadcaster_id},
+                critical=False,
+            )
+            await self._create_subscription(
+                session, headers, session_id, "channel.cheer", "1",
+                {"broadcaster_user_id": self.broadcaster_id},
+                critical=False,
+            )
+            await self._create_subscription(
+                session, headers, session_id, "channel.chat.notification", "1",
+                {"broadcaster_user_id": self.broadcaster_id, "user_id": self.broadcaster_id},
+                critical=False,
+            )
+
+    async def _create_subscription(self, session, headers, session_id, sub_type, version, condition, critical):
         body = {
-            "type": "channel.channel_points_custom_reward_redemption.add",
-            "version": "1",
-            "condition": {"broadcaster_user_id": self.broadcaster_id},
+            "type": sub_type,
+            "version": version,
+            "condition": condition,
             "transport": {"method": "websocket", "session_id": session_id},
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{TWITCH_API_BASE}/eventsub/subscriptions", headers=headers, json=body
-            ) as resp:
-                payload = await resp.json()
-                if resp.status not in (200, 202):
-                    raise AuthError(f"Blad subskrypcji EventSub: {payload}")
-                self.log("Subskrypcja na odbior nagrod aktywna.")
+        async with session.post(
+            f"{TWITCH_API_BASE}/eventsub/subscriptions", headers=headers, json=body
+        ) as resp:
+            payload = await resp.json()
+            if resp.status not in (200, 202):
+                if critical:
+                    raise AuthError(f"Blad subskrypcji EventSub ({sub_type}): {payload}")
+                # Cicha degradacja: logujemy tylko do logu programu (nie do
+                # okienka bledu), reszta alertow dziala normalnie.
+                self.log(f"Alert '{sub_type}' niedostepny w tym tokenie - pomijam.")
+                return
+            self.log(f"Subskrypcja aktywna: {sub_type}")

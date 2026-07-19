@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Twitch Reward Overlay</title>
+<title>PanSzczesniak Stream Alerts Overlay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&display=swap" rel="stylesheet">
@@ -19,46 +19,81 @@
     #stage {
         position: fixed;
         inset: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 18px;
         pointer-events: none;
     }
+    /* Pozycja/rozmiar/obrys kazdego elementu ustawiane sa dynamicznie z JS
+       (na podstawie layoutu z edytora wizualnego) - x/y to SRODEK elementu,
+       stad translate(-50%, -50%). */
     #gif {
-        max-width: 480px;
-        max-height: 480px;
+        position: absolute;
+        object-fit: contain;
         opacity: 0;
-        transform: scale(0.9);
-        transition: opacity 0.6s ease, transform 0.6s ease;
+        box-sizing: border-box;
         filter: drop-shadow(0 0 14px rgba(0,0,0,0.7));
     }
-    #gif.show {
-        opacity: 1;
-        transform: scale(1);
-    }
     #caption {
+        position: absolute;
         opacity: 0;
-        transition: opacity 0.6s ease 0.15s; /* leciutkie opoznienie wzgledem gifa */
-        background-color: #843935;
-        border: 3px solid #000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 6px;
-        padding: 6px 26px;
+        padding: 6px 20px;
+        box-sizing: border-box;
         box-shadow: 0 0 18px rgba(0,0,0,0.6);
-    }
-    #caption.show {
-        opacity: 1;
+        text-align: center;
     }
     #caption-text {
-        font-family: "Amatic SC", cursive;
         font-weight: 700;
-        font-size: 46px;
-        line-height: 1;
-        color: #ffffff;
+        line-height: 1.05;
         text-shadow: 0 0 6px rgba(0,0,0,0.8);
-        white-space: nowrap;
+        word-wrap: break-word;
     }
+
+    /* --- Presety animacji: kazdy ma wersje "in" (pojawienie) i "out" (zniknięcie) --- */
+    @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut  { from { opacity: 1; } to { opacity: 0; } }
+
+    @keyframes slideLeftIn   { from { opacity: 0; transform: translate(calc(-50% - 80px), -50%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+    @keyframes slideLeftOut  { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(calc(-50% - 80px), -50%); } }
+    @keyframes slideRightIn  { from { opacity: 0; transform: translate(calc(-50% + 80px), -50%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+    @keyframes slideRightOut { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(calc(-50% + 80px), -50%); } }
+    @keyframes slideTopIn    { from { opacity: 0; transform: translate(-50%, calc(-50% - 80px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+    @keyframes slideTopOut   { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, calc(-50% - 80px)); } }
+    @keyframes slideBottomIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 80px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+    @keyframes slideBottomOut{ from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, calc(-50% + 80px)); } }
+
+    @keyframes zoomIn   { from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+    @keyframes zoomOut  { from { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } }
+
+    @keyframes bounceIn {
+        0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+        55%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+        75%  { transform: translate(-50%, -50%) scale(0.95); }
+        100% { transform: translate(-50%, -50%) scale(1); }
+    }
+    @keyframes bounceOut {
+        0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        30%  { transform: translate(-50%, -50%) scale(1.08); }
+        100% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+    }
+
+    .anim-in-fade         { animation: fadeIn var(--dur, 600ms) ease forwards; }
+    .anim-out-fade        { animation: fadeOut var(--dur, 600ms) ease forwards; }
+    .anim-in-slide_left   { animation: slideLeftIn var(--dur, 600ms) ease forwards; }
+    .anim-out-slide_left  { animation: slideLeftOut var(--dur, 600ms) ease forwards; }
+    .anim-in-slide_right  { animation: slideRightIn var(--dur, 600ms) ease forwards; }
+    .anim-out-slide_right { animation: slideRightOut var(--dur, 600ms) ease forwards; }
+    .anim-in-slide_top    { animation: slideTopIn var(--dur, 600ms) ease forwards; }
+    .anim-out-slide_top   { animation: slideTopOut var(--dur, 600ms) ease forwards; }
+    .anim-in-slide_bottom { animation: slideBottomIn var(--dur, 600ms) ease forwards; }
+    .anim-out-slide_bottom{ animation: slideBottomOut var(--dur, 600ms) ease forwards; }
+    .anim-in-zoom          { animation: zoomIn var(--dur, 600ms) ease forwards; }
+    .anim-out-zoom         { animation: zoomOut var(--dur, 600ms) ease forwards; }
+    .anim-in-bounce        { animation: bounceIn var(--dur, 600ms) cubic-bezier(.34,1.56,.64,1) forwards; }
+    .anim-out-bounce       { animation: bounceOut var(--dur, 600ms) ease forwards; }
+    .anim-in-none          { opacity: 1; transform: translate(-50%, -50%); }
+    .anim-out-none         { opacity: 0; transform: translate(-50%, -50%); }
 </style>
 </head>
 <body>
@@ -76,13 +111,86 @@ const captionEl = document.getElementById("caption");
 const captionTextEl = document.getElementById("caption-text");
 let hideTimer = null;
 
+// Uzywane, gdy backend (starsza wersja / test) nie wysle layoutu -
+// dokladnie odpowiada domyslnym wartosciom z config.py.
+const DEFAULT_LAYOUT = {
+    image: { x: 50, y: 38, width: 30, height: 40, border_width: 0, border_color: "#000000", border_style: "none" },
+    caption: { x: 50, y: 68, width: 40, height: 10, font_size: 32, font_family: "Amatic SC",
+               font_color: "#ffffff", bg_color: "#843935", bg_opacity: 90,
+               border_width: 3, border_color: "#000000", border_style: "solid" },
+    text_template: "{user}",
+    anim_in: "fade", anim_out: "fade", anim_duration_ms: 600,
+};
+
+const ANIM_NAMES = ["fade", "slide_left", "slide_right", "slide_top", "slide_bottom", "zoom", "bounce", "none"];
+
+function hexToRgba(hex, alphaFraction) {
+    const clean = (hex || "#843935").replace("#", "");
+    const r = parseInt(clean.substring(0, 2), 16) || 0;
+    const g = parseInt(clean.substring(2, 4), 16) || 0;
+    const b = parseInt(clean.substring(4, 6), 16) || 0;
+    return `rgba(${r}, ${g}, ${b}, ${alphaFraction})`;
+}
+
+function clearAnimClasses(el) {
+    ANIM_NAMES.forEach((name) => {
+        el.classList.remove(`anim-in-${name}`, `anim-out-${name}`);
+    });
+}
+
+function applyBorder(el, cfg) {
+    const style = cfg.border_style || "none";
+    if (style === "none" || !cfg.border_width) {
+        el.style.border = "none";
+        return;
+    }
+    el.style.borderStyle = style;
+    el.style.borderWidth = (cfg.border_width || 0) + "px";
+    el.style.borderColor = cfg.border_color || "#000000";
+}
+
+function applyLayout(cfg) {
+    const img = { ...DEFAULT_LAYOUT.image, ...(cfg.image || {}) };
+    const cap = { ...DEFAULT_LAYOUT.caption, ...(cfg.caption || {}) };
+    const durMs = cfg.anim_duration_ms || DEFAULT_LAYOUT.anim_duration_ms;
+
+    gifEl.style.left = img.x + "%";
+    gifEl.style.top = img.y + "%";
+    gifEl.style.width = img.width + "%";
+    gifEl.style.height = img.height + "%";
+    gifEl.style.setProperty("--dur", durMs + "ms");
+    applyBorder(gifEl, img);
+
+    captionEl.style.left = cap.x + "%";
+    captionEl.style.top = cap.y + "%";
+    captionEl.style.width = cap.width + "%";
+    captionEl.style.minHeight = cap.height + "%";
+    captionEl.style.backgroundColor = hexToRgba(cap.bg_color, (cap.bg_opacity ?? 90) / 100);
+    captionEl.style.setProperty("--dur", durMs + "ms");
+    applyBorder(captionEl, cap);
+
+    captionTextEl.style.color = cap.font_color || "#ffffff";
+    captionTextEl.style.fontSize = (cap.font_size || 32) + "px";
+    captionTextEl.style.fontFamily = `"${cap.font_family || "Amatic SC"}", "Segoe UI", cursive, sans-serif`;
+}
+
+// Podstawia tokeny {user}, {reward}, {viewers}, {months}, {tier}... w
+// szablonie tekstu wartosciami przyslanymi z Pythona (data.variables).
+// Nieznany/brakujacy token zostaje wypisany jak w szablonie (latwiej
+// zauwazyc literowke niz gdyby po prostu zniknal).
+function renderTemplate(template, vars) {
+    return (template || "").replace(/\{(\w+)\}/g, (match, key) => {
+        return (vars && key in vars) ? vars[key] : match;
+    });
+}
+
 function connect() {
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === "redeem") {
-            showReward(data.gif, data.sound, data.duration || 5, data.title || "", data.user || "");
+            showReward(data);
         }
     };
 
@@ -93,26 +201,41 @@ function connect() {
     ws.onerror = () => ws.close();
 }
 
-function showReward(gifUrl, soundUrl, duration, title, user) {
+function showReward(data) {
+    const { gif: gifUrl, sound: soundUrl, duration, variables } = data;
+    const layout = data.layout || DEFAULT_LAYOUT;
+    const animIn = layout.anim_in || "fade";
+    const animOut = layout.anim_out || "fade";
+
     clearTimeout(hideTimer);
+    applyLayout(layout);
+    clearAnimClasses(gifEl);
+    clearAnimClasses(captionEl);
 
     if (gifUrl) {
         gifEl.src = gifUrl + "?t=" + Date.now();
-        gifEl.classList.add("show");
     }
-    if (title) {
-        captionTextEl.textContent = `${user} odbiera ${title}`;
-        captionEl.classList.add("show");
-    }
+    captionTextEl.textContent = renderTemplate(layout.text_template, variables || {});
     if (soundUrl) {
         const audio = new Audio(soundUrl);
         audio.play().catch((e) => console.warn("Nie udalo sie odtworzyc dzwieku:", e));
     }
 
+    // Wymuszenie reflow, zeby restart animacji zadzialal nawet gdy ten sam
+    // alert przychodzi dwa razy pod rzad (przegladarka inaczej zignoruje
+    // ponowne dodanie tej samej klasy CSS).
+    void gifEl.offsetWidth;
+    void captionEl.offsetWidth;
+
+    gifEl.classList.add(`anim-in-${animIn}`);
+    captionEl.classList.add(`anim-in-${animIn}`);
+
     hideTimer = setTimeout(() => {
-        gifEl.classList.remove("show");
-        captionEl.classList.remove("show");
-    }, duration * 1000);
+        clearAnimClasses(gifEl);
+        clearAnimClasses(captionEl);
+        gifEl.classList.add(`anim-out-${animOut}`);
+        captionEl.classList.add(`anim-out-${animOut}`);
+    }, (duration || 5) * 1000);
 }
 
 connect();

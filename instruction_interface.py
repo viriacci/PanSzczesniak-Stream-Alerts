@@ -28,6 +28,33 @@ from qfluentwidgets import (
 
 import config as cfgmod
 
+# Wspolny wyglad paska przewijania dla wszystkich zakladek z QScrollArea -
+# zaokraglony, przezroczysty, w kolorach marki (zoltawy uchwyt, cyjan na
+# hover), zamiast domyslnego, kanciastego paska Windows.
+SCROLLBAR_QSS = """
+    QScrollArea { background: transparent; border: none; }
+    QScrollBar:vertical {
+        background: transparent;
+        width: 10px;
+        margin: 2px 0px 2px 0px;
+    }
+    QScrollBar::handle:vertical {
+        background: rgba(227, 192, 72, 120);
+        border-radius: 5px;
+        min-height: 24px;
+    }
+    QScrollBar::handle:vertical:hover {
+        background: rgba(67, 251, 255, 160);
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        height: 0px;
+        background: transparent;
+    }
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+        background: transparent;
+    }
+"""
+
 # Rozpoznaje pelne adresy (http(s)://...) oraz "gole" domeny typu dev.twitch.tv
 _URL_RE = re.compile(
     r'(https?://[^\s<>"\']+'
@@ -117,7 +144,7 @@ class InstructionInterface(QWidget):
         # Glowny scroll area o przezroczystym tle
         scroll = SingleDirectionScrollArea(orient=Qt.Vertical)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        scroll.setStyleSheet(SCROLLBAR_QSS)
         scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         steps_container = QWidget()
@@ -144,8 +171,16 @@ class InstructionInterface(QWidget):
                 elif kind == "button":
                     self._add_action_button_row(centered)
         else:
+            checked_paths = [
+                str(cfgmod.base_dir() / "instrukcja.txt"),
+                str(cfgmod.resource_path("instrukcja.txt")),
+            ]
             info = CaptionLabel(
-                "Brak pliku instrukcja.txt. Umiesc go w folderze projektu."
+                "Brak pliku instrukcja.txt. Program sprawdzil te miejsca:\n"
+                + "\n".join(checked_paths)
+                + "\n\nJesli to sie zdarzylo po instalacji na innym komputerze, "
+                "sprawdz plik startup_log.txt w tym samym folderze - powinien "
+                "pokazac, czy instrukcja.txt w ogole byla w paczce programu."
             )
             info.setStyleSheet("color: #f2f2f2;")
             self.steps_layout.addWidget(info)
