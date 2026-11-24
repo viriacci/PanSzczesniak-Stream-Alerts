@@ -1,4 +1,9 @@
 # Changelog
+## 2.0.0-dev.5
+- OBS WebSocket 5, szyfrowane hasło, sceny, stan transmisji/nagrania, telemetria i odświeżanie źródeł PSSA.
+- PSSA Agent i dock, start/stop/restart/refresh, opcjonalny autostart Windows i start z OBS, ograniczony watchdog.
+- Audyt A: 0 npm advisories, 29/29 testów, packaged smoke. CI read-only z bramką audytu.
+
 ## 2.0.0-dev.4-audit.1
 - Audyt A: poprawki wyścigów sesji OAuth, odświeżania tokenów, reconnect, ACK błędów mediów, zapisu plików, shutdown i walidacji.
 - Testy mock Auth/EventSub, pełny test 1000 alertów, regresje media i ACK.

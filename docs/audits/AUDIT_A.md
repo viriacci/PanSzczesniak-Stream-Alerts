@@ -36,3 +36,5 @@ Twitch: https://dev.twitch.tv/docs/authentication/validate-tokens/ ; https://dev
 
 ## Aktualizacja weryfikacji
 Run 45363061536: 29/29 testów PASS, typecheck, build, smoke i NSIS PASS. Raport npm audit wykazał 15 wpisów wyłącznie w zależnościach dev (8 high / 7 moderate); triage i plan naprawy w [DEPENDENCIES_A.md](DEPENDENCIES_A.md). Bramkę zależności zamknąć dopiero po zweryfikowanej aktualizacji.
+
+Bramka automatyczna zamknięta: 45364375474, 29/29 PASS, 0/0 advisories full/production, smoke spakowanego exe PASS. Manualne scenariusze Twitch/OBS i test wydajności pozostają otwarte.

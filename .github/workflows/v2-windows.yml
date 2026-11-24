@@ -32,11 +32,24 @@ jobs:
           name: pssa-npm-audit
           path: npm-audit.json
           if-no-files-found: error
+      - name: Require clean npm audit
+        shell: pwsh
+        run: |
+          $r = Get-Content npm-audit.json -Raw | ConvertFrom-Json
+          if ($null -eq $r.metadata.vulnerabilities.total -or $r.metadata.vulnerabilities.total -ne 0) { throw 'Dependency audit failed' }
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - run: npm run smoke
       - run: npx electron-builder --win nsis --x64 --publish never
+      - name: Smoke test packaged executable
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'dist/win-unpacked/PSSA 2 Dev.exe'
+          if (-not (Test-Path $exe)) { throw 'Packaged executable missing' }
+          $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Packaged smoke exit $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: PSSA-2-Dev-Windows

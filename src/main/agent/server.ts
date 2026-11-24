@@ -15,6 +15,7 @@ export class AgentController{
  private instance=''
  private pending?:'stop'|'restart'|'refresh'
  private restart=false
+ private restartAfter=0
  private launchAt=0
  private child?:ChildProcess
  private failures:number[]=[]
@@ -32,7 +33,7 @@ export class AgentController{
   const action=this.pending;this.pending=undefined
   return action??null
  }
- closing(instance:string){if(instance===this.instance){this.last=0;if(!this.restart)this.desired=false}}
+ closing(instance:string){if(instance===this.instance){this.last=0;this.restartAfter=this.now()+3000;if(!this.restart)this.desired=false}}
  private start(){
   if(this.running()||this.child||this.state().starting)return
   const now=this.now();this.failures=this.failures.filter(t=>now-t<60000)
@@ -41,7 +42,7 @@ export class AgentController{
   try{
    const child=this.launch();this.child=child
    const exited=(failed:boolean)=>{if(this.child!==child)return;this.child=undefined;this.last=0;this.launchAt=0
-    if(failed&&this.desired){this.failures.push(this.now());this.restart=true;this.detail='PSSA zakończyło się błędem'}else if(!this.restart)this.desired=false
+    if(failed&&this.desired){this.failures.push(this.now());this.restart=true;this.restartAfter=this.now()+3000;this.detail='PSSA zakończyło się błędem'}else if(!this.restart)this.desired=false
    }
    child.once('error',()=>exited(true));child.once('exit',code=>exited(code!==0))
   }catch{this.launchAt=0;this.desired=false;this.detail='Nie udało się uruchomić PSSA'}
@@ -50,11 +51,11 @@ export class AgentController{
   if(cmd==='auto-on'||cmd==='auto-off'){this.autoLaunch=cmd==='auto-on';return}
   if(cmd==='start'){this.failures=[];this.start();return}
   if(cmd==='stop'){this.desired=false;this.restart=false;if(this.running())this.pending='stop';this.detail='Zamykanie PSSA';return}
-  if(cmd==='restart'){this.failures=[];if(this.running()){this.pending='restart';this.restart=true;this.desired=false;this.detail='Restart PSSA'}else this.start();return}
+  if(cmd==='restart'){this.failures=[];if(this.running()){this.pending='restart';this.restart=true;this.restartAfter=this.now()+3000;this.desired=false;this.detail='Restart PSSA'}else this.start();return}
   if(cmd==='refresh'&&this.running()){if(this.pending!=='stop'&&this.pending!=='restart')this.pending='refresh';return}
   throw Error('PSSA nie działa')
  }
- tick(){if(this.restart&&!this.running()&&!this.child){this.restart=false;this.start()}}
+ tick(){if(this.restart&&!this.running()&&!this.child&&this.now()>=this.restartAfter){this.restart=false;this.start()}}
  obsStarted(){if(this.autoLaunch)this.start()}
 }
 const html=`<!doctype html><html lang="pl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PSSA Control</title><style>body{background:#101012;color:#f2f2f2;font:14px system-ui;margin:14px}h1{color:#e3c048;font-size:18px}button{background:#242428;color:#eee;border:1px solid #555;border-radius:5px;padding:9px;margin:3px;cursor:pointer}button:disabled{opacity:.4}#state{color:#e3c048}p{line-height:1.5}</style><h1>PSSA Control</h1><p id="state">Łączenie…</p><div id="actions"><button data-cmd="start">Uruchom</button><button data-cmd="stop">Zamknij</button><button data-cmd="restart">Restart</button><button data-cmd="refresh">Odśwież nakładkę</button></div><p id="notice" role="status"></p><script src="/dock.js"></script></html>`
@@ -93,7 +94,7 @@ export async function serveAgent(dir:string,launch:()=>ChildProcess,port=AGENT_P
  })().catch(()=>{if(!res.headersSent)reply(res,400,{error:'Invalid request'});else res.end()})})
  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',()=>{server.removeListener('error',reject);const a=server.address();if(a&&typeof a!=='string')bound=a.port;resolve()})})
  const timer=setInterval(()=>{controller.tick();if(!watchObs||process.platform!=='win32'||!controller.autoLaunch||checking)return
-  checking=true;execFile('tasklist.exe',['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000},(error,stdout)=>{checking=false;if(error)return;const active=/"obs64\.exe"/i.test(stdout);if(active&&!obs)controller.obsStarted();obs=active})
+  checking=true;execFile(join(process.env.SystemRoot||'C:\\Windows','System32','tasklist.exe'),['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000},(error,stdout)=>{checking=false;if(error)return;const active=/"obs64\.exe"/i.test(stdout);if(active&&!obs)controller.obsStarted();obs=active})
  },2000)
  return {url:'http://127.0.0.1:'+bound,dock:'http://127.0.0.1:'+bound+'/dock#'+key,close:()=>{clearInterval(timer);server.close();server.closeAllConnections()}}
 }

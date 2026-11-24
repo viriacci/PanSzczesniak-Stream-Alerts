@@ -1,9 +1,4 @@
-# Handoff — 2.0-dev.4-audit.1
-Pracować tylko na develop/v2 od aktualnego HEAD. main/legacy bez zmian.
-Etap 4 potwierdzony: run 45360806153, 20/20 PASS, Windows build/smoke/NSIS.
-Audyt A: poprawki auth, EventSub, overlay, media, kolejka, shutdown, UI, read-only CI, nowe testy. Raport docs/audits/AUDIT_A.md. Przed etapem 5 sprawdzić najnowszy pipeline i artefakt pssa-npm-audit; ocenić i naprawić rzeczywiste P0/P1, zapisać wyniki w raporcie. Realne testy Twitch i OBS nadal niewykonane, nie oznaczać jako PASS. Brak gwarancji gotowości do wydania.
-Następny etap po bramce CI i triage: OBS WebSocket, niezależny Agent, dock start/stop/restart/refresh, watchdog. Audyty B po 7 i C po 10. Nie publikować main.
-
-Aktualizacja: audyt A CI 45363061536 zakończył się success (29/29). Triage npm audit: 15 wpisów dev-only; jednorazowy workflow Audit A dependency remediation aktualizuje Vite i electron-builder, testuje i przypina manifesty dopiero przy 0 podatności. Sprawdzić aktualny HEAD i wynik workflow przed etapem 5. Po zakończeniu usunąć jednorazowy workflow z uprawnieniem contents:write i zapisać wynik w DEPENDENCIES_A.md. Nie oznaczać testów rzeczywistego Twitch/OBS jako wykonanych.
-
-Run 45363844728: kandydat Vite/electron-builder usunął wszystkie high, pozostało 6 moderate jednego GHSA minimatch; production audit 0. Manifestów nie zapisano. Druga iteracja dodaje zakresowy override minimatch 11.0.9 i smoke spakowanego exe. Sprawdź nowy run Audit A dependency remediation; jeśli success, potwierdź commit bota i aktualne manifesty, usuń jednorazowy workflow, wpisz wyniki. Jeśli failure, przeanalizuj logi i raporty, bez force downgrade i bez przechodzenia do etapu 5.
+# Handoff — 2.0-dev.5
+Pracować wyłącznie na develop/v2 od aktualnego HEAD. main/legacy/python nietknięte. Audyt A automatycznie zaliczony: run 45364375474, 29/29 PASS, 0 npm advisories full/production, NSIS i packaged smoke PASS. Manifesty abbd15e5bbf2269307b29c21f3f3f11624ba455d. Usunięto jednorazowy write workflow. Manualny Twitch/OBS nadal otwarty.
+Etap 5: OBS WebSocket 5 z szyfrowanym hasłem, polling, sceny, metryki, refresh tylko własnych źródeł, niezależny headless Agent z dockiem start/stop/restart/refresh, autostart Windows, opcjonalny start przy wykryciu OBS, ograniczony watchdog własnego child. Nowe testy mock; sprawdzić CI przed etapem 6. Manualne testy procesu Agenta i OBS nie wykonane; brak wykrywania zawieszenia i automatycznego kill (celowo). 
+Etap 6: Live Center, trwałe sesje Twitch online/offline, próbki widzów co 30s, zdarzenia, czat, OBS telemetry co 5s, bitrate z różnicy bajtów, tytuł/kategoria, markery; nie fabrykować danych. Audyt B po 7, C po 10. Nie publikować main.

@@ -19,6 +19,7 @@ const directory = smoke
   ? mkdtempSync(join(tmpdir(), 'pssa-smoke-'))
   : join(app.getPath('appData'), 'PSSA 2 Dev')
 mkdirSync(directory, { recursive: true })
+if(agentMode)mkdirSync(join(directory,'agent-runtime'),{recursive:true})
 app.setPath('userData', agentMode?join(directory,'agent-runtime'):directory)
 app.setName('PSSA 2 Dev')
 const log = createLogger(directory)

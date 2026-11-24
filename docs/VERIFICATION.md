@@ -18,3 +18,5 @@ Etap 3 CI run 45357845578: typecheck PASS, test overlay FAIL z powodu parameter 
 
 ## Etap 4 potwierdzony
 Run 45360806153: success, 20/20 testów, typecheck, build, smoke i installer. Audyt A: oczekuje na weryfikację nowego CI i analizę npm audit. Raport docs/audits/AUDIT_A.md.
+
+Audyt A zamknięty automatycznie, run 45364375474: 29/29, full/production npm audit 0, packaged EXE smoke PASS. Etap 5: 4 nowe testy OBS i Agenta, smoke IPC OBS; CI oczekuje. Rzeczywisty OBS i proces Agenta poza aplikacją wymagają testu na Windows.
