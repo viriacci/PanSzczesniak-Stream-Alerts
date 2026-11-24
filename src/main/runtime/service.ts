@@ -3,8 +3,8 @@ import type {DatabaseSync} from 'node:sqlite'
 import type {AlertsService} from '../alerts/service'
 import type {ObsService} from '../obs/service'
 import type {AgentBridge} from '../agent/bridge'
-import {join,resolve,relative,isAbsolute} from 'node:path'
-import {statSync,existsSync,writeFileSync} from 'node:fs'
+import {join,resolve,relative,isAbsolute,dirname,basename} from 'node:path'
+import {statSync,existsSync,writeFileSync,realpathSync} from 'node:fs'
 import {createBackup,stageRestore} from './backup'
 import {preferences,savePreferences} from './preferences'
 import {checkRelease} from './updates'
@@ -19,12 +19,12 @@ export class RuntimeService{
  private timer?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,private directory:string,private window:BrowserWindow,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void){}
  state(){return preferences(this.db)}
- save(value:unknown){const p=savePreferences(this.db,value);this.onMode(p);return p}
+ save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);return p}
  start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(){this.stopped=true;clearInterval(this.timer)}
  private guard(){if(this.busy||this.stopped)throw Error('Runtime operation unavailable')}
  private offline(){const l=this.alerts.liveState(),m=this.obs.state().metrics;if(l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}
- private outside(path:string){const rel=relative(resolve(this.directory),resolve(path));if(rel===''||(!rel.startsWith('..')&&!isAbsolute(rel)))throw Error('Choose a file outside app data')}
+ private outside(path:string){const rel=relative(realpathSync(this.directory),join(realpathSync(dirname(resolve(path))),basename(path)));if(rel===''||(!rel.startsWith('..')&&!isAbsolute(rel)))throw Error('Choose a file outside app data')}
  async backup(){
   this.guard();this.offline();this.busy=true
   try{const r=await dialog.showSaveDialog(this.window,{title:'Kopia zapasowa PSSA',defaultPath:'PSSA-'+new Date().toISOString().slice(0,10)+'.pssabackup',filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})

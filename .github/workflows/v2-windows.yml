@@ -50,6 +50,21 @@ jobs:
           $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged smoke timeout' }
           if ($p.ExitCode -ne 0) { throw "Packaged smoke exit $($p.ExitCode)" }
+      - name: Verify clean NSIS installation
+        shell: pwsh
+        run: |
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2-Dev-*.exe' -File)
+          if ($setup.Count -ne 1) { throw 'Expected exactly one setup executable' }
+          $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
+          if (Test-Path $dir) { throw 'Install path already exists' }
+          $p = Start-Process -FilePath $setup[0].FullName -ArgumentList "/S /D=$dir" -PassThru
+          if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw 'Installer timeout' }
+          if ($p.ExitCode -ne 0) { throw "Installer exit $($p.ExitCode)" }
+          $exe = Join-Path $dir 'PSSA 2 Dev.exe'
+          if (-not (Test-Path $exe)) { throw 'Installed executable missing' }
+          $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Installed smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Installed smoke exit $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: PSSA-2-Dev-Windows

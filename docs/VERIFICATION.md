@@ -32,3 +32,5 @@ Dodatkowo 1 test regresji OBS i rozszerzenie smoke o poprawny PNG oraz brakując
 Audyt B: run 45371861162 success, 52/52 PASS, clean audit, build, NSIS, Chromium media smoke i packaged smoke. Etap 8: 5 nowych testów biblioteki/profili/wariantów. CI oczekuje; manualne Twitch/OBS bez zmian.
 
 Etap 8 run 45372844349 success (57 testów, clean audit, build/smoke/NSIS/packaged smoke). Etap 9: 6 nowych testów analityki i importu/eksportu, schema 4, rozszerzenie smoke IPC. Nowy CI oczekuje.
+
+Etap 9 run 45373639990 success, 63/63, audit 0, build i smoke, NSIS i packaged smoke. Etap 10 beta.1: 5 testów runtime/backup, smoke IPC diagnostics, clean install smoke dodany. CI oczekuje. Realny Twitch/OBS, upgrade, autostart, wydajność pozostają otwarte.

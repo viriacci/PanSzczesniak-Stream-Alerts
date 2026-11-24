@@ -77,17 +77,12 @@ export function createBackup(db:DatabaseSync,media:string,destination:string){
  }finally{try{out?.close()}catch{}rmSync(temp,{force:true});rmSync(temp+'-journal',{force:true});rmSync(temp+'-wal',{force:true});rmSync(temp+'-shm',{force:true})}
 }
 export function validateBackup(path:string){
- const src=openArchive(path),tmp=new DatabaseSync(':memory:')
- try{
-  // Build a fresh known schema rather than trusting SQL objects in an imported file.
-  tmp.exec('PRAGMA foreign_keys=ON')
-  // use normal database constructor to migrate below via helper
-  return validateCopy(src)
- }finally{tmp.close();src.close()}
+ const src=openArchive(path)
+ try{return validateCopy(src)}finally{src.close()}
 }
 function validateCopy(src:DatabaseSync){
  const clean=openDatabase(':memory:')
- try{copyData(src,clean);validateData(clean);let count=0;readAssets(src,()=>count++);return count}finally{clean.close()}
+ try{clean.exec('BEGIN IMMEDIATE');copyData(src,clean);validateData(clean);clean.exec('COMMIT');let count=0;readAssets(src,()=>count++);return count}finally{clean.close()}
 }
 export function restoreBackup(db:DatabaseSync,media:string,path:string){
  const src=openArchive(path)
@@ -96,7 +91,7 @@ export function restoreBackup(db:DatabaseSync,media:string,path:string){
   // Content-addressed media is additive. Never delete the old library.
   readAssets(src,(name,bytes)=>{
    const target=join(media,name)
-   if(existsSync(target)){regular(target);if(hash(readFileSync(target))===name.slice(0,64))return;throw Error('Existing media corrupt; repair before restore')}
+   if(existsSync(target)){if(regular(target).size>maxFile)throw Error('Existing media too large');if(hash(readFileSync(target))===name.slice(0,64))return;throw Error('Existing media corrupt; repair before restore')}
    writeFileSync(target,bytes,{flag:'wx',mode:0o600})
   })
   db.exec('BEGIN IMMEDIATE')
@@ -114,8 +109,11 @@ export function pendingRestore(db:DatabaseSync,directory:string){
  const pending=join(directory,'restore.pending.pssabackup')
  if(!existsSync(pending))return ''
  const safety=join(directory,'before-restore-'+Date.now()+'.pssabackup')
- try{createBackup(db,join(directory,'media'),safety);restoreBackup(db,join(directory,'media'),pending);rmSync(pending);return 'Przywrócono dane. Kopia sprzed operacji pozostała w katalogu aplikacji.'}
- catch{try{renameSync(pending,join(directory,'restore.failed-'+Date.now()+'.pssabackup'))}catch{}return 'Przywracanie nie powiodło się. Zachowano dotychczasową bazę.'}
+ const applying=join(directory,'restore.applying-'+randomUUID()+'.pssabackup')
+ try{renameSync(pending,applying);createBackup(db,join(directory,'media'),safety);restoreBackup(db,join(directory,'media'),applying)}
+ catch{try{if(existsSync(applying))renameSync(applying,join(directory,'restore.failed-'+Date.now()+'.pssabackup'))}catch{}return 'Przywracanie nie powiodło się. Zachowano dotychczasową bazę.'}
+ try{rmSync(applying,{force:true})}catch{/* do not retry a successfully applied restore */}
+ return 'Przywrócono dane. Kopia sprzed operacji pozostała w katalogu aplikacji.'
 }
 export function stageRestore(source:string,directory:string){
  const dest=join(directory,'restore.pending.pssabackup')

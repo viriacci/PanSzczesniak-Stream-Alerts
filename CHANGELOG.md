@@ -1,4 +1,10 @@
 # Changelog
+## 2.0.0-beta.1
+- Tryby wydajności, tray i wyładowanie UI, onboarding oraz diagnostyka.
+- Kopia zapasowa historii, ustawień i mediów bez tokenów; staging restore i kopia bezpieczeństwa.
+- Sprawdzanie wydań stable/beta, NSIS clean-install smoke; bez automatycznej instalacji niepodpisanego EXE.
+- Etap 9 potwierdzony w CI.
+
 ## 2.0.0-dev.9
 - Analityka historyczna, zakresy i porównania, trend, heatmapa, kategorie, ranking sesji.
 - Import/eksport PSSA CSV/JSON, oznaczenie źródeł, deduplikacja i brak sztucznych próbek. Schema 4.
