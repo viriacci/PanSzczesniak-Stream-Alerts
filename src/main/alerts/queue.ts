@@ -51,8 +51,8 @@ export class AlertQueue {
    else if(count<rule.minCount)reason='minimum'
    else if(rule.cooldown>0&&this.db.prepare("SELECT 1 FROM alert_queue WHERE rule_key=? AND source='twitch' AND status NOT IN ('suppressed','failed') AND created_at>? LIMIT 1").get(rule.key,now-rule.cooldown*1000))reason='cooldown'
   }
-  if(!reason&&this.pendingCount()>=1000)reason='capacity'
-  const position=Number(this.db.prepare('SELECT coalesce(max(position),0)+1 AS n FROM alert_queue').get()?.n??1)
+  if(!reason&&this.pendingCount()+(this.current?1:0)>=1000)reason='capacity'
+  const position=Number(this.db.prepare('SELECT coalesce(max(id),0)+1 AS n FROM alert_queue').get()?.n??1)
   this.db.prepare('INSERT INTO alert_queue(event_id,source,rule_key,rule_json,text,status,priority,position,created_at,finished_at,reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
    .run(eventId,source,rule.key,JSON.stringify(rule),text,reason?'suppressed':'pending',rule.priority,position,now,reason?now:null,reason)
   this.tick()

@@ -1,12 +1,13 @@
-import {useState} from 'react'
+import {useEffect,useState} from 'react'
 import type {QueueCommand,QueueItem,QueueState} from '../../../shared/queue'
 import {Button,Panel,Status,Empty} from '../components/ui'
 const labels:Record<string,string>={pending:'Oczekuje',playing:'Odtwarzany',done:'Odtworzony',skipped:'Pominięty',failed:'Nieudany',suppressed:'Odfiltrowany'}
 const reasons:Record<string,string>={disabled:'Wyłączony',minimum:'Poniżej progu',cooldown:'Cooldown',capacity:'Limit kolejki',manual:'Ręcznie',restart:'Restart',shutdown:'Zamknięcie aplikacji','overlay-disconnected':'Utrata nakładki','ack-timeout':'Brak potwierdzenia','restart-limit':'Limit prób'}
 export function QueuePage({state,historyOnly=false}:{state?:QueueState;historyOnly?:boolean}){
  const [override,setOverride]=useState<QueueState>(),[busy,setBusy]=useState(false),[error,setError]=useState('')
- // Polling is authoritative; immediate result is used only during an outstanding command.
- const q=busy?(override??state):state
+ // A command result is immediate; the next authoritative poll replaces it.
+ useEffect(()=>setOverride(undefined),[state])
+ const q=override??state
  async function run(command:QueueCommand){
   if(busy)return
   setBusy(true);setError('')

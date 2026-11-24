@@ -55,3 +55,16 @@ test('newer database is rejected without downgrade', () => {
     assert.equal(schemaVersion(db), 99)
   } finally { db.close() }
 })
+
+
+test('schema 1 upgrades to schema 2 without losing settings',()=>{
+ const db=openDatabase(':memory:')
+ try{
+  setCompact(db,true)
+  db.exec('DROP TABLE alert_queue; PRAGMA user_version=1')
+  migrate(db)
+  assert.equal(schemaVersion(db),2)
+  assert.equal(getCompact(db),true)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM alert_queue').get()?.n,0)
+ }finally{db.close()}
+})

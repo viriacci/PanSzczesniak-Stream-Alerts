@@ -33,7 +33,7 @@ export class Overlay {
  stop(){this.playback=undefined;clearInterval(this.heartbeat);for(const s of this.streams)s.end();this.streams.clear();this.server?.close();this.server=undefined;this.key=''}
  online(){return [...this.streams].some(s=>!s.destroyed&&s.writableLength<=65536)}
  active(attempt:string){return this.playback?.attempt===attempt&&!this.playback.stream.destroyed&&this.streams.has(this.playback.stream)}
- private write(stream:ServerResponse,value:unknown){if(stream.destroyed||stream.writableLength>65536){stream.destroy();this.streams.delete(stream);return false}try{stream.write('data: '+JSON.stringify(value)+'\\n\\n');return true}catch{stream.destroy();this.streams.delete(stream);return false}}
+ private write(stream:ServerResponse,value:unknown){if(stream.destroyed||stream.writableLength>65536){stream.destroy();this.streams.delete(stream);return false}try{stream.write('data: '+JSON.stringify(value)+'\n\n');return true}catch{stream.destroy();this.streams.delete(stream);return false}}
  send(value:Playback){
   if(this.playback)return false
   for(const stream of this.streams){if(this.write(stream,{type:'play',...value})){this.playback={attempt:value.attempt,stream};return true}}
