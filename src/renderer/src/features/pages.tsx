@@ -1,3 +1,4 @@
+import {AnalyticsPage} from './analytics'
 import {LibraryPage,ProfilesPage} from './library'
 import {StudioPage} from './studio'
 import {LiveCenter} from './live'
@@ -15,6 +16,7 @@ import { Icon, type IconName } from '../components/icons'
 type Props={live?:LiveState;obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onIntegrations:()=>void}
 export function PageContent({live,obs,agent,alertState,item,status,layout,busy,onCompact,onReset,onIntegrations}:Props) {
  if(item.id==='dashboard')return <><LiveCenter state={live} obs={obs} pending={alertState?.queue.pendingCount??null} onIntegrations={onIntegrations}/><Panel title="Ostatnia aktywność">{alertState?.queue.history.length?alertState.queue.history.slice(0,4).map(x=><div className="setting-row" key={x.id}><span>{x.text}</span><small className="muted">{x.status}</small></div>):<Empty title="Brak zarejestrowanych zdarzeń">Ostatnie zakończone alerty pojawią się tutaj.</Empty>}</Panel></>
+ if(item.id==='analytics')return <AnalyticsPage/>
  if(item.id==='library')return <LibraryPage base={alertState?.twitch.overlayUrl??''}/>
  if(item.id==='profiles')return <ProfilesPage alerts={alertState} live={live}/>
  if(item.id==='studio')return <StudioPage state={alertState}/>

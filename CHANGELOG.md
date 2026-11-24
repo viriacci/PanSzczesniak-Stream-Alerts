@@ -1,4 +1,9 @@
 # Changelog
+## 2.0.0-dev.9
+- Analityka historyczna, zakresy i porównania, trend, heatmapa, kategorie, ranking sesji.
+- Import/eksport PSSA CSV/JSON, oznaczenie źródeł, deduplikacja i brak sztucznych próbek. Schema 4.
+- Etap 8 potwierdzony w CI.
+
 ## 2.0.0-dev.8
 - Biblioteka mediów: deduplikacja, tagi, foldery, filtry, wykrywanie braków, podgląd.
 - Profile alertów i szablony scen, warianty ważone oraz warunki liczby/miesięcy/kategorii.

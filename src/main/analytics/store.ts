@@ -13,10 +13,10 @@ export function selectedSessions(db:DatabaseSync,f:AnalyticsFilter):SessionRow[]
  FROM stream_sessions s LEFT JOIN imported_summaries i ON i.session_id=s.id
  WHERE s.channel_id=? AND s.started_at<? AND coalesce(s.ended_at,s.last_seen_at,s.started_at)>=?
  AND (?='all' OR (?='local' AND s.source='twitch') OR (?='imported' AND s.source<>'twitch'))
- AND (s.source='twitch' OR NOT EXISTS(SELECT 1 FROM stream_sessions local WHERE local.channel_id=s.channel_id AND local.source='twitch' AND local.started_at<coalesce(s.ended_at,s.started_at) AND coalesce(local.ended_at,local.last_seen_at,local.started_at)>s.started_at))
+ AND (s.source='twitch' OR NOT EXISTS(SELECT 1 FROM stream_sessions local WHERE local.channel_id=s.channel_id AND local.source='twitch' AND (local.external_id=s.external_id OR local.started_at=s.started_at OR (local.started_at<coalesce(s.ended_at,s.started_at) AND coalesce(local.ended_at,local.last_seen_at,local.started_at)>s.started_at))))
  ORDER BY s.started_at DESC LIMIT 20001`).all(f.from,f.to,f.category,f.category,f.from,f.to,f.category,f.category,f.from,f.to,f.category,f.category,f.channel,f.to,f.from,f.source,f.source,f.source)
  if(rows.length>20000)throw Error('Too many sessions; narrow range')
- return rows.filter(r=>!f.category||(r.source==='twitch'?n(r.samples)>0:categoryKey(String(r.category_id),String(r.category))===f.category)).map(r=>{
+ return rows.filter(r=>!(n(r.ended_at??r.last_seen_at??r.started_at)===f.from&&n(r.started_at)<f.from)).filter(r=>!f.category||(r.source==='twitch'?n(r.samples)>0:categoryKey(String(r.category_id),String(r.category))===f.category)).map(r=>{
   const startedAt=n(r.started_at),endedAt=n(r.ended_at??r.last_seen_at??r.started_at),local=r.source==='twitch',complete=startedAt>=f.from&&endedAt<=f.to
   return {id:n(r.id),channel:String(r.channel_id),externalId:String(r.external_id??''),startedAt,endedAt,title:String(r.title),categoryId:String(r.category_id),category:String(r.category),source:String(r.source),provenance:local?'PSSA / Twitch':String(r.provenance??'Unknown import'),duration:Math.max(0,Math.min(endedAt,f.to)-Math.max(startedAt,f.from)),average:local?nullable(r.local_avg):complete?nullable(r.imported_avg):null,peak:local?nullable(r.local_peak):complete?nullable(r.imported_peak):null,samples:n(r.samples),endQuality:String(r.end_quality)}
  })

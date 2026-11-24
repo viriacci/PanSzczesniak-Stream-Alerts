@@ -71,6 +71,9 @@ export function importHistory(db:DatabaseSync,rows:HistoricalSession[],format:'c
 export function exportHistory(db:DatabaseSync,value:unknown,format:'csv'|'json'){
  const f=parseFilter(value)
  const rows=selectedSessions(db,{...f,category:''}).filter(s=>s.startedAt>=f.from&&s.endedAt<=f.to&&s.endedAt>s.startedAt&&s.endQuality!=='unknown'&&(!f.category||(s.source==='twitch'?db.prepare("SELECT 1 FROM viewer_samples WHERE session_id=? AND (CASE WHEN category_id<>'' THEN 'id:'||category_id ELSE 'name:'||category END)=? LIMIT 1").get(s.id,f.category): (s.categoryId?'id:'+s.categoryId:'name:'+s.category)===f.category)))
+ if(rows.length>10000)throw Error('Narrow the export range to 10000 sessions')
  const sessions:HistoricalSession[]=rows.map(({channel,externalId,startedAt,endedAt,title,categoryId,category,average,peak,provenance,endQuality})=>({channel,externalId,startedAt,endedAt,title,categoryId,category,average,peak,provenance:provenance+(endQuality==='last-seen'?' (end estimated)':'')}))
- return format==='csv'?encodeCsv(sessions):JSON.stringify({version:1,sessions,report:report(db,f)},null,2)
+ const result=format==='csv'?encodeCsv(sessions):JSON.stringify({version:1,sessions,report:report(db,f)},null,2)
+ if(Buffer.byteLength(result,'utf8')>10*1024*1024)throw Error('Narrow export range to 10 MB')
+ return result
 }

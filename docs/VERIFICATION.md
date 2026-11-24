@@ -30,3 +30,5 @@ Etap 7: run 45370241006 success, 45/45, npm audit 0, typecheck, build, smoke ren
 Dodatkowo 1 test regresji OBS i rozszerzenie smoke o poprawny PNG oraz brakujący PNG. Łącznie 52 testy Node; CI oczekuje.
 
 Audyt B: run 45371861162 success, 52/52 PASS, clean audit, build, NSIS, Chromium media smoke i packaged smoke. Etap 8: 5 nowych testów biblioteki/profili/wariantów. CI oczekuje; manualne Twitch/OBS bez zmian.
+
+Etap 8 run 45372844349 success (57 testów, clean audit, build/smoke/NSIS/packaged smoke). Etap 9: 6 nowych testów analityki i importu/eksportu, schema 4, rozszerzenie smoke IPC. Nowy CI oczekuje.
