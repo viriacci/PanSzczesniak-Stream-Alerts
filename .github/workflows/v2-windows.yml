@@ -12,8 +12,6 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 25
-    outputs:
-      needs-lock: ${{ steps.lock-check.outputs.needed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -21,22 +19,18 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
-      - name: Check lockfile
-        id: lock-check
+      - run: npm ci
+      - name: Dependency advisory report
         shell: pwsh
         run: |
-          $needed = if (Test-Path package-lock.json) { 'false' } else { 'true' }
-          "needed=$needed" >> $env:GITHUB_OUTPUT
-      - name: Install dependencies
-        shell: pwsh
-        run: |
-          if (Test-Path package-lock.json) { npm ci } else { npm install }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Save resolved dependency lock
-        uses: actions/upload-artifact@v4
+          npm audit --json | Set-Content -Encoding utf8 npm-audit.json
+          $auditExit = $LASTEXITCODE
+          if ($auditExit -ne 0) { Write-Warning "npm audit returned $auditExit; report requires triage" }
+          exit 0
+      - uses: actions/upload-artifact@v4
         with:
-          name: pssa-package-lock
-          path: package-lock.json
+          name: pssa-npm-audit
+          path: npm-audit.json
           if-no-files-found: error
       - run: npm run typecheck
       - run: npm test
@@ -48,31 +42,3 @@ jobs:
           name: PSSA-2-Dev-Windows
           path: dist/*.exe
           if-no-files-found: error
-  pin-lockfile:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop/v2' && needs.windows.outputs.needs-lock == 'true'
-    needs: windows
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.sha }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: pssa-package-lock
-          path: lock-artifact
-      - name: Commit verified lockfile
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin develop/v2
-          test "$(git rev-parse origin/develop/v2)" = "$GITHUB_SHA" || exit 0
-          test ! -e package-lock.json || exit 0
-          cp lock-artifact/package-lock.json package-lock.json
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- package-lock.json
-          git commit -m 'build(v2): pin verified npm dependency tree'
-          git push origin HEAD:refs/heads/develop/v2

@@ -55,11 +55,13 @@ export class Auth {
   if(!this.deps.storage.isEncryptionAvailable())throw Error('Bezpieczny magazyn niedostępny')
   this.logout();const generation=this.generation,state=randomBytes(32).toString('hex')
   const code=await new Promise<string>((resolve,reject)=>{
-   let done=false
+   let done=false,claimed=false
    const finish=(error?:Error,code?:string)=>{if(done)return;done=true;clearTimeout(timer);server.close();server.closeAllConnections();this.cancel=undefined;error?reject(error):resolve(code!)}
    const server=createServer({requestTimeout:10000,headersTimeout:5000},(req,res)=>{
     let url:URL;try{url=new URL(req.url??'/',redirect)}catch{res.writeHead(400);res.end('Invalid callback');return}
     if(req.method!=='GET'||!['localhost:3000','127.0.0.1:3000'].includes(req.headers.host??'')||url.origin!==redirect||url.pathname!=='/'||url.searchParams.get('state')!==state){res.writeHead(400);res.end('Invalid callback');return}
+    if(claimed){res.writeHead(409);res.end('Callback already accepted');return}
+    claimed=true
     const code=url.searchParams.get('code')
     res.writeHead(code?200:400,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','Connection':'close','Referrer-Policy':'no-referrer'})
     res.end(code?'Autoryzacja odebrana. Wróć do PSSA.':'Autoryzacja anulowana.',()=>finish(code?undefined:Error('Autoryzacja anulowana'),code??undefined))

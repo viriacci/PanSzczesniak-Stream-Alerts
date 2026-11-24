@@ -4,7 +4,8 @@ import { defaultRule, kinds, normalizeLayout, parseRule, validKey, type AlertRul
 import { legacyMedia } from './media.ts'
 export async function importLegacy(file:string,target:string){
  const st=await stat(file);if(!st.isFile()||st.size>5*1024*1024)throw Error('Nieprawidłowy plik konfiguracji')
- const raw=JSON.parse((await readFile(file,'utf8')).replace(/^\uFEFF/,'')) as any
+ const contents=await readFile(file,'utf8');if(Buffer.byteLength(contents,'utf8')>5*1024*1024)throw Error('Plik konfiguracji przekracza limit')
+ const raw=JSON.parse(contents.replace(/^\uFEFF/,'')) as any
  if(!raw||typeof raw!=='object'||(!raw.alerts&&!raw.rewards))throw Error('Nie rozpoznano konfiguracji PSSA')
  const result:AlertRule[]=[],warnings:string[]=[]
  const rewardEntries=Object.entries(raw.rewards??{});if(rewardEntries.length>1000)throw Error('Zbyt wiele reguł w konfiguracji')

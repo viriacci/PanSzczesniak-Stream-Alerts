@@ -24,7 +24,7 @@ export class AlertsService {
  private generation=0
  private validation?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,dir:string,private window:BrowserWindow,private documents:string){
-  this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=id=>this.queue.acknowledge(id)
+  this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
   this.events=new EventSub(this.auth,(phase,detail)=>{this.phase=phase;this.detail=detail},e=>this.dispatch(e))
  }
  async start(auto=true){
@@ -36,7 +36,7 @@ export class AlertsService {
   this.ticker=setInterval(()=>{try{this.queue.tick()}catch{this.detail='Błąd silnika kolejki'}},250)
   this.validation=setInterval(()=>{const generation=this.generation;if(this.auth.identity)void this.auth.ensure().catch(()=>{if(this.stopped||generation!==this.generation)return;this.events.stop();this.phase='error';this.detail='Sesja Twitch wymaga ponownego połączenia'})},3600000)
  }
- stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.queue.stop();this.events.stop();this.auth.stop();this.overlay.stop()}
+ stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
  state():AlertState{return {twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  async login(clientId:string,secret:string){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')

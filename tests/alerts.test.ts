@@ -39,3 +39,11 @@ test('legacy import copies only safe media and ignores credentials',async()=>{
   assert.equal(result.rules[0]!.template,'{user}');assert.equal(JSON.stringify(result).includes('"access_token"'),false)
  }finally{await rm(root,{recursive:true,force:true})}
 })
+
+test('shared chat notifications do not trigger local sub alerts',()=>{
+ assert.equal(normalizeEvent('e','channel.chat.notification',{notice_type:'sub',source_broadcaster_user_id:'99',broadcaster_user_id:'42'}),undefined)
+})
+test('media types cannot be swapped between image and audio',()=>{
+ assert.throws(()=>parseRule({...defaultRule('raid'),image:'a'.repeat(64)+'.mp3'}))
+ assert.throws(()=>parseRule({...defaultRule('raid'),audio:'a'.repeat(64)+'.png'}))
+})

@@ -1,6 +1,6 @@
-import { normalizeEvent, subscriptions } from './events'
-import type { Auth } from './auth'
-import type { AlertEvent } from '../../shared/alerts'
+import { normalizeEvent, subscriptions } from './events.ts'
+import type { Auth } from './auth.ts'
+import type { AlertEvent } from '../../shared/alerts.ts'
 export class EventSub {
  private sockets=new Set<WebSocket>()
  private current?:WebSocket

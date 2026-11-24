@@ -12,7 +12,7 @@ export async function copyMedia(source:string,target:string,kind:'image'|'audio'
  const name=createHash('sha256').update(bytes).digest('hex')+ext
  await mkdir(target,{recursive:true})
  const destination=join(target,name),temporary=join(target,'.'+randomUUID()+'.tmp')
- try{const old=await readFile(destination);if(createHash('sha256').update(old).digest('hex')===name.slice(0,64))return name}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}
+ try{const existing=await stat(destination);if(!existing.isFile()||existing.size>50*1024*1024)throw Error('Nieprawidłowy plik docelowy');const old=await readFile(destination);if(createHash('sha256').update(old).digest('hex')===name.slice(0,64))return name}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}
  try{await writeFile(temporary,bytes,{flag:'wx'});await rename(temporary,destination)}finally{await rm(temporary,{force:true}).catch(()=>{})}
  return name
 }

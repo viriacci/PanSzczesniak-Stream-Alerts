@@ -1,4 +1,9 @@
 # Changelog
+## 2.0.0-dev.4-audit.1
+- Audyt A: poprawki wyścigów sesji OAuth, odświeżania tokenów, reconnect, ACK błędów mediów, zapisu plików, shutdown i walidacji.
+- Testy mock Auth/EventSub, pełny test 1000 alertów, regresje media i ACK.
+- CI read-only, npm ci i raport advisory.
+
 ## 2.0.0-dev.4
 - Trwała kolejka i historia, migracja SQLite 2, priorytety, ręczne przesuwanie, pauza, skip, replay.
 - Cooldown, minimalna liczba, głośność globalna/indywidualna, mute, przerwy.

@@ -15,3 +15,6 @@ Dodano test HTTP/SSE lokalnej nakładki: dostęp z kluczem, odmowa bez klucza i 
 
 ## Etap 4
 Etap 3 CI run 45357845578: typecheck PASS, test overlay FAIL z powodu parameter property w trybie strip-only. Zmieniono konstruktor na jawne pola. Dodano 5 testów kolejki, w tym 1000 zdarzeń, rozszerzono test ACK i smoke; zmieniono test migracji schema 2. Wynik nowego CI oczekuje. Rzeczywisty Twitch/OBS nieprzetestowany. Audyt A jest następną obowiązkową bramką.
+
+## Etap 4 potwierdzony
+Run 45360806153: success, 20/20 testów, typecheck, build, smoke i installer. Audyt A: oczekuje na weryfikację nowego CI i analizę npm audit. Raport docs/audits/AUDIT_A.md.

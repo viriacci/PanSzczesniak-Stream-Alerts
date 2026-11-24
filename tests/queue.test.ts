@@ -88,3 +88,29 @@ test('1000 queued alerts survive and excess is explicitly suppressed',()=>{
   assert.equal(f.q.state().pendingCount,1000);assert.equal(f.q.state().history[0]?.reason,'capacity')
  }finally{f.q.stop();f.db.close()}
 })
+
+test('media failure is not recorded as successful playback',()=>{
+ const f=fixture()
+ try{
+  f.connect(true);f.q.enqueue(f.event('broken'),f.rule)
+  assert.equal(f.q.acknowledge(f.last()!.attempt,'media-error'),true)
+  assert.equal(f.q.state().history[0]?.status,'failed')
+  assert.equal(f.q.state().history[0]?.reason,'media-error')
+ }finally{f.q.stop();f.db.close()}
+})
+test('1000 queued events drain sequentially with unique playback attempts',()=>{
+ const f=fixture()
+ try{
+  for(let i=0;i<1000;i++)f.q.enqueue(f.event('drain-'+i),f.rule)
+  f.connect(true);f.q.tick()
+  const attempts=new Set<string>()
+  for(let i=0;i<1000;i++){
+   assert.ok(f.q.state().current)
+   const attempt=f.last()!.attempt;assert.equal(attempts.has(attempt),false);attempts.add(attempt)
+   f.ack();f.advance(500)
+  }
+  assert.equal(f.q.state().pendingCount,0)
+  assert.equal(f.q.state().current,null)
+  assert.equal(f.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='done'").get()?.n,1000)
+ }finally{f.q.stop();f.db.close()}
+})
