@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.0-rc.2
+- Wymuszenie indeksu historii i test rzeczywistego planu zapytań bez tymczasowego sortowania.
+
 ## 2.0.0-rc.1
 - Kolejka zdarzeniowa, bez aktywnego timera w idle.
 - Schemat 5: indeksy historii/czatu, obsługa archiwów v4.

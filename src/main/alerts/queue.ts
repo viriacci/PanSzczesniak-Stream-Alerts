@@ -3,6 +3,9 @@ import type { DatabaseSync } from 'node:sqlite'
 import { parseRule, renderText, type AlertEvent, type AlertRule } from '../../shared/alerts.ts'
 import { defaultQueueSettings,parseQueueSettings,parseQueueCommand,type QueueItem,type QueueSummary,type QueueSource,type QueueState,type QueueStatus,type Playback,type QueueSettings } from '../../shared/queue.ts'
 
+// Partial index predicate must remain identical to schema migration 5.
+export const historyQueryTail=" FROM alert_queue INDEXED BY alert_queue_history WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100"
+
 export interface Transport {
  online():boolean
  send(value:Playback):boolean
@@ -53,7 +56,7 @@ export class AlertQueue {
   const fields="id,source,rule_key,json_extract(rule_json,'$.title') AS title,text,status,priority,position,attempts,created_at,finished_at,reason"
   const current=this.current?this.db.prepare('SELECT '+fields+' FROM alert_queue WHERE id=?').get(this.current.id):undefined
   const pending=this.db.prepare('SELECT '+fields+" FROM alert_queue WHERE status='pending' ORDER BY priority DESC,position,id LIMIT 100").all().map(r=>this.summary(r))
-  const history=this.db.prepare('SELECT '+fields+" FROM alert_queue WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100").all().map(r=>this.summary(r))
+  const history=this.db.prepare('SELECT '+fields+historyQueryTail).all().map(r=>this.summary(r))
   const state={settings:{...this.settings},current:current?this.summary(current):null,pending,pendingCount:this.pendingCount(),history,online};this.cached={revision:this.revision,online,state};return state
  }
  enqueue(event:AlertEvent,rule:AlertRule,source:QueueSource='twitch'){

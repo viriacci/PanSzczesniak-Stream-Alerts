@@ -40,3 +40,5 @@ Beta.1 run 45374474420 success: 68/68, audit 0, build, smoke, NSIS, packaged i c
 Beta.2 run 45375146660: 73/73 PASS, audit clean, build/smoke, NSIS, installed, upgrade/uninstall marker. Beta.3: 4 nowe testy (77), smoke Node Agent/revision, benchmark, inventory, SBOM. CI oczekuje.
 
 Beta.3 run 45377162735 success; Beta.4 run 45378166188 success, 78/78, npm audit 0, worker/Agent Node, build/smoke/NSIS/install/upgrade/uninstall. RC.1: 5 nowych testów (83 łącznie), w tym migracja v4→v5, restore v4, nextDelay, awaria migracji EventSub i 8h wirtualny soak. Dodatkowy smoke Background destroy/recreate. CI oczekuje. Rzeczywiste testy stanowiska: docs/RELEASE_ACCEPTANCE.md.
+
+RC.1 run 45379912938: npm audit 0, benchmark i typecheck PASS, 82/83 testów PASS (w tym wirtualne 8h); FAIL plan historii używał alert_queue_pending i TEMP B-TREE. RC.2 jawnie wskazuje partial index w produkcyjnym SQL i testuje ten sam fragment zapytania. CI oczekuje.

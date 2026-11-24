@@ -1,3 +1,4 @@
+import {historyQueryTail} from '../src/main/alerts/queue.ts'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -76,7 +77,7 @@ test('v4 database gains covering history and chat indexes without losing rows',(
   assert.equal(db.prepare('SELECT count(*) n FROM stream_events').get()?.n,1)
   const plan=db.prepare("EXPLAIN QUERY PLAN SELECT count(*),count(DISTINCT chatter_key) FROM stream_events WHERE session_id=? AND kind='chat'").all(1)
   assert.match(JSON.stringify(plan),/events_chat_by_session/)
-  const history=db.prepare("EXPLAIN QUERY PLAN SELECT id FROM alert_queue WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100").all()
-  assert.match(JSON.stringify(history),/alert_queue_history/)
+  const history=db.prepare('EXPLAIN QUERY PLAN SELECT id'+historyQueryTail).all()
+  assert.match(JSON.stringify(history),/alert_queue_history/);assert.doesNotMatch(JSON.stringify(history),/TEMP B-TREE/)
  }finally{db.close()}
 })

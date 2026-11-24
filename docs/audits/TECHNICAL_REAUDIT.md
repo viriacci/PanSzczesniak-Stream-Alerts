@@ -47,3 +47,5 @@ Nie są to wyniki obciążenia całej aplikacji, GPU ani FPS.
 
 ## Domknięcie RC.1
 Beta.4 run 45378166188 — 78/78, audit 0, full Windows CI PASS. RC T18–T23: kolejka budzona przez zdarzenia/ACK/zmianę transportu i pojedynczy deadline, schema 5 (indeksy historii i zdarzeń), odczyt backupów v4 i v5, zachowanie starego EventSub podczas awarii zastępczego socketu, Background destroy/recreate BrowserWindow i rebinding IPC, limit importu po odczycie, 8h wirtualnego soak. Weryfikacja RC oczekuje. Brak pomiaru rzeczywistego GPU, RAM i frametimes; nie zastępować go testem syntetycznym. Pełny upstream source audit i fizyczne stanowisko nadal poza dowodem CI.
+
+RC.1: rzeczywisty planner SQLite dla historii preferował indeks statusu i sortowanie. RC.2 wymusza alert_queue_history przez INDEXED BY i regresję na identycznym SQL. Bez zmiany schematu. Benchmark RC.1: idle 360.14→1.67 ms (14400→0 prepare), snapshot 818.32→0.38 ms (3000→0), konfiguracja 1249.11→123.86 ms (500→500). Test syntetyczny, nie FPS ani RAM.
