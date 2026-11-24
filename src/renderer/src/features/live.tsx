@@ -17,8 +17,8 @@ function ViewerChart({state}:{state:LiveState}){
  const segments:typeof points[]=[]
  for(const p of points){const segment=segments.at(-1);if(!segment||p.at-segment.at(-1)!.at>90000)segments.push([p]);else segment.push(p)}
  return <div className="live-chart"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Wykres obserwowanej oglądalności; przerwy oznaczają brak próbek">
- {Array.from({length:5},(_,i)=>peak*i/4).map((v,i)=><g key={i}><line x1={left} x2={width-right} y1={y(v)} y2={y(v)} stroke="#303036"/><text x={left-8} y={y(v)+4} textAnchor="end" fill="#a2a1ab" fontSize="10">{Math.round(v)}</text></g>)}
- {segments.map((segment,i)=><g key={i}><polyline fill="none" stroke="#e3c048" strokeWidth="2" points={segment.map(p=>x(p.at)+','+y(p.viewers)).join(' ')}/>{segment.length===1&&<circle cx={x(segment[0]!.at)} cy={y(segment[0]!.viewers)} r="3" fill="#e3c048"/>}</g>)}
+ {Array.from({length:5},(_,i)=>peak*i/4).map((v,i)=><g key={i}><line x1={left} x2={width-right} y1={y(v)} y2={y(v)} stroke="var(--line)"/><text x={left-8} y={y(v)+4} textAnchor="end" fill="#a2a1ab" fontSize="10">{Math.round(v)}</text></g>)}
+ {segments.map((segment,i)=><g key={i}><polyline fill="none" stroke="var(--gold)" strokeWidth="2" points={segment.map(p=>x(p.at)+','+y(p.viewers)).join(' ')}/>{segment.length===1&&<circle cx={x(segment[0]!.at)} cy={y(segment[0]!.viewers)} r="3" fill="var(--gold)"/>}</g>)}
  <text x={left} y={height-5} fill="#a2a1ab" fontSize="11">{new Date(min).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</text><text x={width-right} y={height-5} textAnchor="end" fill="#a2a1ab" fontSize="11">{new Date(points.at(-1)!.at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</text>
  </svg><p className="muted">Średnia z rzeczywistych próbek (co około 30 s), nie oficjalna analityka Twitch. Widok ostatnich maks. 480 próbek. Luki nie są interpolowane.</p></div>
 }

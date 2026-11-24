@@ -11,14 +11,14 @@ function Trend({stats}:{stats:PeriodStats}){
  const segments:{i:number;v:number}[][]=[]
  points.forEach((p,i)=>{if(p.average===null)return;const last=segments.at(-1);if(!last||last.at(-1)!.i!==i-1)segments.push([{i,v:p.average}]);else last.push({i,v:p.average})})
  return <svg viewBox="0 0 650 183" className="analytics-chart" role="img" aria-label="Średnia dzienna z lokalnych próbek widzów, luki oznaczają brak danych">
- {[0,.25,.5,.75,1].map(v=><g key={v}><line x1="35" x2="635" y1={y(peak*v)} y2={y(peak*v)} stroke="#303036"/><text x="28" y={y(peak*v)+3} textAnchor="end" fill="#999" fontSize="10">{Math.round(peak*v)}</text></g>)}
- {segments.map((s,i)=><g key={i}><polyline fill="none" stroke="#e3c048" strokeWidth="2" points={s.map(p=>x(p.i)+','+y(p.v)).join(' ')}/>{s.length===1&&<circle cx={x(s[0]!.i)} cy={y(s[0]!.v)} r="3" fill="#e3c048"/>}</g>)}
+ {[0,.25,.5,.75,1].map(v=><g key={v}><line x1="35" x2="635" y1={y(peak*v)} y2={y(peak*v)} stroke="var(--line)"/><text x="28" y={y(peak*v)+3} textAnchor="end" fill="#999" fontSize="10">{Math.round(peak*v)}</text></g>)}
+ {segments.map((s,i)=><g key={i}><polyline fill="none" stroke="var(--gold)" strokeWidth="2" points={s.map(p=>x(p.i)+','+y(p.v)).join(' ')}/>{s.length===1&&<circle cx={x(s[0]!.i)} cy={y(s[0]!.v)} r="3" fill="var(--gold)"/>}</g>)}
  {points.filter((_,i)=>i===0||i===points.length-1||i===Math.floor(points.length/2)).map(p=><text key={p.day} x={x(points.indexOf(p))} y="174" textAnchor={p===points[0]?'start':p===points.at(-1)?'end':'middle'} fill="#aaa" fontSize="11">{p.day.slice(5)}</text>)}</svg>
 }
 function Heatmap({stats}:{stats:PeriodStats}){
  const peak=Math.max(1,...stats.heatmap.map(x=>x.average))
  const cells=new Map(stats.heatmap.map(x=>[x.day+':'+x.hour,x]))
- return <div className="heat-scroll"><div className="heatmap"><span/>{Array.from({length:24},(_,h)=><span key={h}>{h%3===0?String(h).padStart(2,'0'):''}</span>)}{['Pon','Wt','Śr','Czw','Pt','Sob','Nd'].flatMap((d,i)=>[<span key={d}>{d}</span>,...Array.from({length:24},(_,h)=>{const p=cells.get(i+':'+h);return <span key={i+':'+h} className="heat-cell" style={{background:p?'rgba(227,192,72,'+(.12+.88*p.average/peak)+')':'#242428'}} title={d+' '+h+':00 UTC · '+(p?fmt(p.average)+' widzów / '+p.samples+' próbek':'Brak danych')}/>})])}</div></div>
+ return <div className="heat-scroll"><div className="heatmap"><span/>{Array.from({length:24},(_,h)=><span key={h}>{h%3===0?String(h).padStart(2,'0'):''}</span>)}{['Pon','Wt','Śr','Czw','Pt','Sob','Nd'].flatMap((d,i)=>[<span key={d}>{d}</span>,...Array.from({length:24},(_,h)=>{const p=cells.get(i+':'+h);return <span key={i+':'+h} className="heat-cell" style={{background:p?'color-mix(in srgb, var(--brand-fill, var(--gold)) '+Math.round((.12+.88*p.average/peak)*100)+'%, var(--bg))':'var(--raised)'}} title={d+' '+h+':00 UTC · '+(p?fmt(p.average)+' widzów / '+p.samples+' próbek':'Brak danych')}/>})])}</div></div>
 }
 export function AnalyticsPage(){
  const [channels,setChannels]=useState<string[]>([]),[channel,setChannel]=useState(''),[from,setFrom]=useState(date(today()-29*DAY)),[to,setTo]=useState(date(today())),[category,setCategory]=useState(''),[source,setSource]=useState<AnalyticsFilter['source']>('all'),[data,setData]=useState<AnalyticsReport>(),[busy,setBusy]=useState(false),[notice,setNotice]=useState('')

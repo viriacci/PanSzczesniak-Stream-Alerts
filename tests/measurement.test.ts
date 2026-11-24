@@ -1,3 +1,4 @@
+import {themes} from '../src/shared/themes.ts'
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {mkdtempSync,rmSync,readdirSync,readFileSync,appendFileSync} from 'node:fs'
@@ -12,6 +13,7 @@ test('themes migrate old preferences and reject arbitrary theme IDs',()=>{
  const {theme,...old}=defaults
  assert.equal(parseRuntime(old).theme,'pssa')
  assert.equal(parseRuntime({...old,theme:'vivionyx'}).theme,'vivionyx')
+ assert.deepEqual(themes.vivionyx.colors,['#141414','#843935','#ae9278'])
  assert.equal(parseRuntime({...old,theme:'shiroe'}).theme,'shiroe')
  assert.throws(()=>parseRuntime({...old,theme:'<script>'}))
 })

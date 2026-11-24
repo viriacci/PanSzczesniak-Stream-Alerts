@@ -44,3 +44,5 @@ Beta.3 run 45377162735 success; Beta.4 run 45378166188 success, 78/78, npm audit
 RC.1 run 45379912938: npm audit 0, benchmark i typecheck PASS, 82/83 testów PASS (w tym wirtualne 8h); FAIL plan historii używał alert_queue_pending i TEMP B-TREE. RC.2 jawnie wskazuje partial index w produkcyjnym SQL i testuje ten sam fragment zapytania. CI oczekuje.
 
 RC.2 run 45380348076 success, 83/83, full Windows CI. RC.3: 4 dodatkowe testy (87 łącznie), rzeczywisty smoke sesji pomiarowej w Background, IPC skórek i redakcji crash logu, source maps jako osobny artefakt. CI oczekuje. Realny stream i GPU counter na maszynie użytkownika jeszcze niezweryfikowane.
+
+RC.3 run 45382575827: pełny Windows CI PASS, w tym smoke pomiaru w Background i crash redaction. RC.4: korekta palety i test jej wartości, CI oczekuje.

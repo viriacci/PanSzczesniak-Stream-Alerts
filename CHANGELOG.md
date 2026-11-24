@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.0-rc.4
+- ViviOnyx: paleta #141414 / #843935 / #ae9278, kontrast tekstu, dopasowanie biblioteki i edytora oraz wykresów do motywu.
+
 ## 2.0.0-rc.3
 - Trzy skórki lokalnego interfejsu; koncepcje ViviOnyx i Shiroe.
 - Opcjonalna sesja pomiarowa CPU/RAM, GPU, OBS, Agenta i kolejki, historia, porównanie, CSV/JSON.
