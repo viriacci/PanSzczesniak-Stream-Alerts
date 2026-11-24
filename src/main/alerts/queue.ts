@@ -45,6 +45,8 @@ export class AlertQueue {
   return this.insert(source+':'+event.id,source,parseRule(rule),renderText(rule.template,event),event.count??event.months??0)
  }
  private insert(eventId:string,source:QueueSource,rule:AlertRule,text:string,count:number){
+  // Only the chosen scene is part of an immutable playback snapshot.
+  rule={...rule,variants:[]}
   if(this.stopped)throw Error('Queue stopped')
   if(this.db.prepare('SELECT id FROM alert_queue WHERE event_id=?').get(eventId))return false
   const now=this.now()

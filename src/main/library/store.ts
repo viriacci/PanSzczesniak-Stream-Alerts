@@ -1,9 +1,10 @@
+import {parseVariants} from '../../shared/variants.ts'
 import {randomUUID} from 'node:crypto'
 import type {DatabaseSync} from 'node:sqlite'
 import {defaultRule,parseRule,validKey,validMedia,type AlertRule} from '../../shared/alerts.ts'
 import {parseScene,type Scene} from '../../shared/scene.ts'
 import {sceneForRule} from '../../shared/scene-legacy.ts'
-import {rules,saveRules,saveScene} from '../alerts/store.ts'
+import {rules,saveRules,saveScene,saveRule} from '../alerts/store.ts'
 import {mediaKind,type LibraryAction,type LibraryState,type Asset,type Profile,type SceneTemplate} from '../../shared/library.ts'
 import {readdir,stat,realpath} from 'node:fs/promises'
 import {join,relative,isAbsolute} from 'node:path'
@@ -32,7 +33,8 @@ export function config(db:DatabaseSync):Config{
  for(const [id,m] of entries)if(validAsset(id))meta[id]=metadata(m)
  return {active:v.active,profiles,templates,metadata:meta}
 }
-function persist(db:DatabaseSync,c:Config){db.prepare("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key,JSON.stringify(c))}
+export function activeProfile(db:DatabaseSync){const id=db.prepare("SELECT value FROM settings WHERE key='library.active'").get()?.value;return typeof id==='string'?id:'default'}
+function persist(db:DatabaseSync,c:Config){db.prepare("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key,JSON.stringify(c));db.prepare("INSERT INTO settings(key,value) VALUES ('library.active',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(c.active)}
 function refsForRule(r:AlertRule){return [r.image,r.audio,...(r.scene?.layers.map(l=>l.asset)??[]),...(r.variants??[]).flatMap(v=>v.scene.layers.map(l=>l.asset))].filter(validAsset)}
 export function references(db:DatabaseSync,c=config(db)){
  const refs=new Map<string,number>();const add=(ids:string[])=>{for(const id of new Set(ids))if(validAsset(id))refs.set(id,(refs.get(id)??0)+1)}
@@ -74,6 +76,18 @@ export function libraryAction(db:DatabaseSync,value:unknown){
   const t=c.templates.find(t=>t.id===x.id);if(!t||typeof x.key!=='string'||!validKey(x.key))throw Error('Template not found')
   saveScene(db,x.key,t.scene,x.key);return
  }else if(x.type==='template-delete'){if(!c.templates.some(t=>t.id===x.id))throw Error('Template not found');c.templates=c.templates.filter(t=>t.id!==x.id)}
+ else if(x.type==='variant-save'||x.type==='variant-delete'){
+  if(typeof x.key!=='string'||!validKey(x.key))throw Error('Invalid alert')
+  const r=rules(db).find(r=>r.key===x.key);if(!r)throw Error('Alert not found')
+  const variants=r.variants??[]
+  if(x.type==='variant-delete'){if(!variants.some(v=>v.id===x.id))throw Error('Variant not found');saveRule(db,{...r,variants:variants.filter(v=>v.id!==x.id)});return}
+  const old=x.id===undefined?undefined:variants.find(v=>v.id===x.id)
+  if(x.id!==undefined&&!old)throw Error('Variant not found')
+  const t=c.templates.find(t=>t.id===x.templateId)
+  if(!t&&!(old&&x.templateId===''))throw Error('Template not found')
+  const v={id:old?.id??randomUUID(),name:x.name,scene:t?.scene??old!.scene,weight:x.weight,minCount:x.minCount,maxCount:x.maxCount,minMonths:x.minMonths,categoryId:x.categoryId}
+  saveRule(db,{...r,variants:parseVariants([...variants.filter(y=>y.id!==v.id),v])});return
+ }
  else throw Error('Invalid library action')
  persist(db,c)
 }
@@ -88,7 +102,8 @@ export async function libraryState(db:DatabaseSync,dir:string):Promise<LibrarySt
  let root:string|undefined
  try{root=await realpath(dir);for(const e of await readdir(root,{withFileTypes:true}))if(e.isFile()&&validAsset(e.name))ids.add(e.name)}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}
  const assets:Asset[]=[]
- for(const id of [...ids].sort().slice(0,10000)){
+ const all=[...ids].sort();if(all.length>10000)throw Error('Library index limit exceeded (10000 assets)')
+ for(const id of all){
   let bytes:number|null=null
   if(root)try{const file=await realpath(join(root,id)),rel=relative(root,file);if(rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid media path');const st=await stat(file);if(st.isFile())bytes=st.size}catch{}
   assets.push({id,...(c.metadata[id]??{name:id,folder:'',tags:[]}),kind:mediaKind(id),bytes,missing:bytes===null,references:refs.get(id)??0})

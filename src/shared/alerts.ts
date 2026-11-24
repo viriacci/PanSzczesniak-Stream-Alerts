@@ -9,7 +9,7 @@ export interface Border {border_width:number;border_color:string;border_style:st
 export interface AlertLayout { image:{x:number;y:number;width:number;height:number}&Border; caption:{x:number;y:number;width:number;height:number;font_size:number;font_color:string;bg_color:string;bg_opacity:number;font_family:string}&Border; anim_in:string;anim_out:string;anim_duration_ms:number }
 export interface TwitchState { phase:'disconnected'|'authorizing'|'connecting'|'connected'|'retrying'|'error'; login:string; detail:string; overlayUrl:string; clients:number }
 export interface Reward {id:string;title:string;cost:number}
-export interface AlertState { twitch:TwitchState; rules:AlertRule[]; rewards:Reward[]; queue:QueueState }
+export interface AlertState { profileId?:string; twitch:TwitchState; rules:AlertRule[]; rewards:Reward[]; queue:QueueState }
 export const templates:Record<AlertKind,string>={redemption:'{user} odbiera {reward}',raid:'{user} najeżdża z {viewers} widzami!',follow:'{user} zaczyna obserwować!',sub:'{user} subskrybuje!',prime_sub:'{user} subskrybuje z Prime!',resub:'{user} odnawia subskrypcję ({months} mies.)!',gift:'{user} podarował subskrypcję!',mass_gift:'{user} podarował {count} subskrypcji!',bits:'{user} przekazuje {bits} Bits!'}
 export function validKey(key:string):boolean {return (kinds as readonly string[]).includes(key)||/^reward:[a-zA-Z0-9_-]{1,128}$/.test(key)}
 export function validMedia(name:string):boolean {return name===''||/^[a-f0-9]{64}\.(png|jpg|jpeg|gif|webp|mp3|wav|ogg|m4a|webm|mp4)$/i.test(name)}
