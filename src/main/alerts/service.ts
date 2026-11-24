@@ -4,15 +4,18 @@ import { join } from 'node:path'
 import { randomBytes,randomUUID } from 'node:crypto'
 import { Auth } from '../twitch/auth'
 import { EventSub } from '../twitch/eventsub'
+import { AlertQueue } from './queue'
 import { Overlay } from '../overlay/server'
 import { rules,saveRule,saveRules } from './store'
 import { copyMedia,imageExt,audioExt } from './media'
 import { importLegacy } from './import'
-import { defaultRule,renderText,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
+import { defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
 export class AlertsService {
  private auth:Auth
  private events:EventSub
  private overlay:Overlay
+ private queue:AlertQueue
+ private ticker?:ReturnType<typeof setInterval>
  private phase:TwitchState['phase']='disconnected'
  private detail=''
  private rewards:Reward[]=[]
@@ -21,7 +24,7 @@ export class AlertsService {
  private generation=0
  private validation?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,dir:string,private window:BrowserWindow,private documents:string){
-  this.media=join(dir,'media');this.auth=new Auth(db);this.overlay=new Overlay(this.media)
+  this.media=join(dir,'media');this.auth=new Auth(db);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=id=>this.queue.acknowledge(id)
   this.events=new EventSub(this.auth,(phase,detail)=>{this.phase=phase;this.detail=detail},e=>this.dispatch(e))
  }
  async start(auto=true){
@@ -30,10 +33,11 @@ export class AlertsService {
   this.db.prepare("INSERT INTO settings(key,value) VALUES ('overlay.key',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key)
   try{await this.overlay.start(key)}catch{this.detail='Port overlay 18766 zajęty'}
   if(auto){try{if(this.auth.load())void this.connect().catch(()=>{})}catch{this.phase='error';this.detail='Zapisana sesja wymaga ponownego logowania'}}
+  this.ticker=setInterval(()=>{try{this.queue.tick()}catch{this.detail='Błąd silnika kolejki'}},250)
   this.validation=setInterval(()=>{if(this.auth.identity)void this.auth.ensure().catch(()=>{this.events.stop();this.phase='error';this.detail='Sesja Twitch wymaga ponownego połączenia'})},3600000)
  }
- stop(){this.stopped=true;this.generation++;clearInterval(this.validation);this.events.stop();this.auth.stop();this.overlay.stop()}
- state():AlertState{return {twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards}}
+ stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.queue.stop();this.events.stop();this.auth.stop();this.overlay.stop()}
+ state():AlertState{return {twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  async login(clientId:string,secret:string){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
   this.generation++;const g=this.generation;this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
@@ -62,6 +66,7 @@ export class AlertsService {
   const map=new Map(rules(this.db).map(x=>[x.key,x]));for(const rule of data.rules)map.set(rule.key,rule);saveRules(this.db,[...map.values()])
   return {count:data.rules.length,warnings:data.warnings}
  }
- test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const kind=key.startsWith('reward:')?'redemption':key as AlertEvent['kind'];const event:AlertEvent={id:randomUUID(),kind,user:'Test PSSA',reward:rule.title,count:5,months:3};return this.overlay.publish(rule,renderText(rule.template,event))}
- private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule?.enabled)this.overlay.publish(rule,renderText(rule.template,event))}catch{this.detail='Błąd odczytu reguły alertu'}}
+ queueCommand(command:unknown){return this.queue.command(command)}
+ test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const kind=key.startsWith('reward:')?'redemption':key as AlertEvent['kind'];const event:AlertEvent={id:randomUUID(),kind,user:'Test PSSA',reward:rule.title,count:5,months:3};return this.queue.enqueue(event,rule,'test')?1:0}
+ private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule)this.queue.enqueue(event,rule)}catch{this.detail='Błąd odczytu reguły alertu'}}
 }

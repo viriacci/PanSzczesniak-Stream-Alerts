@@ -89,7 +89,7 @@ async function start(): Promise<void> {
   if (smoke) {
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 1 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/"))'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 2 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1)'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     app.quit()

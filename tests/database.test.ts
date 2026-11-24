@@ -16,7 +16,7 @@ test('schema and settings persist across restarts', () => {
       assert.equal(setCompact(db, true), true)
     } finally { db.close() }
     db = openDatabase(path)
-    try { assert.equal(getCompact(db), true); migrate(db); assert.equal(schemaVersion(db), 1) }
+    try { assert.equal(getCompact(db), true); migrate(db); assert.equal(schemaVersion(db), SCHEMA_VERSION) }
     finally { db.close() }
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
@@ -41,8 +41,8 @@ test('foreign keys, sample validation and event deduplication', () => {
 test('failed migration rolls back schema and version', () => {
   const db = openDatabase(':memory:')
   try {
-    assert.throws(() => migrate(db, ['unused', 'CREATE TABLE temporary_test(x); INVALID SQL;']))
-    assert.equal(schemaVersion(db), 1)
+    assert.throws(() => migrate(db, ['unused', 'unused', 'CREATE TABLE temporary_test(x); INVALID SQL;']))
+    assert.equal(schemaVersion(db), SCHEMA_VERSION)
     assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE name='temporary_test'").get(), undefined)
   } finally { db.close() }
 })

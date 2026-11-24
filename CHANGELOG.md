@@ -1,4 +1,10 @@
 # Changelog
+## 2.0.0-dev.4
+- Trwała kolejka i historia, migracja SQLite 2, priorytety, ręczne przesuwanie, pauza, skip, replay.
+- Cooldown, minimalna liczba, głośność globalna/indywidualna, mute, przerwy.
+- Nakładka z ACK i ponowieniem po rozłączeniu, limit prób, watchdog.
+- Testy kolejki i poprawka testu overlay Node strip-only.
+
 ## 2.0.0-dev.3
 - OAuth Twitch, szyfrowane poświadczenia, EventSub i reconnect.
 - Alerty follow/raid/bits/sub/Prime/resub/gift/mass gift oraz nagrody kanału.

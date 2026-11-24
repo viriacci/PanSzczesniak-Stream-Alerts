@@ -1,7 +1,9 @@
+import type { QueueCommand, QueueState } from './queue'
 import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  queueCommand:'pssa:queue:command',
   alertState: 'pssa:alerts:state',
   twitchLogin: 'pssa:twitch:login',
   twitchLogout: 'pssa:twitch:logout',
@@ -25,6 +27,7 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  queueCommand(command:QueueCommand):Promise<QueueState>
   alertState(): Promise<AlertState>
   twitchLogin(clientId:string,secret:string): Promise<void>
   twitchLogout(): Promise<void>

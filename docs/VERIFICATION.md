@@ -12,3 +12,6 @@ Run 45356052125: success. https://github.com/viriacci/PanSzczesniak-Stream-Alert
 Dodano 4 testy jednostkowe/integracyjne normalizacji zdarzeń, walidacji reguł, zapisu i importu; rozszerzono smoke. Rzeczywisty Twitch/OBS, OAuth callback i render multimediów wymagają testów ręcznych; bez ich wykonania nie uznawać ich za zaliczone.
 
 Dodano test HTTP/SSE lokalnej nakładki: dostęp z kluczem, odmowa bez klucza i niedozwolonej nazwy pliku, dostarczenie zdarzenia. Wynik wymaga CI.
+
+## Etap 4
+Etap 3 CI run 45357845578: typecheck PASS, test overlay FAIL z powodu parameter property w trybie strip-only. Zmieniono konstruktor na jawne pola. Dodano 5 testów kolejki, w tym 1000 zdarzeń, rozszerzono test ACK i smoke; zmieniono test migracji schema 2. Wynik nowego CI oczekuje. Rzeczywisty Twitch/OBS nieprzetestowany. Audyt A jest następną obowiązkową bramką.

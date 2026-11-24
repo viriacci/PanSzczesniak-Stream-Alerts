@@ -39,6 +39,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
    [IPC.alertState,0,()=>alerts.state()],
+   [IPC.queueCommand,1,command=>alerts.queueCommand(command)],
    [IPC.twitchLogin,2,(id,secret)=>{if(typeof id!=='string'||typeof secret!=='string')throw Error('Invalid credentials');return alerts.login(id,secret)}],
    [IPC.twitchLogout,0,()=>alerts.logout()],
    [IPC.twitchConnect,0,()=>alerts.connect()],

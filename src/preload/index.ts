@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
+  queueCommand:command=>ipcRenderer.invoke(IPC.queueCommand,command),
   alertState:()=>ipcRenderer.invoke(IPC.alertState),
   twitchLogin:(id,secret)=>ipcRenderer.invoke(IPC.twitchLogin,id,secret),
   twitchLogout:()=>ipcRenderer.invoke(IPC.twitchLogout),

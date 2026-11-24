@@ -1,0 +1,90 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {openDatabase} from '../src/main/database/index.ts'
+import {AlertQueue,type Transport} from '../src/main/alerts/queue.ts'
+import {defaultRule,type AlertEvent} from '../src/shared/alerts.ts'
+import {defaultQueueSettings,type Playback} from '../src/shared/queue.ts'
+
+function fixture(){
+ const db=openDatabase(':memory:');let clock=100000,connected=false,active='',last:Playback|undefined,volume=-1
+ const transport:Transport={online:()=>connected,send:p=>{if(!connected)return false;active=p.attempt;last=p;return true},active:id=>connected&&active===id,cancel:id=>{if(active===id)active=''},volume:(id,v)=>{if(active===id)volume=v}}
+ const q=new AlertQueue(db,transport,()=>clock)
+ const event=(id:string,count=5):AlertEvent=>({id,kind:'raid',user:id,count})
+ const rule={...defaultRule('raid'),enabled:true}
+ return {db,q,transport,event,rule,connect:(v:boolean)=>{connected=v},advance:(ms:number)=>{clock+=ms;q.tick()},now:()=>clock,last:()=>last,volume:()=>volume,ack:()=>{const id=active;assert.equal(q.acknowledge(id),true);active=''}}
+}
+
+test('offline queue, priority, pause, gap and ACK prevent overlapping playback',()=>{
+ const f=fixture()
+ try{
+  f.q.enqueue(f.event('a'),{...f.rule,priority:2})
+  f.q.enqueue(f.event('b'),{...f.rule,priority:9})
+  f.connect(true);f.q.tick();assert.equal(f.q.state().current?.text.includes('b'),true)
+  const token=f.last()!.attempt;f.q.tick();assert.equal(f.last()!.attempt,token)
+  assert.equal(f.q.acknowledge('wrong'),false)
+  f.q.command({type:'settings',settings:{...defaultQueueSettings,paused:true}})
+  f.ack();f.advance(1000);assert.equal(f.q.state().current,null)
+  f.q.command({type:'settings',settings:defaultQueueSettings})
+  assert.equal(f.q.state().current?.text.includes('a'),true);f.ack()
+  assert.equal(f.q.state().history.filter(x=>x.status==='done').length,2)
+ }finally{f.q.stop();f.db.close()}
+})
+
+test('persistent deduplication, filters, manual ordering and replay',()=>{
+ const f=fixture()
+ try{
+  assert.equal(f.q.enqueue(f.event('a'),{...f.rule,cooldown:10}),true)
+  assert.equal(f.q.enqueue(f.event('a'),f.rule),false)
+  assert.equal(f.q.enqueue(f.event('b'),{...f.rule,cooldown:10}),false)
+  assert.equal(f.q.enqueue(f.event('c',1),{...f.rule,minCount:2}),false)
+  assert.equal(f.q.enqueue(f.event('disabled'),{...f.rule,enabled:false}),false)
+  assert.equal(f.q.enqueue(f.event('d'),f.rule),true)
+  let state=f.q.state();assert.equal(state.pendingCount,2);assert.equal(state.history.length,3)
+  const d=state.pending[1]!.id
+  state=f.q.command({type:'move',id:d,direction:-1});assert.equal(state.pending[0]!.id,d)
+  state=f.q.command({type:'skip',id:d});assert.equal(state.pendingCount,1)
+  state=f.q.command({type:'replay',id:d});assert.equal(state.pendingCount,2)
+  f.q.stop()
+  const q2=new AlertQueue(f.db,f.transport,f.now)
+  assert.equal(q2.enqueue(f.event('a'),f.rule),false);assert.equal(q2.state().pendingCount,2)
+  q2.stop()
+ }finally{f.db.close()}
+})
+
+test('disconnect retries are bounded; stale ACK cannot finish next attempt',()=>{
+ const f=fixture()
+ try{
+  f.connect(true);f.q.enqueue(f.event('a'),f.rule)
+  const first=f.last()!.attempt
+  for(let i=0;i<3;i++){
+   f.connect(false);f.q.tick()
+   f.connect(true);f.advance(500)
+   if(i<2){assert.notEqual(f.last()!.attempt,first);assert.equal(f.q.acknowledge(first),false)}
+  }
+  assert.equal(f.q.state().pendingCount,0);assert.equal(f.q.state().history[0]?.status,'failed')
+ }finally{f.q.stop();f.db.close()}
+})
+
+test('mute, volume, skip and watchdog',()=>{
+ const f=fixture()
+ try{
+  f.connect(true);f.q.enqueue(f.event('a'),{...f.rule,volume:50})
+  assert.equal(f.last()?.volume,50)
+  f.q.command({type:'settings',settings:{...defaultQueueSettings,muted:true}})
+  assert.equal(f.volume(),0)
+  f.q.command({type:'settings',settings:{...defaultQueueSettings,volume:40}})
+  assert.equal(f.volume(),20)
+  f.q.command({type:'skip',id:f.q.state().current!.id});assert.equal(f.q.state().history[0]?.status,'skipped')
+  f.q.enqueue(f.event('b'),f.rule);f.advance(500);f.advance(16000)
+  assert.equal(f.q.state().history[0]?.reason,'ack-timeout')
+ }finally{f.q.stop();f.db.close()}
+})
+
+test('1000 queued alerts survive and excess is explicitly suppressed',()=>{
+ const f=fixture()
+ try{
+  for(let i=0;i<1000;i++)assert.equal(f.q.enqueue(f.event('event-'+i),f.rule),true)
+  assert.equal(f.q.enqueue(f.event('overflow'),f.rule),false)
+  assert.equal(f.q.state().pendingCount,1000);assert.equal(f.q.state().history[0]?.reason,'capacity')
+ }finally{f.q.stop();f.db.close()}
+})

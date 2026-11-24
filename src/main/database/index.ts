@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 const migrations: readonly string[] = [
   `CREATE TABLE settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
@@ -31,7 +31,25 @@ const migrations: readonly string[] = [
     payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
     UNIQUE(source, external_id)
   ) STRICT;
-  CREATE INDEX events_by_session_time ON stream_events(session_id, occurred_at);`
+  CREATE INDEX events_by_session_time ON stream_events(session_id, occurred_at);`,
+  `CREATE TABLE alert_queue (
+    id INTEGER PRIMARY KEY,
+    event_id TEXT NOT NULL UNIQUE,
+    source TEXT NOT NULL CHECK(source IN ('twitch','test','replay')),
+    rule_key TEXT NOT NULL,
+    rule_json TEXT NOT NULL CHECK(json_valid(rule_json)),
+    text TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','playing','done','skipped','failed','suppressed')),
+    priority INTEGER NOT NULL CHECK(priority BETWEEN 0 AND 10),
+    position INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    reason TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+  CREATE INDEX alert_queue_pending ON alert_queue(status,priority DESC,position,id);
+  CREATE INDEX alert_queue_cooldown ON alert_queue(rule_key,source,created_at DESC);
+  CREATE UNIQUE INDEX alert_queue_one_playing ON alert_queue(status) WHERE status='playing';`
 ]
 
 export function schemaVersion(db: DatabaseSync): number {
