@@ -26,7 +26,7 @@ export class Auth {
   this.db.prepare("INSERT INTO settings(key,value) VALUES ('twitch.secure.v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(encrypted)
   this.credentials=data
  }
- stop(){this.generation++;this.cancel?.();this.cancel=undefined;this.credentials=undefined}
+ stop(){this.generation++;this.refreshTask=undefined;this.cancel?.();this.cancel=undefined;this.credentials=undefined}
  logout(){this.stop();this.db.prepare("DELETE FROM settings WHERE key='twitch.secure.v1'").run()}
  private async token(params:Record<string,string>){
   const response=await fetch('https://id.twitch.tv/oauth2/token',{method:'POST',body:new URLSearchParams(params),signal:AbortSignal.timeout(15000)})
@@ -51,7 +51,7 @@ export class Auth {
    let done=false
    const finish=(error?:Error,code?:string)=>{if(done)return;done=true;clearTimeout(timer);server.close();this.cancel=undefined;error?reject(error):resolve(code!)}
    const server=createServer((req,res)=>{
-    const url=new URL(req.url??'/',redirect)
+    let url:URL;try{url=new URL(req.url??'/',redirect)}catch{res.writeHead(400);res.end('Invalid callback');return}
     if(req.method!=='GET'||url.pathname!=='/'||url.searchParams.get('state')!==state){res.writeHead(400);res.end('Invalid callback');return}
     const code=url.searchParams.get('code')
     res.writeHead(code?200:400,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'})
@@ -76,6 +76,7 @@ export class Auth {
   const c=this.credentials;if(!c)throw Error('Zaloguj Twitch')
   const v=await this.validate(c.access,c.clientId)
   if(!v)await this.refresh()
+  else if(v.userId!==c.userId)throw Error('Nieprawidłowa tożsamość Twitch')
  }
  private async refresh(){
   if(this.refreshTask)return this.refreshTask

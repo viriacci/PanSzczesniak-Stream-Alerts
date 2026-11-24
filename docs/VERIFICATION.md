@@ -10,3 +10,5 @@ Dodano trzy testy jednostkowe walidacji layoutu, trwałości ustawień i przywra
 Run 45356052125: success. https://github.com/viriacci/PanSzczesniak-Stream-Alerts/actions/runs/45356052125
 ## Etap 3 — oczekuje na CI
 Dodano 4 testy jednostkowe/integracyjne normalizacji zdarzeń, walidacji reguł, zapisu i importu; rozszerzono smoke. Rzeczywisty Twitch/OBS, OAuth callback i render multimediów wymagają testów ręcznych; bez ich wykonania nie uznawać ich za zaliczone.
+
+Dodano test HTTP/SSE lokalnej nakładki: dostęp z kluczem, odmowa bez klucza i niedozwolonej nazwy pliku, dostarczenie zdarzenia. Wynik wymaga CI.

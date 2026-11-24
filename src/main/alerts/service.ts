@@ -29,7 +29,7 @@ export class AlertsService {
   const key=typeof raw==='string'&&/^[a-f0-9]{64}$/.test(raw)?raw:randomBytes(32).toString('hex')
   this.db.prepare("INSERT INTO settings(key,value) VALUES ('overlay.key',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key)
   try{await this.overlay.start(key)}catch{this.detail='Port overlay 18766 zajęty'}
-  if(auto){try{if(this.auth.load())await this.connect()}catch{this.phase='error';this.detail='Zapisana sesja wymaga ponownego logowania'}}
+  if(auto){try{if(this.auth.load())void this.connect().catch(()=>{})}catch{this.phase='error';this.detail='Zapisana sesja wymaga ponownego logowania'}}
   this.validation=setInterval(()=>{if(this.auth.identity)void this.auth.ensure().catch(()=>{this.events.stop();this.phase='error';this.detail='Sesja Twitch wymaga ponownego połączenia'})},3600000)
  }
  stop(){this.stopped=true;this.generation++;clearInterval(this.validation);this.events.stop();this.auth.stop();this.overlay.stop()}
@@ -37,10 +37,10 @@ export class AlertsService {
  async login(clientId:string,secret:string){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
   this.generation++;const g=this.generation;this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
-  try{await this.auth.login(clientId,secret);if(g!==this.generation||this.stopped)return;await this.connect()}
+  try{await this.auth.login(clientId,secret);if(g!==this.generation||this.stopped)return;this.phase='connecting';await this.connect()}
   catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Logowanie nie powiodło się. Sprawdź dane i redirect URI.'}throw Error('Logowanie Twitch nie powiodło się')}
  }
- async connect(){const g=this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start()}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
+ async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start()}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
  logout(){this.generation++;this.events.stop();this.auth.logout();this.rewards=[];this.phase='disconnected';this.detail=''}
  async sync(){const id=this.auth.identity?.userId;if(!id)throw Error('Zaloguj Twitch');const g=this.generation
   const data=await this.auth.helix('channel_points/custom_rewards?broadcaster_id='+encodeURIComponent(id))

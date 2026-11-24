@@ -11,8 +11,8 @@ export class EventSub {
  private attempts=0
  private seen=new Map<string,number>()
  constructor(private auth:Auth,private state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void,private emit:(e:AlertEvent)=>void){}
- start(){this.stop();this.stopped=false;this.attempts=0;this.connect('wss://eventsub.wss.twitch.tv/ws',false)}
- stop(){this.stopped=true;clearTimeout(this.retry);for(const s of this.sockets)this.close(s);this.current=undefined;this.pending=undefined}
+ start(){this.stop();this.stopped=false;this.attempts=0;this.seen.clear();this.connect('wss://eventsub.wss.twitch.tv/ws',false)}
+ stop(){this.stopped=true;clearTimeout(this.retry);this.retry=undefined;for(const s of this.sockets)this.close(s);this.current=undefined;this.pending=undefined}
  private close(s:WebSocket){clearTimeout(this.timers.get(s));this.timers.delete(s);this.sockets.delete(s);try{s.close()}catch{}}
  private watchdog(s:WebSocket,seconds:number){clearTimeout(this.timers.get(s));this.timers.set(s,setTimeout(()=>{this.close(s);this.lost(s)},seconds*1000+2000))}
  private lost(s:WebSocket){
