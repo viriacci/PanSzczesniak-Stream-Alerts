@@ -16,3 +16,6 @@ nsis:
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
   shortcutName: PSSA 2 Dev
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: false

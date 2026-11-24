@@ -1,12 +1,12 @@
 import {useEffect,useState,type FormEvent} from 'react'
 import type {ObsState,AgentState,ObsAction,AgentAction} from '../../../shared/obs'
 import {Button,Panel,Status} from '../components/ui'
-export function useObs(){
+export function useObs(slow=false){
  const [obs,setObs]=useState<ObsState>(),[agent,setAgent]=useState<AgentState>()
  useEffect(()=>{let active=true,busy=false
-  const poll=async()=>{if(busy)return;busy=true;try{const [o,a]=await Promise.all([window.pssa.obsState(),window.pssa.agentState()]);if(active){setObs(o);setAgent(a)}}catch{if(active){setObs(undefined);setAgent(undefined)}}finally{busy=false}}
-  void poll();const t=window.setInterval(poll,2000);return()=>{active=false;window.clearInterval(t)}
- },[])
+  const poll=async()=>{if(busy||document.hidden)return;busy=true;try{const [o,a]=await Promise.all([window.pssa.obsState(),window.pssa.agentState()]);if(active){setObs(o);setAgent(a)}}catch{if(active){setObs(undefined);setAgent(undefined)}}finally{busy=false}}
+  void poll();const t=window.setInterval(poll,slow?5000:2000);return()=>{active=false;window.clearInterval(t)}
+ },[slow])
  return {obs,agent}
 }
 export function ObsPage({obs,agent}:{obs?:ObsState;agent?:AgentState}){

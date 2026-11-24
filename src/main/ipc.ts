@@ -1,3 +1,4 @@
+import type {RuntimeService} from './runtime/service'
 import type { ObsService } from './obs/service'
 import type { AgentBridge } from './agent/bridge'
 import type { AlertsService } from './alerts/service'
@@ -9,7 +10,7 @@ import { getCompact, setCompact, schemaVersion } from './database'
 import { getLayout, setLayout } from './database/layout'
 import { isTrustedDocument } from './security/ipc-policy'
 
-export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: string, version: string, alerts:AlertsService,obs:ObsService,agent?:AgentBridge): () => void {
+export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: string, version: string, alerts:AlertsService,obs:ObsService,agent:AgentBridge|undefined,runtime:RuntimeService): () => void {
   function authorize(event: IpcMainInvokeEvent): void {
     const frame = event.senderFrame
     if (window.isDestroyed() || event.sender !== window.webContents ||
@@ -40,6 +41,15 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
     return setLayout(db, args[0])
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
+   [IPC.runtimeState,0,()=>runtime.state()],
+   [IPC.runtimeSave,1,value=>runtime.save(value)],
+   [IPC.backupCreate,0,()=>runtime.backup()],
+   [IPC.backupRestore,0,()=>runtime.restore()],
+   [IPC.diagnostics,0,()=>runtime.diagnostics()],
+   [IPC.diagnosticsExport,0,()=>runtime.exportDiagnostics()],
+   [IPC.updateCheck,0,()=>runtime.check()],
+   [IPC.updateInfo,0,()=>runtime.updateInfo()],
+   [IPC.updateOpen,0,()=>runtime.openUpdate()],
    [IPC.alertState,0,()=>alerts.state()],
    [IPC.analyticsChannels,0,()=>alerts.analyticsChannels()],
    [IPC.analyticsReport,1,filter=>alerts.analyticsReport(filter)],

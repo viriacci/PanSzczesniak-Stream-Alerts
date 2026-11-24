@@ -2,9 +2,9 @@ import {useEffect,useState} from 'react'
 import type {LiveState,Category} from '../../../shared/live'
 import type {ObsState} from '../../../shared/obs'
 import {Button,Panel,Status,Empty} from '../components/ui'
-export function useLive(){
+export function useLive(slow=false){
  const [state,setState]=useState<LiveState>()
- useEffect(()=>{let active=true,busy=false;const poll=async()=>{if(busy)return;busy=true;try{const v=await window.pssa.liveState();if(active)setState(v)}catch{if(active)setState(undefined)}finally{busy=false}};void poll();const t=window.setInterval(poll,2000);return()=>{active=false;window.clearInterval(t)}},[])
+ useEffect(()=>{let active=true,busy=false;const poll=async()=>{if(busy||document.hidden)return;busy=true;try{const v=await window.pssa.liveState();if(active)setState(v)}catch{if(active)setState(undefined)}finally{busy=false}};void poll();const t=window.setInterval(poll,slow?5000:2000);return()=>{active=false;window.clearInterval(t)}},[slow])
  return state
 }
 function duration(ms:number){const s=Math.max(0,Math.floor(ms/1000));return [Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(n=>String(n).padStart(2,'0')).join(':')}

@@ -1,3 +1,4 @@
+import type {RuntimePreferences,Diagnostics,UpdateInfo} from './runtime'
 import type {AnalyticsFilter,AnalyticsReport,ImportResult} from './analytics'
 import type {LibraryAction,LibraryState} from './library'
 import type {Scene} from './scene'
@@ -8,6 +9,15 @@ import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  runtimeState:'pssa:runtime:state',
+  runtimeSave:'pssa:runtime:save',
+  backupCreate:'pssa:backup:create',
+  backupRestore:'pssa:backup:restore',
+  diagnostics:'pssa:diagnostics:state',
+  diagnosticsExport:'pssa:diagnostics:export',
+  updateCheck:'pssa:update:check',
+  updateInfo:'pssa:update:info',
+  updateOpen:'pssa:update:open',
   analyticsChannels:'pssa:analytics:channels',
   analyticsReport:'pssa:analytics:report',
   analyticsImport:'pssa:analytics:import',
@@ -45,6 +55,15 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  runtimeState():Promise<RuntimePreferences>
+  runtimeSave(value:RuntimePreferences):Promise<RuntimePreferences>
+  backupCreate():Promise<{media:number}|null>
+  backupRestore():Promise<boolean>
+  diagnostics():Promise<Diagnostics>
+  diagnosticsExport():Promise<boolean>
+  updateCheck():Promise<UpdateInfo>
+  updateInfo():Promise<UpdateInfo>
+  updateOpen():Promise<void>
   analyticsChannels():Promise<string[]>
   analyticsReport(filter:AnalyticsFilter):Promise<AnalyticsReport>
   analyticsImport():Promise<ImportResult|null>

@@ -2,12 +2,12 @@ import {useEffect,useState,type FormEvent} from 'react'
 import {defaultRule,type AlertRule,type AlertState} from '../../../shared/alerts'
 import {Button,Panel,Status} from '../components/ui'
 const labels:Record<string,string>={raid:'Raid',follow:'Follow',sub:'Subskrypcja',prime_sub:'Prime',resub:'Odnowienie',gift:'Gift sub',mass_gift:'Mass gift',bits:'Bits'}
-export function useAlerts(){
+export function useAlerts(slow=false){
  const [state,setState]=useState<AlertState>()
  useEffect(()=>{let active=true;let running=false
-  const poll=async()=>{if(running)return;running=true;try{const v=await window.pssa.alertState();if(active)setState(v)}catch{if(active)setState(undefined)}finally{running=false}}
-  void poll();const t=window.setInterval(poll,1500);return()=>{active=false;window.clearInterval(t)}
- },[])
+  const poll=async()=>{if(running||document.hidden)return;running=true;try{const v=await window.pssa.alertState();if(active)setState(v)}catch{if(active)setState(undefined)}finally{running=false}}
+  void poll();const t=window.setInterval(poll,slow?5000:1500);return()=>{active=false;window.clearInterval(t)}
+ },[slow])
  return state
 }
 export function TwitchPage({state}:{state?:AlertState}){

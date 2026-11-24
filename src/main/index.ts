@@ -1,10 +1,14 @@
+import {RuntimeService} from './runtime/service'
+import {pendingRestore} from './runtime/backup'
+import {preferences,savePreferences} from './runtime/preferences'
+import type {RuntimePreferences} from '../shared/runtime'
 import { createHash } from 'node:crypto'
 import { makeLayer,type Scene } from '../shared/scene'
 import { AgentBridge } from './agent/bridge'
 import { serveAgent,launchProcess } from './agent/server'
 import { ObsService } from './obs/service'
 import { AlertsService } from './alerts/service'
-import { app, BrowserWindow, dialog, session, screen } from 'electron'
+import { app, BrowserWindow, dialog, session, screen, Tray, Menu, nativeImage } from 'electron'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -29,6 +33,9 @@ let window: BrowserWindow | undefined
 let db: DatabaseSync | undefined
 let disposeIpc: (() => void) | undefined
 let cleaned = false
+let runtime:RuntimeService|undefined
+let tray:Tray|undefined
+let reveal:()=>void=()=>{}
 let alerts:AlertsService|undefined
 let obs:ObsService|undefined
 let agent:AgentBridge|undefined
@@ -39,6 +46,7 @@ function cleanup(): void {
   cleaned = true
   try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
   clearInterval(liveObsTimer)
+  try{runtime?.stop();tray?.destroy()}catch{console.warn('PSSA: runtime cleanup failed')}
   try{agent?.stop()}catch{console.warn('PSSA: agent bridge cleanup failed')}
   try{obs?.stop()}catch{console.warn('PSSA: OBS cleanup failed')}
   try{alerts?.stop()}catch{console.warn('PSSA: service cleanup failed')}
@@ -55,6 +63,7 @@ function fail(): void {
 async function start(): Promise<void> {
   log('startup')
   db = openDatabase(join(directory, 'pssa.sqlite'))
+  const restoreStatus=smoke?'':pendingRestore(db,directory)
   const file = join(__dirname, '../renderer/index.html')
   const devUrl = !app.isPackaged && !smoke ? process.env.ELECTRON_RENDERER_URL : undefined
   if (devUrl) {
@@ -100,14 +109,43 @@ async function start(): Promise<void> {
   const activeAlerts=alerts,activeObs=obs
   if(!smoke)liveObsTimer=setInterval(()=>{try{activeAlerts.observeObs(activeObs.state())}catch{console.warn('PSSA: telemetry write failed')}},1000)
   if(!smoke){agent=new AgentBridge(directory,async()=>activeAlerts.reloadOverlay());agent.start()}
-  disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts,obs,agent)
+  let blank=false,modeGeneration=0
+  const loadRenderer=()=>devUrl?activeWindow.loadURL(document):activeWindow.loadFile(file)
+  const showWindow=async()=>{
+   const g=++modeGeneration
+   if(activeWindow.isDestroyed()||cleaned)return
+   if(blank){await loadRenderer();if(g!==modeGeneration||cleaned)return;blank=false}
+   if(activeWindow.isMinimized())activeWindow.restore()
+   activeWindow.show();activeWindow.focus()
+  }
+  reveal=()=>{if(preferences(activeDb).mode==='background')savePreferences(activeDb,{...preferences(activeDb),mode:'streaming'});void showWindow().catch(()=>{if(!cleaned)dialog.showErrorBox('PSSA','Nie udało się przywrócić interfejsu. Uruchom PSSA ponownie.')})}
+  const applyMode=(p:RuntimePreferences)=>{
+   if(smoke||cleaned)return
+   const g=++modeGeneration
+   if(p.mode!=='background'||!tray){if(blank)reveal();return}
+   // Let the IPC result reach the renderer, then unload its document and timers.
+   setTimeout(()=>{if(g!==modeGeneration||cleaned||activeWindow.isDestroyed())return
+    blank=true;activeWindow.hide();void activeWindow.loadURL('about:blank').catch(()=>{if(g===modeGeneration&&!cleaned)reveal()})
+   },150)
+  }
+  if(!smoke){
+   try{
+    const icon=nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGN8fMCDgRTARJLqUQ2jGoaUBgAQ3wILGYFI4wAAAABJRU5ErkJggg==')
+    tray=new Tray(icon);tray.setToolTip('PSSA 2')
+    tray.setContextMenu(Menu.buildFromTemplate([{label:'Otwórz PSSA',click:()=>reveal()},{label:'Zakończ PSSA',click:()=>app.quit()}]))
+    tray.on('double-click',()=>reveal())
+   }catch{tray=undefined}
+  }
+  runtime=new RuntimeService(db,directory,window,alerts,obs,agent,restoreStatus,applyMode)
+  if(!smoke)runtime.start()
+  disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts,obs,agent,runtime)
   if (devUrl) await window.loadURL(document)
   else await window.loadFile(file)
   log('ready')
   if (smoke) {
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 4 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0)'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 4 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 4)'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     // Load the real served overlay in a separate isolated Chromium window and wait for ACK.
@@ -152,7 +190,7 @@ async function start(): Promise<void> {
     }finally{preview.destroy()}
     app.quit()
   } else {
-    window.show()
+    window.show();applyMode(runtime.state())
   }
 }
 
@@ -167,8 +205,7 @@ if(agentMode){
 } else {
   app.on('second-instance', () => {
     if (window && !window.isDestroyed()) {
-      if (window.isMinimized()) window.restore()
-      window.focus()
+      reveal()
     }
   })
   app.on('window-all-closed', () => app.quit())
