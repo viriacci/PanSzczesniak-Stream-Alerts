@@ -1,4 +1,9 @@
 # Changelog
+## 2.0.0-rc.3
+- Trzy skórki lokalnego interfejsu; koncepcje ViviOnyx i Shiroe.
+- Opcjonalna sesja pomiarowa CPU/RAM, GPU, OBS, Agenta i kolejki, historia, porównanie, CSV/JSON.
+- Lokalne crash logi i native dumps bez uploadu, eksport diagnostyczny.
+
 ## 2.0.0-rc.2
 - Wymuszenie indeksu historii i test rzeczywistego planu zapytań bez tymczasowego sortowania.
 

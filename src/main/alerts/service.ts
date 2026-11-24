@@ -67,6 +67,7 @@ export class AlertsService {
    this.ticker=setTimeout(()=>{this.ticker=undefined;try{this.queue.tick();this.wake()}catch{this.detail='Błąd silnika kolejki';if(!this.stopped)this.ticker=setTimeout(()=>this.wake(),1000)}},Math.max(1,delay))
   })
  }
+ telemetry(){return {...this.queue.telemetry(),overlayClients:this.overlay.clients,twitchPhase:this.phase}}
  state():AlertState{return {profileId:activeProfile(this.db),twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  poll(since:unknown){
   if(typeof since!=='number'||!Number.isSafeInteger(since)||since< -1)throw Error('Invalid snapshot revision')

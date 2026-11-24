@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
+  measurementState:()=>ipcRenderer.invoke(IPC.measurementState),
+  measurementStart:gpu=>ipcRenderer.invoke(IPC.measurementStart,gpu),
+  measurementStop:()=>ipcRenderer.invoke(IPC.measurementStop),
+  measurementExport:(id,format)=>ipcRenderer.invoke(IPC.measurementExport,id,format),
+  crashState:()=>ipcRenderer.invoke(IPC.crashState),
+  crashExport:()=>ipcRenderer.invoke(IPC.crashExport),
+  rendererFault:(kind,stack)=>ipcRenderer.invoke(IPC.rendererFault,kind,stack),
   runtimeState:()=>ipcRenderer.invoke(IPC.runtimeState),
   runtimeSave:value=>ipcRenderer.invoke(IPC.runtimeSave,value),
   backupCreate:()=>ipcRenderer.invoke(IPC.backupCreate),

@@ -85,7 +85,7 @@ export async function serveAgent(dir:string,launch:()=>ChildProcess,port=AGENT_P
    if(req.headers.origin){reply(res,403,{});return}
    if(req.url==='/api/closing'){controller.closing(input.instance);reply(res,200,{});return}
    if(req.url==='/api/ack'){if(typeof input.id!=='string'||!controller.ack(input.instance,input.id)){reply(res,409,{});return}reply(res,200,{});return}
-   const command=controller.heartbeat(input.instance);reply(res,200,{command,...controller.state()});return
+   const command=controller.heartbeat(input.instance);reply(res,200,{command,...controller.state(),...(input.measure===true?{measurement:{at:Date.now(),cpuSeconds:(()=>{const c=process.cpuUsage();return (c.user+c.system)/1e6})(),ramMB:process.memoryUsage.rss()/1048576,pid:process.pid}}:{})});return
   }
   if(req.url==='/api/command'){
    if(!['start','stop','restart','refresh','auto-on','auto-off'].includes(input.command)){reply(res,400,{});return}

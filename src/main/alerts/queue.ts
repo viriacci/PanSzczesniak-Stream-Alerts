@@ -24,6 +24,8 @@ export class AlertQueue {
  private stopped=false
  private hasPending=false
  private revision=0
+ private totals={done:0,failed:0,suppressed:0,retried:0}
+ telemetry(){return {...this.totals,queuePending:this.pendingCount(),queuePlaying:!!this.current}}
  private cached?:{revision:number;online:boolean;state:QueueState}
  get version(){return this.revision}
  onChange:()=>void=()=>{}
@@ -78,7 +80,7 @@ export class AlertQueue {
   const position=Number(this.db.prepare('SELECT coalesce(max(id),0)+1 AS n FROM alert_queue').get()?.n??1)
   this.db.prepare('INSERT INTO alert_queue(event_id,source,rule_key,rule_json,text,status,priority,position,created_at,finished_at,reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
    .run(eventId,source,rule.key,JSON.stringify(rule),text,reason?'suppressed':'pending',rule.priority,position,now,reason?now:null,reason)
-  if(!reason)this.hasPending=true;this.changed();this.tick()
+  if(!reason)this.hasPending=true;else this.totals.suppressed++;this.changed();this.tick()
   return !reason
  }
  private effective(rule:AlertRule){return this.settings.muted?0:Math.round(rule.volume*this.settings.volume/100)}
@@ -105,14 +107,15 @@ export class AlertQueue {
  private interrupted(reason:string){
   const active=this.current;if(!active)return
   const item=this.get(active.id)
-  if(item&&item.attempts<3)this.db.prepare("UPDATE alert_queue SET status='pending',reason=? WHERE id=?").run(reason,active.id)
-  else this.db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason=? WHERE id=?").run(this.now(),reason,active.id)
+  if(item&&item.attempts<3){this.totals.retried++;this.db.prepare("UPDATE alert_queue SET status='pending',reason=? WHERE id=?").run(reason,active.id)}
+  else {this.totals.failed++;this.db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason=? WHERE id=?").run(this.now(),reason,active.id)}
   this.hasPending=true;this.changed();this.current=undefined;try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
   this.nextAt=this.now()+this.settings.gapMs
  }
  private finish(status:QueueStatus,reason:string,cancel:boolean){
   const active=this.current;if(!active)return
   this.db.prepare('UPDATE alert_queue SET status=?,finished_at=?,reason=? WHERE id=?').run(status,this.now(),reason,active.id)
+  if(status==='done')this.totals.done++;if(status==='failed')this.totals.failed++
   this.current=undefined;this.changed()
   if(cancel)try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
   this.nextAt=this.now()+this.settings.gapMs

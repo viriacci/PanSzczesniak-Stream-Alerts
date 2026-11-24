@@ -1,3 +1,4 @@
+import type {MeasurementState,CrashEntry} from './performance'
 import type {RuntimePreferences,Diagnostics,UpdateInfo} from './runtime'
 import type {AnalyticsFilter,AnalyticsReport,ImportResult} from './analytics'
 import type {LibraryAction,LibraryState} from './library'
@@ -9,6 +10,13 @@ import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  measurementState:'pssa:measurement:state',
+  measurementStart:'pssa:measurement:start',
+  measurementStop:'pssa:measurement:stop',
+  measurementExport:'pssa:measurement:export',
+  crashState:'pssa:crash:state',
+  crashExport:'pssa:crash:export',
+  rendererFault:'pssa:crash:renderer',
   runtimeState:'pssa:runtime:state',
   runtimeSave:'pssa:runtime:save',
   backupCreate:'pssa:backup:create',
@@ -56,6 +64,13 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  measurementState():Promise<MeasurementState>
+  measurementStart(gpu:boolean):Promise<MeasurementState>
+  measurementStop():Promise<MeasurementState>
+  measurementExport(id:string,format:'csv'|'json'):Promise<boolean>
+  crashState():Promise<CrashEntry[]>
+  crashExport():Promise<boolean>
+  rendererFault(kind:'error'|'rejection'|'react',stack:string):Promise<void>
   runtimeState():Promise<RuntimePreferences>
   runtimeSave(value:RuntimePreferences):Promise<RuntimePreferences>
   backupCreate():Promise<{media:number}|null>

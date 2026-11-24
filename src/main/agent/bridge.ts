@@ -11,6 +11,10 @@ export class AgentBridge{
  private lastRefresh=''
  private nextPoll=0
  private startup=false
+ private measuring=false
+ private point?:{at:number;cpuSeconds:number;ramMB:number;pid:number}
+ setMeasurement(on:boolean){this.measuring=on;this.point=undefined}
+ measurementPoint(){return this.measuring&&this.point&&Date.now()-this.point.at<10000?this.point:null}
  private state:AgentState={online:false,running:false,dockUrl:'',autoLaunch:false,startup:false,detail:''}
  constructor(private directory:string,private refresh:()=>Promise<number>){this.key=agentKey(directory)}
  private args(){return app.isPackaged?['--pssa-agent']:[app.getAppPath(),'--pssa-agent']}
@@ -21,8 +25,9 @@ export class AgentBridge{
  private async poll(){
   if(this.busy||this.stopped||Date.now()<this.nextPoll)return;this.busy=true
   try{
-   const h=await this.api('/api/heartbeat',{instance:this.instance})
+   const h=await this.api('/api/heartbeat',{instance:this.instance,measure:this.measuring})
    if(this.stopped)return
+   const m=h.measurement;if(this.measuring&&m&&[m.at,m.cpuSeconds,m.ramMB,m.pid].every(Number.isFinite))this.point=m
    const cmd=h.command
    if(cmd?.action==='stop'||cmd?.action==='restart'){await this.api('/api/closing',{instance:this.instance}).catch(()=>{});if(!this.stopped)app.quit();return}
    if(cmd?.action==='refresh'&&typeof cmd.id==='string'){

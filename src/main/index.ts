@@ -1,3 +1,4 @@
+import {CrashLog} from './runtime/crashes'
 import {launchNodeAgent} from './agent/launch'
 import {BRAND} from '../shared/brand'
 import {RuntimeService} from './runtime/service'
@@ -9,7 +10,7 @@ import { makeLayer,type Scene } from '../shared/scene'
 import { AgentBridge } from './agent/bridge'
 import { ObsService } from './obs/service'
 import { AlertsService } from './alerts/service'
-import { app, BrowserWindow, dialog, session, screen, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, dialog, session, screen, Tray, Menu, nativeImage, crashReporter } from 'electron'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -30,6 +31,7 @@ if(agentMode)mkdirSync(join(directory,'agent-runtime'),{recursive:true})
 app.setPath('userData', agentMode?join(directory,'agent-runtime'):directory)
 app.setName('PSSA 2 Dev')
 const log = createLogger(directory)
+const crashes=new CrashLog(directory,app.getVersion(),'main')
 let window: BrowserWindow | undefined
 let db: DatabaseSync | undefined
 let disposeIpc: (() => void) | undefined
@@ -53,7 +55,8 @@ function cleanup(): void {
   try{db?.close()}catch{console.warn('PSSA: database cleanup failed')}
   log('shutdown')
 }
-function fail(): void {
+function fail(error?:unknown): void {
+  crashes.write('startup-failed','',null,error instanceof Error?error.stack:undefined)
   log('startup-failed')
   if (!smoke) dialog.showErrorBox(BRAND, 'Nie udało się uruchomić aplikacji. Sprawdź application.log w katalogu danych.')
   cleanup()
@@ -100,7 +103,7 @@ async function start(): Promise<void> {
    w.webContents.setWindowOpenHandler(()=>({action:'deny'}))
    w.webContents.on('will-navigate',event=>event.preventDefault())
    w.webContents.on('will-attach-webview',event=>event.preventDefault())
-   w.webContents.on('render-process-gone',()=>{log('renderer-gone');if(smoke)fail();else if(!cleaned&&window===w)dialog.showErrorBox(BRAND,'Interfejs uległ awarii. Uruchom aplikację ponownie.')})
+   w.webContents.on('render-process-gone',(_e,details)=>{if(details.reason==='clean-exit')return;log('renderer-gone');if(smoke)fail();else if(!cleaned&&window===w)dialog.showErrorBox(BRAND,'Interfejs uległ awarii. Uruchom aplikację ponownie.')})
    w.on('close',()=>rememberWindow(w))
    w.once('closed',()=>{if(window===w){window=undefined;disposeIpc?.();disposeIpc=undefined}})
    if(state.maximized&&!smoke)w.maximize()
@@ -152,9 +155,11 @@ async function start(): Promise<void> {
   if(!activeWindow)throw Error('Renderer unavailable')
   log('ready')
   if (smoke) {
-    const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true)
+    const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true,app.getVersion())
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{child.kill();reject(Error('Node Agent smoke timeout'))},12000);child.once('error',e=>{clearTimeout(timer);reject(e)});child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(Error('Node Agent smoke failed'))})})
     // Exercise the actual preload and IPC bridge in the loaded renderer.
+    const newFeatures=await activeWindow.webContents.executeJavaScript('window.pssa.runtimeState().then(async p=>(await window.pssa.runtimeSave({...p,theme:"vivionyx"})).theme==="vivionyx"&&(await window.pssa.runtimeSave({...p,theme:"pssa"})).theme==="pssa"&&!(await window.pssa.measurementState()).active&&Array.isArray(await window.pssa.crashState()))')
+    if(newFeatures!==true)throw Error('New feature IPC smoke failed')
     const revisionCheck=await activeWindow.webContents.executeJavaScript('window.pssa.alertPoll(-1).then(async first=>!!first.state&&(await window.pssa.alertPoll(first.revision)).state===null)')
     if(revisionCheck!==true)throw Error('Alert snapshot revision smoke failed')
     const passed = await activeWindow.webContents.executeJavaScript(
@@ -212,11 +217,16 @@ async function start(): Promise<void> {
 
 if(agentMode){
  const args=app.isPackaged?[]:[app.getAppPath()]
- const child=launchNodeAgent(directory,process.execPath,args,__dirname)
+ const child=launchNodeAgent(directory,process.execPath,args,__dirname,false,app.getVersion())
  child.once('error',()=>app.exit(1));child.once('spawn',()=>{child.unref();app.exit(0)})
 } else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  process.on('uncaughtExceptionMonitor',error=>crashes.write('uncaught-exception','',null,error.stack))
+  process.on('unhandledRejection',error=>{crashes.write('unhandled-rejection','',null,error instanceof Error?error.stack:undefined);cleanup();app.exit(1)})
+  app.on('render-process-gone',(_e,_contents,details)=>{if(details.reason!=='clean-exit')crashes.write('render-process-gone',details.reason,details.exitCode)})
+  app.on('child-process-gone',(_e,details)=>{if(details.reason!=='clean-exit')crashes.write('child-process-gone',details.reason,details.exitCode)})
+  try{const dumps=join(directory,'crash-dumps');mkdirSync(dumps,{recursive:true});app.setPath('crashDumps',dumps);crashReporter.start({uploadToServer:false,companyName:'Pan Szczesniak',productName:'PSSA',submitURL:''})}catch{crashes.write('crash-reporter-unavailable')}
   app.on('second-instance', () => {
     if(!cleaned)reveal()
   })

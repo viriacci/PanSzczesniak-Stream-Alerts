@@ -1,3 +1,4 @@
+import {themes} from '../../shared/themes'
 import {BRAND} from '../../shared/brand'
 import {useRuntime,Onboarding} from './features/runtime'
 import {useLive} from './features/live'
@@ -14,6 +15,7 @@ import { PageContent } from './features/pages'
 
 export function App() {
  const {runtime,saveRuntime}=useRuntime()
+ const theme=themes[runtime?.theme??'pssa']
  const slow=runtime?.mode==='streaming'
  const alertState=useAlerts(slow)
  const live=useLive(slow)
@@ -71,13 +73,13 @@ export function App() {
  const sidebarSize=collapsed?64:layout.sidebarWidth
  const styles={'--sidebar-width':sidebarSize+'px','--inspector-width':layout.inspectorWidth+'px'} as CSSProperties
  const filtered=groups.map(group=>({...group,items:group.items.filter(p=>p.label.toLocaleLowerCase('pl').includes(query.toLocaleLowerCase('pl')))})).filter(g=>g.items.length)
- return <div className={`app ${status?.compact?'compact':''} ${slow?'streaming-mode':''}`} style={styles}>
-  <header className="titlebar"><div className="title-brand" title={BRAND} aria-label={BRAND}><span className="brand-symbol">P</span><span>PSSA <small>STREAM ALERTS</small></span></div><span className="title-version">{status?.version??'2.0-dev'}</span><span className="title-caption">BETA BUILD</span></header>
+ return <div className={`app ${status?.compact?'compact':''} ${slow?'streaming-mode':''}`} style={styles} data-theme={runtime?.theme??'pssa'}>
+  <header className="titlebar"><div className="title-brand" title={BRAND+' / '+theme.name} aria-label={BRAND+' / '+theme.name}><span className="brand-symbol">{theme.symbol}</span><span>{runtime?.theme&&runtime.theme!=='pssa'?theme.name:'PSSA'} <small>STREAM ALERTS</small></span></div><span className="title-version">{status?.version??'2.0-dev'}</span><span className="title-caption">{theme.subtitle}</span></header>
   <div className={`workspace ${inspector?'has-inspector':''}`}>
    <aside className={`sidebar ${collapsed?'collapsed':''}`} aria-label="Nawigacja główna">
     <div className="sidebar-top"><Button variant="ghost" title="Zwiń / rozwiń menu (Ctrl+B)" aria-label="Zwiń / rozwiń menu" aria-expanded={!collapsed} disabled={!ready} onClick={()=>patch({collapsed:!collapsed})}><Icon name="sidebar"/></Button>{!collapsed&&<label className="nav-search"><Icon name="search" size={15}/><input aria-label="Szukaj modułu" placeholder="Szukaj modułu" value={query} onChange={e=>setQuery(e.target.value)}/></label>}</div>
     <nav>{(collapsed?groups:filtered).map(g=><div className="nav-group" key={g.label}>{!collapsed&&<h2>{g.label}</h2>}{g.items.map(p=><button key={p.id} type="button" disabled={!ready} className={`nav-link ${p.id===item.id?'active':''}`} aria-current={p.id===item.id?'page':undefined} aria-label={p.label} title={collapsed?p.label:undefined} onClick={()=>navigate(p.id)}><Icon name={p.icon}/>{!collapsed&&<span>{p.label}</span>}</button>)}</div>)}{!collapsed&&filtered.length===0&&<p className="nav-empty">Brak wyników</p>}</nav>
-    <div className="sidebar-bottom"><span className="account-avatar">P</span>{!collapsed&&<div><strong>{twitch?.login||'Profil lokalny'}</strong><small>{twitch?.phase==='connected'?'Twitch połączony':'Twitch niepołączony'}</small></div>}</div>
+    <div className="sidebar-bottom"><span className="account-avatar">{theme.symbol}</span>{!collapsed&&<div><strong>{twitch?.login||'Profil lokalny'}</strong><small>{twitch?.phase==='connected'?'Twitch połączony':'Twitch niepołączony'}</small></div>}</div>
    </aside>
    {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className="content" tabIndex={-1} ref={content} id="main-content">
@@ -86,7 +88,7 @@ export function App() {
    </main>
    {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase??'Offline'}</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
   </div>
-  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">PSSA BETA · ETAP 10</span></footer>
+  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">{theme.name} · PSSA</span></footer>
   {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role={notice.error?'alert':'status'}><span>{notice.text}</span><Button variant="ghost" aria-label="Zamknij powiadomienie" onClick={()=>setNotice(null)}><Icon name="close" size={16}/></Button></div>}
   {ready&&runtime&&!runtime.onboarded&&<Onboarding runtime={runtime} save={saveRuntime} onIntegrations={()=>navigate('integrations')}/>}
   {confirm&&<ConfirmDialog title="Przywrócić domyślny układ?" onClose={()=>setConfirm(false)} onConfirm={reset}>Zresetuje szerokość paneli i ich widoczność. Nie zmieni statystyk ani ustawień alertów.</ConfirmDialog>}
