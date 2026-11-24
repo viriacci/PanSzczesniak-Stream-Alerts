@@ -34,7 +34,7 @@ export function config(db:DatabaseSync):Config{
  return {active:v.active,profiles,templates,metadata:meta}
 }
 export function activeProfile(db:DatabaseSync){const id=db.prepare("SELECT value FROM settings WHERE key='library.active'").get()?.value;return typeof id==='string'?id:'default'}
-function persist(db:DatabaseSync,c:Config){db.prepare("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key,JSON.stringify(c));db.prepare("INSERT INTO settings(key,value) VALUES ('library.active',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(c.active)}
+function persist(db:DatabaseSync,c:Config){const json=JSON.stringify(c);if(Buffer.byteLength(json,'utf8')>32*1024*1024)throw Error('Library configuration exceeds 32 MB');db.prepare("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key,json);db.prepare("INSERT INTO settings(key,value) VALUES ('library.active',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(c.active)}
 function refsForRule(r:AlertRule){return [r.image,r.audio,...(r.scene?.layers.map(l=>l.asset)??[]),...(r.variants??[]).flatMap(v=>v.scene.layers.map(l=>l.asset))].filter(validAsset)}
 export function references(db:DatabaseSync,c=config(db)){
  const refs=new Map<string,number>();const add=(ids:string[])=>{for(const id of new Set(ids))if(validAsset(id))refs.set(id,(refs.get(id)??0)+1)}

@@ -1,4 +1,9 @@
 # Changelog
+## 2.0.0-dev.8
+- Biblioteka mediów: deduplikacja, tagi, foldery, filtry, wykrywanie braków, podgląd.
+- Profile alertów i szablony scen, warianty ważone oraz warunki liczby/miesięcy/kategorii.
+- Audyt B: 52/52 PASS, clean npm audit, packaged smoke.
+
 ## 2.0.0-dev.7-audit.1
 - Audyt B: potwierdzenia Agenta, izolacja sesji OBS, readiness scen, poprawki Live Center i bezpieczny zapis scen.
 - HTTP Range, lekkie snapshoty kolejki, optymalizacja geometrii, szkice w pamięci, walidacja i regresje.

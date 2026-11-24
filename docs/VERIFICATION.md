@@ -28,3 +28,5 @@ Etap 6 run 45368803283: npm audit clean, typecheck FAIL TS2532 auth.ts:29; popra
 Etap 7: run 45370241006 success, 45/45, npm audit 0, typecheck, build, smoke render/ACK, NSIS, packaged smoke PASS. Audyt B: 6 nowych testów i rozszerzenie testu Agenta, CI oczekuje. Manualne scenariusze nieprzeprowadzone.
 
 Dodatkowo 1 test regresji OBS i rozszerzenie smoke o poprawny PNG oraz brakujący PNG. Łącznie 52 testy Node; CI oczekuje.
+
+Audyt B: run 45371861162 success, 52/52 PASS, clean audit, build, NSIS, Chromium media smoke i packaged smoke. Etap 8: 5 nowych testów biblioteki/profili/wariantów. CI oczekuje; manualne Twitch/OBS bez zmian.

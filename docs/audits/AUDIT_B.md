@@ -33,3 +33,6 @@ Wszystkie wymienione pozycje mają poprawki w kodzie, ale status weryfikacji = o
 
 ## Dodatkowe testy po przeglądzie
 Dodano regresję wymiany socketu OBS w trakcie refreshu oraz rozszerzony smoke rzeczywistego Chromium: poprawna wielowarstwowa scena z deterministycznym PNG, potwierdzenie renderowania i ACK, brakujący PNG musi zakończyć się failed/media-error. Preview oczekuje na ten sam readiness i ogranicza odświeżanie zegara React do ~15 Hz, pozostawiając renderowanie animacji w requestAnimationFrame. Wynik wymaga CI.
+
+## Zamknięcie bramki automatycznej
+Run 45371861162: 52/52 PASS, npm audit 0, typecheck, build, smoke Chromium (warstwy PNG oraz brakujący zasób), NSIS i packaged smoke PASS. Regresje B01–B16 potwierdzone w zakresie automatycznych testów; manualne ograniczenia pozostają otwarte. Etap 8 odblokowany.
