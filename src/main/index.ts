@@ -1,0 +1,102 @@
+import { app, BrowserWindow, dialog, session } from 'electron'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { pathToFileURL } from 'node:url'
+import type { DatabaseSync } from 'node:sqlite'
+import { openDatabase } from './database'
+import { registerIpc } from './ipc'
+import { createLogger } from './logger'
+
+const smoke = process.argv.includes('--smoke-test')
+const directory = smoke
+  ? mkdtempSync(join(tmpdir(), 'pssa-smoke-'))
+  : join(app.getPath('appData'), 'PSSA 2 Dev')
+mkdirSync(directory, { recursive: true })
+app.setPath('userData', directory)
+app.setName('PSSA 2 Dev')
+const log = createLogger(directory)
+let window: BrowserWindow | undefined
+let db: DatabaseSync | undefined
+let disposeIpc: (() => void) | undefined
+let cleaned = false
+
+function cleanup(): void {
+  if (cleaned) return
+  cleaned = true
+  disposeIpc?.()
+  db?.close()
+  log('shutdown')
+}
+function fail(): void {
+  log('startup-failed')
+  if (!smoke) dialog.showErrorBox('PSSA 2 Dev', 'Nie udało się uruchomić aplikacji. Sprawdź application.log w katalogu danych.')
+  cleanup()
+  app.exit(1)
+}
+
+async function start(): Promise<void> {
+  log('startup')
+  db = openDatabase(join(directory, 'pssa.sqlite'))
+  const file = join(__dirname, '../renderer/index.html')
+  const devUrl = !app.isPackaged && !smoke ? process.env.ELECTRON_RENDERER_URL : undefined
+  if (devUrl) {
+    const url = new URL(devUrl)
+    if (url.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(url.hostname) || url.username || url.password) {
+      throw new Error('Development renderer must be loopback HTTP')
+    }
+  }
+  const document = devUrl ? new URL(devUrl).href : pathToFileURL(file).href
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  session.defaultSession.setPermissionCheckHandler(() => false)
+  window = new BrowserWindow({
+    title: 'PSSA 2 Dev', width: 1180, height: 760, minWidth: 700, minHeight: 500,
+    show: false, backgroundColor: '#101012',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true, sandbox: true, nodeIntegration: false,
+      webSecurity: true, webviewTag: false, devTools: !app.isPackaged
+    }
+  })
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', event => event.preventDefault())
+  window.webContents.on('will-attach-webview', event => event.preventDefault())
+  window.webContents.on('render-process-gone', () => {
+    log('renderer-gone')
+    if (smoke) fail()
+    else dialog.showErrorBox('PSSA 2 Dev', 'Interfejs uległ awarii. Uruchom aplikację ponownie.')
+  })
+  disposeIpc = registerIpc(window, db, document, app.getVersion())
+  if (devUrl) await window.loadURL(document)
+  else await window.loadFile(file)
+  log('ready')
+  if (smoke) {
+    // Exercise the actual preload and IPC bridge in the loaded renderer.
+    const passed = await window.webContents.executeJavaScript(
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 1 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true)'
+    )
+    if (passed !== true) throw new Error('Smoke test failed')
+    app.quit()
+  } else {
+    window.show()
+  }
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (window && !window.isDestroyed()) {
+      if (window.isMinimized()) window.restore()
+      window.focus()
+    }
+  })
+  app.on('window-all-closed', () => app.quit())
+  app.on('before-quit', cleanup)
+  app.on('quit', () => {
+    if (smoke) {
+      try { rmSync(directory, { recursive: true, force: true }) } catch { /* temporary files only */ }
+    }
+  })
+  app.whenReady().then(start).catch(fail)
+}

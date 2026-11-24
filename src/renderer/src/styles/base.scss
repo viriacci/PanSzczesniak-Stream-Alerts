@@ -1,0 +1,25 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+  color: #f2f2f2;
+  background: #101012;
+  --gold: #e3c048;
+  --panel: #1b1b1e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.shell { max-width: 980px; margin: auto; padding: 48px; }
+.shell.compact { padding: 20px; }
+header { display: flex; align-items: center; gap: 16px; margin-bottom: 36px; }
+.brand { font-size: 28px; font-weight: 700; color: var(--gold); letter-spacing: .14em; }
+.tag, .eyebrow, footer { color: #aaaab2; font-size: 12px; letter-spacing: .09em; }
+.panel { padding: 32px; border: 1px solid #35353b; border-radius: 12px; background: var(--panel); }
+.compact .panel { padding: 16px; }
+h1 { font-size: clamp(24px, 4vw, 36px); }
+dl { display: grid; grid-template-columns: minmax(110px, 1fr) 2fr; gap: 12px; margin: 28px 0; }
+dt { color: #aaaab2; }
+dd { margin: 0; }
+button { padding: 12px 18px; border: 1px solid var(--gold); border-radius: 6px; background: transparent; color: var(--gold); font: inherit; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible { outline: 2px solid white; outline-offset: 3px; }
+footer { margin-top: 20px; }

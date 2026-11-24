@@ -1,0 +1,6 @@
+# Architektura
+Renderer (React/SCSS) → jawny kontrakt PssaApi → preload (contextBridge) → IPC (main) → serwisy i SQLite.
+Proces main ma wyłączny dostęp do bazy i systemu plików. Renderer nie ma Node, bezpośredniego ipcRenderer ani danych uwierzytelniających. IPC sprawdza konkretny webContents, główną ramkę, URL i argumenty. Nawigacja, popupy, webview i uprawnienia są zablokowane. CSP ogranicza zasoby, dev URL wyłącznie loopback. DevTools tylko poza pakietem.
+SQLite przez node:sqlite (bez dodatkowego natywnego addonu). API izolowane w module database. Migracje atomowe przez user_version, FK i WAL. Wyższa nieobsługiwana wersja bazy jest odrzucana. Czas w Unix epoch ms UTC, brak próbki != zero widzów. Źródło zapisane w stream_sessions i stream_events. Importer później odpowiada za scalanie sesji między źródłami.
+Kolejka, Twitch, OBS, overlay i agent zostaną osobnymi modułami w odpowiednich etapach. Nie ma jeszcze serwera sieciowego ani tokenów. Nie zapisujemy sekretów w ustawieniach. Na etapie 3 użyć aktualnego asynchronicznego API safeStorage i fail closed przy braku bezpiecznego magazynu.
+Logi zawierają stałe kody zdarzeń, bez dowolnych payloadów. W etapie 10 dojdzie diagnostyka z redakcją.

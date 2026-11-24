@@ -1,6 +1,0 @@
-aiohttp>=3.9
-websockets>=12.0
-pyinstaller>=6.0
-Pillow>=10.0
-PySide6>=6.6
-PySide6-Fluent-Widgets[full]>=1.11
