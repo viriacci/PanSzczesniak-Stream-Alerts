@@ -82,8 +82,8 @@ export interface PssaApi {
   twitchLogout(): Promise<void>
   twitchConnect(): Promise<void>
   syncRewards(): Promise<Reward[]>
-  saveScene(key:string,scene:Scene,title:string):Promise<AlertRule>
-  saveAlert(rule:AlertRule): Promise<AlertRule>
+  saveScene(key:string,scene:Scene,title:string,profile:string):Promise<AlertRule>
+  saveAlert(rule:AlertRule,profile:string): Promise<AlertRule>
   chooseMedia(kind:'image'|'audio'|'video'): Promise<string|null>
   importLegacy(): Promise<{count:number;warnings:string[]}|null>
   testAlert(key:string): Promise<number>

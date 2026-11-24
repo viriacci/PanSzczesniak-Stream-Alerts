@@ -1,6 +1,9 @@
+import {publishNew} from './output.ts'
+import {tmpdir} from 'node:os'
+import {parseLayout} from '../../shared/layout.ts'
 import {DatabaseSync,type SQLInputValue} from 'node:sqlite'
 import {createHash,randomUUID} from 'node:crypto'
-import {mkdirSync,readdirSync,readFileSync,writeFileSync,renameSync,rmSync,lstatSync,existsSync,copyFileSync,statSync} from 'node:fs'
+import {mkdirSync,readdirSync,readFileSync,writeFileSync,renameSync,rmSync,lstatSync,existsSync,copyFileSync,statSync,mkdtempSync} from 'node:fs'
 import {join,resolve,dirname,extname} from 'node:path'
 import {openDatabase,SCHEMA_VERSION,schemaVersion} from '../database/index.ts'
 import {parseRule,validMedia} from '../../shared/alerts.ts'
@@ -8,6 +11,7 @@ import {parseQueueSettings} from '../../shared/queue.ts'
 import {parseRuntime} from '../../shared/runtime.ts'
 import {config,activeProfile} from '../library/store.ts'
 const tables=['stream_sessions','viewer_samples','stream_events','obs_samples','imported_summaries','alert_queue'] as const
+const archiveTables=[...tables,'settings','backup_manifest','backup_media']
 const settingKeys=['compact','layout.v1','window.v1','alerts.v1','queue.v1','library.v1','library.active','live.chat.salt','runtime.v1']
 const maxArchive=1024*1024*1024,maxFile=50*1024*1024
 const hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex')
@@ -24,6 +28,8 @@ function copyData(from:DatabaseSync,to:DatabaseSync){
 }
 function validateData(db:DatabaseSync){
  const read=(key:string)=>db.prepare('SELECT value FROM settings WHERE key=?').get(key)?.value
+ const layout=read('layout.v1');if(typeof layout==='string')parseLayout(JSON.parse(layout))
+ const compact=read('compact');if(compact!==undefined&&compact!=='true'&&compact!=='false')throw Error('Invalid compact')
  const a=read('alerts.v1');if(typeof a==='string'){const v=JSON.parse(a);if(!Array.isArray(v)||v.length>1024)throw Error('Invalid rules');v.forEach(parseRule)}
  const q=read('queue.v1');if(typeof q==='string')parseQueueSettings(JSON.parse(q))
  const runtime=read('runtime.v1');if(typeof runtime==='string')parseRuntime(JSON.parse(runtime))
@@ -33,11 +39,18 @@ function validateData(db:DatabaseSync){
  if(db.prepare('PRAGMA foreign_key_check').get())throw Error('Invalid foreign keys')
 }
 function openArchive(path:string){
- if(regular(path).size>maxArchive)throw Error('Backup too large')
+ if(regular(path).size>maxArchive||['-wal','-shm','-journal'].some(s=>existsSync(path+s)))throw Error('Backup too large or has sidecar files')
  const db=new DatabaseSync(path,{readOnly:true})
  try{db.exec('PRAGMA trusted_schema=OFF; PRAGMA query_only=ON')
-  if(schemaVersion(db)!==SCHEMA_VERSION||db.prepare('PRAGMA quick_check').get()?.quick_check!=='ok'||db.prepare("SELECT value FROM backup_manifest WHERE key='format'").get()?.value!=='pssa-backup-v1')throw Error('Unsupported or damaged backup')
-  for(const t of [...tables,'settings','backup_manifest','backup_media'])if(db.prepare("SELECT type FROM sqlite_schema WHERE name=?").get(t)?.type!=='table')throw Error('Invalid archive table')
+  if(schemaVersion(db)!==SCHEMA_VERSION)throw Error('Unsupported backup schema')
+  const expected=openDatabase(':memory:')
+  try{
+   expected.exec('CREATE TABLE backup_manifest(key TEXT PRIMARY KEY,value TEXT NOT NULL) STRICT; CREATE TABLE backup_media(name TEXT PRIMARY KEY,bytes BLOB NOT NULL) STRICT;')
+   // Reject foreign SQL objects, virtual tables, generated columns and modified constraints.
+   const objects=(d:DatabaseSync)=>d.prepare("SELECT name,type,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name").all()
+   if(JSON.stringify(objects(db))!==JSON.stringify(objects(expected)))throw Error('Invalid archive schema')
+  }finally{expected.close()}
+  if(db.prepare('PRAGMA quick_check').get()?.quick_check!=='ok'||db.prepare("SELECT value FROM backup_manifest WHERE key='format'").get()?.value!=='pssa-backup-v1')throw Error('Unsupported or damaged backup')
   return db
  }catch(e){db.close();throw e}
 }
@@ -72,7 +85,7 @@ export function createBackup(db:DatabaseSync,media:string,destination:string){
   out.exec('COMMIT');out.close();out=undefined
   if(statSync(temp).size>maxArchive)throw Error('Backup exceeds 1 GB')
   // Windows rename is non-overwriting only when target doesn't exist; exclusive copy prevents overwrite on all platforms.
-  copyFileSync(temp,destination,1);rmSync(temp,{force:true})
+  publishNew(temp,destination);rmSync(temp,{force:true})
   return count
  }finally{try{out?.close()}catch{}rmSync(temp,{force:true});rmSync(temp+'-journal',{force:true});rmSync(temp+'-wal',{force:true});rmSync(temp+'-shm',{force:true})}
 }
@@ -81,8 +94,9 @@ export function validateBackup(path:string){
  try{return validateCopy(src)}finally{src.close()}
 }
 function validateCopy(src:DatabaseSync){
- const clean=openDatabase(':memory:')
- try{clean.exec('BEGIN IMMEDIATE');copyData(src,clean);validateData(clean);clean.exec('COMMIT');let count=0;readAssets(src,()=>count++);return count}finally{clean.close()}
+ const scratch=mkdtempSync(join(tmpdir(),'pssa-validate-'))
+ let clean:DatabaseSync|undefined
+ try{clean=openDatabase(join(scratch,'validate.sqlite'));clean.exec('PRAGMA journal_mode=DELETE; PRAGMA cache_size=-8192; BEGIN IMMEDIATE');copyData(src,clean);validateData(clean);clean.exec('COMMIT');let count=0;readAssets(src,()=>count++);return count}finally{try{clean?.close()}finally{rmSync(scratch,{recursive:true,force:true})}}
 }
 export function restoreBackup(db:DatabaseSync,media:string,path:string){
  const src=openArchive(path)
@@ -92,7 +106,7 @@ export function restoreBackup(db:DatabaseSync,media:string,path:string){
   readAssets(src,(name,bytes)=>{
    const target=join(media,name)
    if(existsSync(target)){if(regular(target).size>maxFile)throw Error('Existing media too large');if(hash(readFileSync(target))===name.slice(0,64))return;throw Error('Existing media corrupt; repair before restore')}
-   writeFileSync(target,bytes,{flag:'wx',mode:0o600})
+   const temp=target+'.'+randomUUID()+'.tmp';try{writeFileSync(temp,bytes,{flag:'wx',mode:0o600});publishNew(temp,target)}finally{rmSync(temp,{force:true})}
   })
   db.exec('BEGIN IMMEDIATE')
   try{
@@ -118,7 +132,7 @@ export function pendingRestore(db:DatabaseSync,directory:string){
 export function stageRestore(source:string,directory:string){
  const dest=join(directory,'restore.pending.pssabackup')
  if(existsSync(dest)||resolve(source)===resolve(dest))throw Error('Restore already staged')
- regular(source);if(statSync(source).size>maxArchive)throw Error('Backup too large')
+ regular(source);if(['-wal','-shm','-journal'].some(s=>existsSync(source+s)))throw Error('Backup has sidecar files');if(statSync(source).size>maxArchive)throw Error('Backup too large')
  const temp=dest+'.'+randomUUID()+'.tmp'
  try{copyFileSync(source,temp,1);validateBackup(temp);renameSync(temp,dest)}finally{rmSync(temp,{force:true})}
 }

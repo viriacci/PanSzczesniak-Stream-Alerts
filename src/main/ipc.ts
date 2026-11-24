@@ -68,13 +68,15 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.twitchLogout,0,()=>alerts.logout()],
    [IPC.twitchConnect,0,()=>alerts.connect()],
    [IPC.syncRewards,0,()=>alerts.sync()],
-   [IPC.saveAlert,1,rule=>alerts.save(rule)],
-   [IPC.saveScene,3,(key,scene,title)=>alerts.saveScene(key,scene,title)],
+   [IPC.saveAlert,2,(rule,profile)=>alerts.save(rule,profile)],
+   [IPC.saveScene,4,(key,scene,title,profile)=>alerts.saveScene(key,scene,title,profile)],
    [IPC.chooseMedia,1,kind=>{if(kind!=='image'&&kind!=='audio'&&kind!=='video')throw Error('Invalid media kind');return alerts.choose(kind)}],
    [IPC.importLegacy,0,()=>alerts.import()],
    [IPC.testAlert,1,key=>{if(typeof key!=='string'||!validKey(key))throw Error('Invalid alert');return alerts.test(key)}]
   ]
-  for(const [channel,count,handler] of handlers)ipcMain.handle(channel,(event,...args:unknown[])=>{authorize(event);if(args.length!==count)throw Error('Invalid arguments');return handler(...args)})
+  const dialogs=new Set<string>([IPC.backupCreate,IPC.backupRestore,IPC.diagnosticsExport,IPC.analyticsImport,IPC.analyticsExport,IPC.chooseMedia,IPC.importLegacy])
+  let dialogOpen=false
+  for(const [channel,count,handler] of handlers)ipcMain.handle(channel,async(event,...args:unknown[])=>{authorize(event);if(args.length!==count)throw Error('Invalid arguments');if(!dialogs.has(channel))return handler(...args);if(dialogOpen)throw Error('Another file operation is active');dialogOpen=true;try{return await handler(...args)}finally{dialogOpen=false}})
   return () => {
     for(const [channel] of handlers)ipcMain.removeHandler(channel)
     ipcMain.removeHandler(IPC.getLayout)

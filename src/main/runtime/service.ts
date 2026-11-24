@@ -1,3 +1,4 @@
+import {outsideData,writeNew} from './output'
 import {app,dialog,shell,type BrowserWindow} from 'electron'
 import type {DatabaseSync} from 'node:sqlite'
 import type {AlertsService} from '../alerts/service'
@@ -23,14 +24,14 @@ export class RuntimeService{
  start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(){this.stopped=true;clearInterval(this.timer)}
  private guard(){if(this.busy||this.stopped)throw Error('Runtime operation unavailable')}
- private offline(){const l=this.alerts.liveState(),m=this.obs.state().metrics;if(l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}
- private outside(path:string){const rel=relative(realpathSync(this.directory),join(realpathSync(dirname(resolve(path))),basename(path)));if(rel===''||(!rel.startsWith('..')&&!isAbsolute(rel)))throw Error('Choose a file outside app data')}
+ private offline(){const l=this.alerts.liveState(),a=this.alerts.state(),m=this.obs.state().metrics;if(a.queue.current||a.queue.pendingCount||l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}
+ private outside(path:string){return outsideData(this.directory,path)}
  async backup(){
   this.guard();this.offline();this.busy=true
   try{const r=await dialog.showSaveDialog(this.window,{title:'Kopia zapasowa PSSA',defaultPath:'PSSA-'+new Date().toISOString().slice(0,10)+'.pssabackup',filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
    if(r.canceled||!r.filePath)return null
-   this.outside(r.filePath);if(this.stopped)throw Error('App stopping');this.offline()
-   return {media:createBackup(this.db,join(this.directory,'media'),r.filePath)}
+   const target=this.outside(r.filePath);if(this.stopped)throw Error('App stopping');this.offline()
+   return {media:createBackup(this.db,join(this.directory,'media'),target)}
   }finally{this.busy=false}
  }
  async restore(){
@@ -49,7 +50,7 @@ export class RuntimeService{
  }
  async exportDiagnostics(){
   this.guard();this.busy=true
-  try{const r=await dialog.showSaveDialog(this.window,{defaultPath:'pssa-diagnostics.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath)return false;this.outside(r.filePath);if(this.stopped)return false;writeFileSync(r.filePath,JSON.stringify(this.diagnostics(),null,2),{flag:'wx'});return true}finally{this.busy=false}
+  try{const r=await dialog.showSaveDialog(this.window,{defaultPath:'pssa-diagnostics.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath)return false;const target=this.outside(r.filePath);if(this.stopped)return false;writeNew(target,JSON.stringify(this.diagnostics(),null,2));return true}finally{this.busy=false}
  }
  async check(){if(this.stopped)return this.cached;if(this.update)return this.update
   const channel=this.state().updates

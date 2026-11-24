@@ -1,3 +1,4 @@
+import {outsideData,writeNew} from '../src/main/runtime/output.ts'
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,readdirSync,existsSync} from 'node:fs'
@@ -76,5 +77,28 @@ test('release selection follows channel, semantic version and fixed official rep
  assert.equal(beta.version,'2.0.0-beta.10');assert.equal(beta.state,'available');assert.match(beta.url,/^https:\/\/github\.com\/viriacci\/PanSzczesniak-Stream-Alerts\/releases\/tag\//)
  assert.equal(selectRelease([],'2.0.0-beta.1','beta').state,'none')
  const fake=(async()=>new Response('bad',{status:503})) as typeof fetch
+ assert.equal((await checkRelease('2.0.0-beta.1','beta',fake)).state,'error')
+})
+
+test('exports refuse app data and never overwrite an existing file',()=>{
+ const root=tmp()
+ try{const dir=join(root,'data');mkdirSync(dir);const internal=join(dir,'pssa.sqlite'),external=join(root,'report.json')
+  writeFileSync(internal,'database')
+  assert.throws(()=>outsideData(dir,internal))
+  assert.equal(outsideData(dir,external),external)
+  writeNew(external,'original');assert.throws(()=>writeNew(external,'replacement'));assert.equal(readFileSync(external,'utf8'),'original')
+  assert.equal(readFileSync(internal,'utf8'),'database')
+  assert.equal(readdirSync(root).some(x=>x.endsWith('.tmp')),false)
+ }finally{rmSync(root,{recursive:true,force:true})}
+})
+test('backup rejects additional schema objects before restore',()=>{
+ const root=tmp(),db=openDatabase(':memory:')
+ try{const file=join(root,'copy.pssabackup');createBackup(db,join(root,'media'),file)
+  const bad=new DatabaseSync(file);try{bad.exec('CREATE VIEW extra AS SELECT value FROM settings')}finally{bad.close()}
+  assert.throws(()=>validateBackup(file),/schema/)
+ }finally{db.close();rmSync(root,{recursive:true,force:true})}
+})
+test('release checker rejects excessive responses',async()=>{
+ const fake=(async()=>new Response('x'.repeat(2*1024*1024+1))) as typeof fetch
  assert.equal((await checkRelease('2.0.0-beta.1','beta',fake)).state,'error')
 })

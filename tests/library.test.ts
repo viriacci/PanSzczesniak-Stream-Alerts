@@ -1,3 +1,4 @@
+import {assertActiveProfile} from '../src/main/library/store.ts'
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {mkdtemp,writeFile,rm} from 'node:fs/promises'
@@ -94,4 +95,15 @@ test('media catalog deduplicates imported content, keeps metadata and detects re
   assert.equal(references(db).get(id),2)
   assert.throws(()=>libraryAction(db,{type:'asset-edit',id:'../secret',name:'Bad',folder:'',tags:[]}))
  }finally{db.close();await rm(dir,{recursive:true,force:true})}
+})
+
+test('a stale editor cannot save into another active profile',()=>{
+ const db=openDatabase(':memory:')
+ try{
+  assert.doesNotThrow(()=>assertActiveProfile(db,'default'))
+  libraryAction(db,{type:'profile-create',name:'New',categoryId:''})
+  const id=config(db).profiles[1]!.id;activate(db,id)
+  assert.throws(()=>assertActiveProfile(db,'default'),/profile changed/)
+  assert.doesNotThrow(()=>assertActiveProfile(db,id))
+ }finally{db.close()}
 })

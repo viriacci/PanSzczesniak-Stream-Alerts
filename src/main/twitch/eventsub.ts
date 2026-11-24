@@ -33,7 +33,7 @@ export class EventSub {
  private connect(url:string,migrated:boolean){
   if(this.stopped)return
   try{const u=new URL(url);if(u.protocol!=='wss:'||u.hostname!=='eventsub.wss.twitch.tv'||u.username||u.password||u.port)throw Error('Invalid reconnect URL')}catch{if(this.current){this.state('connected','Odrzucono nieprawidłowy adres migracji');return}this.state('error','Nieprawidłowy adres EventSub');return}
-  let s:WebSocket;try{s=this.makeSocket(url)}catch{this.state('error','Nie można utworzyć połączenia EventSub');return}this.sockets.add(s);if(migrated)this.pending=s;else{this.current=s;this.state('connecting','Łączenie EventSub…')}
+  let s:WebSocket;try{s=this.makeSocket(url)}catch{if(migrated&&this.current){this.state('connected','Migracja niedostępna; zachowano połączenie');return}this.state('retrying','Nie można utworzyć połączenia EventSub');if(!this.retry)this.retry=setTimeout(()=>{this.retry=undefined;this.connect('wss://eventsub.wss.twitch.tv/ws',false)},Math.min(60000,1000*2**Math.min(this.attempts++,6)));return}this.sockets.add(s);if(migrated)this.pending=s;else{this.current=s;this.state('connecting','Łączenie EventSub…')}
   let interval=10,welcomed=false
   this.watchdog(s,15)
   s.addEventListener('message',event=>{void (async()=>{

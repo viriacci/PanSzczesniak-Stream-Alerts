@@ -1,3 +1,4 @@
+import {BRAND} from '../shared/brand'
 import {RuntimeService} from './runtime/service'
 import {pendingRestore} from './runtime/backup'
 import {preferences,savePreferences} from './runtime/preferences'
@@ -55,7 +56,7 @@ function cleanup(): void {
 }
 function fail(): void {
   log('startup-failed')
-  if (!smoke) dialog.showErrorBox('PSSA 2 Dev', 'Nie udało się uruchomić aplikacji. Sprawdź application.log w katalogu danych.')
+  if (!smoke) dialog.showErrorBox(BRAND, 'Nie udało się uruchomić aplikacji. Sprawdź application.log w katalogu danych.')
   cleanup()
   app.exit(1)
 }
@@ -77,7 +78,7 @@ async function start(): Promise<void> {
   session.defaultSession.setPermissionCheckHandler(() => false)
   const state = readWindowState(db, screen.getAllDisplays().map(display => display.workArea))
   window = new BrowserWindow({
-    title: 'PSSA 2 Dev', ...state.bounds, minWidth: 700, minHeight: 500,
+    title: BRAND+' 2 Beta', ...state.bounds, minWidth: 700, minHeight: 500,
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#111114', symbolColor: '#e8e7eb', height: 36 },
     show: false, backgroundColor: '#101012',
     webPreferences: {
@@ -122,7 +123,7 @@ async function start(): Promise<void> {
   const applyMode=(p:RuntimePreferences)=>{
    if(smoke||cleaned)return
    const g=++modeGeneration
-   if(p.mode!=='background'||!tray){if(blank)reveal();return}
+   if(p.mode!=='background'||!tray){if(p.mode==='background'&&!tray)savePreferences(activeDb,{...p,mode:'streaming'});if(blank)reveal();return}
    // Let the IPC result reach the renderer, then unload its document and timers.
    setTimeout(()=>{if(g!==modeGeneration||cleaned||activeWindow.isDestroyed())return
     blank=true;activeWindow.hide();void activeWindow.loadURL('about:blank').catch(()=>{if(g===modeGeneration&&!cleaned)reveal()})
@@ -131,7 +132,7 @@ async function start(): Promise<void> {
   if(!smoke){
    try{
     const icon=nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGN8fMCDgRTARJLqUQ2jGoaUBgAQ3wILGYFI4wAAAABJRU5ErkJggg==')
-    tray=new Tray(icon);tray.setToolTip('PSSA 2')
+    tray=new Tray(icon);tray.setToolTip(BRAND)
     tray.setContextMenu(Menu.buildFromTemplate([{label:'Otwórz PSSA',click:()=>reveal()},{label:'Zakończ PSSA',click:()=>app.quit()}]))
     tray.on('double-click',()=>reveal())
    }catch{tray=undefined}
@@ -171,7 +172,7 @@ async function start(): Promise<void> {
       const scene:Scene={version:1,width:1920,height:1080,duration:1500,layers:[{...makeLayer('image','smoke-image',1500),asset},{...makeLayer('text','smoke-text',1500),text:'Multi-layer smoke'}]}
       const exercise=async(value:Scene,expected:'done'|'failed')=>{
         const previous=new Set(activeAlerts.state().queue.history.map(x=>x.id))
-        const saved=await activeWindow.webContents.executeJavaScript('window.pssa.saveScene("raid",'+JSON.stringify(value)+',"Raid")')
+        const saved=await activeWindow.webContents.executeJavaScript('window.pssa.saveScene("raid",'+JSON.stringify(value)+',"Raid","default")')
         if(!saved?.scene||activeAlerts.test('raid')!==1)throw Error('Scene smoke setup failed')
         const until=Date.now()+12000;let rendered=false
         while(Date.now()<until){

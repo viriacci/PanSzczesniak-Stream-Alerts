@@ -1,4 +1,9 @@
 # Changelog
+## 2.0.0-beta.2
+- Audyt C: bezpieczne eksporty i kopie, izolacja profili, wspólny guard dialogów, reconnect, limity aktualizacji i fallback Background.
+- Branding Pan Szczesniak Stream Alerts.
+- Regresje oraz rozszerzenie CI o upgrade i uninstall.
+
 ## 2.0.0-beta.1
 - Tryby wydajności, tray i wyładowanie UI, onboarding oraz diagnostyka.
 - Kopia zapasowa historii, ustawień i mediów bez tokenów; staging restore i kopia bezpieczeństwa.

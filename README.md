@@ -1,4 +1,4 @@
-# PanSzczesniak Stream Alerts 2.0
+# Pan Szczesniak Stream Alerts 2.0
 
 Lokalna aplikacja Windows dla Twitcha i OBS. Etap 6: Live Center, Twitch, silnik alertów i OBS, nie gotowy następca PSSA 1.x.
 

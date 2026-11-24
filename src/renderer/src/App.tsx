@@ -1,3 +1,4 @@
+import {BRAND} from '../../shared/brand'
 import {useRuntime,Onboarding} from './features/runtime'
 import {useLive} from './features/live'
 import {useObs} from './features/obs'
@@ -71,7 +72,7 @@ export function App() {
  const styles={'--sidebar-width':sidebarSize+'px','--inspector-width':layout.inspectorWidth+'px'} as CSSProperties
  const filtered=groups.map(group=>({...group,items:group.items.filter(p=>p.label.toLocaleLowerCase('pl').includes(query.toLocaleLowerCase('pl')))})).filter(g=>g.items.length)
  return <div className={`app ${status?.compact?'compact':''} ${slow?'streaming-mode':''}`} style={styles}>
-  <header className="titlebar"><div className="title-brand"><span className="brand-symbol">P</span><span>PSSA <small>STREAM ALERTS</small></span></div><span className="title-version">{status?.version??'2.0-dev'}</span><span className="title-caption">BETA BUILD</span></header>
+  <header className="titlebar"><div className="title-brand" title={BRAND} aria-label={BRAND}><span className="brand-symbol">P</span><span>PSSA <small>STREAM ALERTS</small></span></div><span className="title-version">{status?.version??'2.0-dev'}</span><span className="title-caption">BETA BUILD</span></header>
   <div className={`workspace ${inspector?'has-inspector':''}`}>
    <aside className={`sidebar ${collapsed?'collapsed':''}`} aria-label="Nawigacja główna">
     <div className="sidebar-top"><Button variant="ghost" title="Zwiń / rozwiń menu (Ctrl+B)" aria-label="Zwiń / rozwiń menu" aria-expanded={!collapsed} disabled={!ready} onClick={()=>patch({collapsed:!collapsed})}><Icon name="sidebar"/></Button>{!collapsed&&<label className="nav-search"><Icon name="search" size={15}/><input aria-label="Szukaj modułu" placeholder="Szukaj modułu" value={query} onChange={e=>setQuery(e.target.value)}/></label>}</div>

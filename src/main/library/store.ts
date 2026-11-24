@@ -110,3 +110,5 @@ export async function libraryState(db:DatabaseSync,dir:string):Promise<LibrarySt
  }
  return {assets,activeProfile:c.active,profiles:c.profiles.map(({id,name,categoryId})=>({id,name,categoryId})),templates:c.templates}
 }
+
+export function assertActiveProfile(db:DatabaseSync,expected:unknown){if(typeof expected!=='string'||expected!==activeProfile(db))throw Error('Active profile changed; reopen editor')}

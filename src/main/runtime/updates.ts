@@ -21,6 +21,6 @@ export function selectRelease(input:unknown,current:string,channel:UpdateChannel
  return {state:'available',version,url:'https://github.com/'+repo+'/releases/tag/'+encodeURIComponent(latest.tag_name),detail:'Dostępne wydanie. Instalacja ręczna po weryfikacji podpisu.'}
 }
 export async function checkRelease(current:string,channel:UpdateChannel,request=fetch):Promise<UpdateInfo>{
- try{const r=await request(api,{headers:{Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(8000),redirect:'error'});if(!r.ok)throw Error('Release lookup failed');return selectRelease(await r.json(),current,channel)}
+ try{const r=await request(api,{headers:{Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(8000),redirect:'error'});if(!r.ok)throw Error('Release lookup failed');const reader=r.body?.getReader();if(!reader)throw Error('Empty response');let size=0;const chunks:Uint8Array[]=[];try{for(;;){const {value,done}=await reader.read();if(done)break;if(value){size+=value.byteLength;if(size>2*1024*1024){await reader.cancel();throw Error('Release response too large')}chunks.push(value)}}}finally{reader.releaseLock()}return selectRelease(JSON.parse(Buffer.concat(chunks).toString('utf8')),current,channel)}
  catch{return {state:'error',version:'',url:'',detail:'Nie udało się sprawdzić wydań.'}}
 }

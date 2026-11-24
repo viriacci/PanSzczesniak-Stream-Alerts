@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: pssa-v2-${{ github.ref }}
   cancel-in-progress: true
@@ -50,6 +51,12 @@ jobs:
           $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged smoke timeout' }
           if ($p.ExitCode -ne 0) { throw "Packaged smoke exit $($p.ExitCode)" }
+      - uses: actions/download-artifact@v4
+        with:
+          name: PSSA-2-Dev-Windows
+          run-id: 45374474420
+          github-token: ${{ github.token }}
+          path: previous-beta
       - name: Verify clean NSIS installation
         shell: pwsh
         run: |
@@ -65,6 +72,34 @@ jobs:
           $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Installed smoke timeout' }
           if ($p.ExitCode -ne 0) { throw "Installed smoke exit $($p.ExitCode)" }
+      - name: Verify upgrade and retained data on uninstall
+        shell: pwsh
+        run: |
+          $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
+          $new = @(Get-ChildItem dist -Filter 'PSSA-2-Dev-*.exe' -File)
+          if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Installer missing' }
+          $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
+          $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
+          if ($uninstaller.Count -ne 1) { throw 'Uninstaller missing' }
+          $data = Join-Path $env:APPDATA 'PSSA 2 Dev'
+          New-Item -ItemType Directory -Path $data -Force | Out-Null
+          $marker = Join-Path $data 'ci-retention-marker.txt'
+          Set-Content -LiteralPath $marker -Value 'preserve'
+          function Run-Installer($path, $arguments) {
+            $p = Start-Process -FilePath $path -ArgumentList $arguments -PassThru
+            if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw 'Install operation timeout' }
+            if ($p.ExitCode -ne 0) { throw "Install operation exit $($p.ExitCode)" }
+          }
+          Run-Installer $uninstaller[0].FullName '/S'
+          if (-not (Test-Path $marker)) { throw 'Uninstall removed app data' }
+          Run-Installer $old[0].FullName "/S /D=$dir"
+          Run-Installer $new[0].FullName "/S /D=$dir"
+          if ((Get-Content -LiteralPath $marker -Raw).Trim() -ne 'preserve') { throw 'Upgrade removed app data' }
+          Run-Installer (Join-Path $dir 'PSSA 2 Dev.exe') '--smoke-test'
+          $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
+          if ($uninstaller.Count -ne 1) { throw 'Uninstaller missing after upgrade' }
+          Run-Installer $uninstaller[0].FullName '/S'
+          if (-not (Test-Path $marker)) { throw 'Uninstall removed data after upgrade' }
       - uses: actions/upload-artifact@v4
         with:
           name: PSSA-2-Dev-Windows

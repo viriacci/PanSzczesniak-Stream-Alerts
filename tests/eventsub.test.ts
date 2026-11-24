@@ -31,3 +31,15 @@ test('EventSub reconnect keeps old socket until welcome, avoids resubscription a
   client.stop();next.message('notification',event,{...meta,message_id:'three'});assert.equal(events.length,2)
  }finally{client.stop()}
 })
+
+test('socket creation failure schedules retry and migration failure retains old connection',async()=>{
+ const states:string[]=[],sockets:Socket[]=[];let fail=true
+ const client=new EventSub({identity:{userId:'42',login:'test'},helix:async()=>({})},phase=>states.push(phase),()=>{},()=>{if(fail)throw Error('socket unavailable');const s=new Socket();sockets.push(s);return s as unknown as WebSocket})
+ try{
+  client.start();assert.equal(states.at(-1),'retrying')
+  client.stop();fail=false;client.start()
+  const old=sockets[0]!;old.message('session_welcome',{session:{id:'one',keepalive_timeout_seconds:10}});await settle()
+  fail=true;old.message('session_reconnect',{session:{reconnect_url:'wss://eventsub.wss.twitch.tv/ws?reconnect=1'}})
+  await settle();assert.equal(old.closed,false);assert.equal(states.at(-1),'connected')
+ }finally{client.stop()}
+})

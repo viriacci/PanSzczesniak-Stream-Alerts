@@ -1,3 +1,5 @@
+import {outsideData,writeNew} from '../runtime/output'
+import {assertActiveProfile} from '../library/store'
 import {channels,report} from '../analytics/store'
 import {decodeHistory,importHistory,exportHistory} from '../analytics/transfer'
 import {readFile,stat,writeFile} from 'node:fs/promises'
@@ -30,12 +32,13 @@ export class AlertsService {
  private detail=''
  private rewards:Reward[]=[]
  private media:string
+ private directory:string
  private dialogBusy=false
  private stopped=false
  private generation=0
  private validation?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,dir:string,private window:BrowserWindow,private documents:string){
-  this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.live=new LiveService(db,this.auth);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
+  this.directory=dir;this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.live=new LiveService(db,this.auth);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
   this.events=new EventSub(this.auth,(phase,detail)=>{this.phase=phase;this.detail=detail},e=>this.dispatch(e),undefined,(id,type,event,at,normalized)=>{try{this.live.event(id,type,event,at,normalized)}catch{this.detail='Błąd zapisu statystyk'}})
  }
  async start(auto=true){
@@ -64,8 +67,8 @@ export class AlertsService {
   this.rewards=(Array.isArray(data.data)?data.data:[]).filter((x:any)=>typeof x.id==='string'&&typeof x.title==='string').map((x:any)=>({id:x.id,title:x.title,cost:Number(x.cost)||0}))
   return this.rewards
  }
- saveScene(key:unknown,value:unknown,title:unknown){return saveScene(this.db,key,value,title)}
- save(value:unknown){return saveRule(this.db,value)}
+ saveScene(key:unknown,value:unknown,title:unknown,profile:unknown){assertActiveProfile(this.db,profile);return saveScene(this.db,key,value,title)}
+ save(value:unknown,profile:unknown){assertActiveProfile(this.db,profile);return saveRule(this.db,value)}
  async choose(kind:'image'|'audio'|'video'){
   if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
   try{const result=await dialog.showOpenDialog(this.window,{properties:['openFile'],filters:[{name:kind==='image'?'Grafiki':kind==='video'?'Wideo':'Dźwięki',extensions:(kind==='image'?imageExt:kind==='video'?videoExt:audioExt).map(x=>x.slice(1))}]})
@@ -97,7 +100,7 @@ export class AlertsService {
  }
  async analyticsExport(value:unknown,format:unknown){
   if(this.dialogBusy||this.stopped||format!=='csv'&&format!=='json')throw Error('Invalid export');this.dialogBusy=true
-  try{const data=exportHistory(this.db,value,format);const result=await dialog.showSaveDialog(this.window,{title:'Eksport statystyk PSSA',defaultPath:'pssa-history.'+format,filters:[{name:format.toUpperCase(),extensions:[format]}]});if(result.canceled||!result.filePath)return false;if(this.stopped)throw Error('App stopping');await writeFile(result.filePath,data,'utf8');return true}finally{this.dialogBusy=false}
+  try{const data=exportHistory(this.db,value,format);const result=await dialog.showSaveDialog(this.window,{title:'Eksport statystyk PSSA',defaultPath:'pssa-history.'+format,filters:[{name:format.toUpperCase(),extensions:[format]}]});if(result.canceled||!result.filePath)return false;if(this.stopped)throw Error('App stopping');writeNew(outsideData(this.directory,result.filePath),data);return true}finally{this.dialogBusy=false}
  }
  liveState(){return this.live.snapshot()}
  liveAction(value:unknown){return this.live.action(value)}
