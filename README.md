@@ -1,6 +1,6 @@
 # PanSzczesniak Stream Alerts 2.0
 
-Lokalna aplikacja Windows dla Twitcha i OBS. Etap 2: interfejs i fundamenty, nie gotowy następca PSSA 1.x.
+Lokalna aplikacja Windows dla Twitcha i OBS. Etap 3: integracja Twitch i alerty, nie gotowy następca PSSA 1.x.
 
 ## Uruchomienie
 
@@ -21,7 +21,7 @@ Instalator developerski (niepodpisany) ma trafić do `dist/`. Windows CI etapu 1
 - `main` i `legacy/python`: zachowana wersja Pythonowa.
 - `develop/v2`: nowa aplikacja.
 - Dane v2: `%APPDATA%/PSSA 2 Dev` (osobna baza i log).
-- Lockfile: do wygenerowania i zatwierdzenia po pierwszej udanej instalacji zależności; do tego czasu build nie jest w pełni powtarzalny.
-- Etap 2 nie łączy się z Twitchem ani OBS, nie importuje danych starego programu.
+- Lockfile jest przechowywany w repozytorium; użyj npm ci.
+- Etap 3: Twitch i nakładka OBS, import konfiguracji. Kolejka i pełne sterowanie OBS w kolejnych etapach. Zobacz docs/TWITCH.md i docs/OBS.md.
 
 Zobacz [architekturę](docs/ARCHITECTURE.md), [handoff](docs/HANDOFF.md), [roadmapę](ROADMAP.md) i [przewodnik do nauki](docs/LEARNING_GUIDE.md).

@@ -1,4 +1,11 @@
 # Changelog
+## 2.0.0-dev.3
+- OAuth Twitch, szyfrowane poświadczenia, EventSub i reconnect.
+- Alerty follow/raid/bits/sub/Prime/resub/gift/mass gift oraz nagrody kanału.
+- Reguły alertów, grafiki i audio, lokalny overlay SSE, offline test.
+- Import ustawień i mediów z Python bez tokenów.
+- UI integracji, alertów i nagród, dokumentacja i testy.
+
 ## 2.0.0-dev.2
 - Czarno-złoty shell, 13 zakładek, wyszukiwanie, komponenty React i ikony SVG.
 - Regulowane panele, tryb kompaktowy, skróty, zapamiętanie układu i pozycji okna.

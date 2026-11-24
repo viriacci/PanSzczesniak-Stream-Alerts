@@ -1,3 +1,4 @@
+import { AlertsService } from './alerts/service'
 import { app, BrowserWindow, dialog, session, screen } from 'electron'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -21,11 +22,13 @@ let window: BrowserWindow | undefined
 let db: DatabaseSync | undefined
 let disposeIpc: (() => void) | undefined
 let cleaned = false
+let alerts:AlertsService|undefined
 
 function cleanup(): void {
   if (cleaned) return
   cleaned = true
   disposeIpc?.()
+  alerts?.stop()
   db?.close()
   log('shutdown')
 }
@@ -77,14 +80,16 @@ async function start(): Promise<void> {
     catch { console.warn('PSSA: unable to persist window bounds') }
   })
   if (state.maximized && !smoke) activeWindow.maximize()
-  disposeIpc = registerIpc(window, db, document, app.getVersion())
+  alerts=new AlertsService(db,directory,window,app.getPath('documents'))
+  await alerts.start(!smoke)
+  disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts)
   if (devUrl) await window.loadURL(document)
   else await window.loadFile(file)
   log('ready')
   if (smoke) {
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 1 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280)'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 1 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/"))'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     app.quit()

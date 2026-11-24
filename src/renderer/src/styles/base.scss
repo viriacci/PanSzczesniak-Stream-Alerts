@@ -144,3 +144,5 @@ svg { flex:none; }
 @keyframes enter { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
 @media(max-width:850px) { .title-caption,.hero-emblem { display:none; }.title-brand small { display:none; }.hero { padding:16px; }.setting-row { flex-wrap:wrap; }.footer-right { display:none; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
+
+.alert-form { display:flex; flex-direction:column; gap:12px; margin-top:12px; } .alert-form label { display:flex; flex-direction:column; gap:6px; color:var(--muted); font-size:12px; } .alert-form input:not([type=checkbox]) { width:100%; min-width:0; padding:9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); } .alert-form .alert-checkbox { flex-direction:row; align-items:center; } .alert-actions { display:flex; flex-wrap:wrap; gap:8px; } .alert-form input[type=checkbox] { accent-color:var(--gold); }

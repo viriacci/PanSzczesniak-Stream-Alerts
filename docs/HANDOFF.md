@@ -1,5 +1,5 @@
-# Handoff — 2.0-dev.2
-Pracować tylko na develop/v2, od aktualnego HEAD. main i legacy/python pozostają na c0458a1412cc6c5a753bf84779e3d33753553d3a.
-Etap 1 potwierdzony w Windows CI (run 45355291216). Etap 2: shell, nawigacja, design tokens, komponenty React, wyszukiwanie modułów, skróty, dialog, powiadomienia, regulowane panele, kompaktowy layout, pozycja okna, dashboard bez fikcyjnych danych, placeholdery późniejszych modułów. Zapis SQLite przez walidowany IPC.
-Bramka etapu 2: sprawdzić nowy run Windows; naprawić błędy, potwierdzić lockfile i wynik smoke; testy wizualne i ręczne oznaczyć osobno. Fonty korzystają z systemowych fallbacków; licencjonowane bundlowanie do uzupełnienia. Nie twierdzić że Twitch/OBS działają.
-Etap 3: migrować funkcje Python z legacy/python, zacząć od OAuth i safeStorage, EventSub reconnect i dedup, alerty, nagrody, lokalny overlay, offline test, import konfiguracji i mediów. Nie zapisywać tokenów w logach ani w plaintext. Audyty po 4/7/10; SullyGnome tylko z autoryzowanym dostępem.
+# Handoff — 2.0-dev.3
+Gałąź develop/v2, od aktualnego HEAD; main i legacy/python bez zmian. Etap 2: CI success run 45356052125, lockfile commit ae0a318651e6b13c9f969c474293a35da6e225b3.
+Etap 3: OAuth, szyfrowane poświadczenia, EventSub, reguły alertów, synchronizacja nagród, lokalny overlay SSE, test offline, import starszych ustawień i mediów. UI Integracje, Alerty, Nagrody. Bez dodatkowych zależności. Weryfikacja nowego CI wymagana. Testy z rzeczywistym Twitch i OBS nieprzeprowadzone.
+Etap 4: kolejka, trwała deduplikacja, historia, priorytety, grupowanie, pauza/skip/replay, głośność/cooldown, ACK i odporność na rozłączenie OBS. Zastąpić aktualne bezpośrednie publish() wywołaniem kolejki. Dodać testy mockowanego OAuth/EventSub i transportu overlay. Po etapie 4 obowiązkowy audyt A; nie publikować main.
+Ograniczenia etapu 3: brak kolejki, LAN i sterowania OBS, brak pełnej zgodności animacji/fontów i obramowań starego edytora. Live Center i analityka później. SullyGnome tylko autoryzowany dostęp.

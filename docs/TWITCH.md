@@ -1,0 +1,6 @@
+# Twitch — etap 3
+Własna aplikacja użytkownika w Twitch Developer Console, redirect http://localhost:3000; Client ID i Secret. Autoryzacja w domyślnej przeglądarce, jednorazowy losowy state, callback wyłącznie na loopback, limit 3 min. Tokeny i secret szyfrowane Electron safeStorage (Windows DPAPI) i zapisywane w SQLite; nie są zwracane do renderera. Walidacja sesji przed połączeniem i co godzinę, refresh przy 401. Wylogowanie usuwa lokalny zapis (nie odwołuje uprawnień Twitcha globalnie).
+EventSub WebSocket: follow v2, raid, cheer, redemption, chat.notification. Chat notification rozpoznaje sub, Prime, resub, gift i community gift, bez podwójnego alertu dla członków paczki. Migracja reconnect zachowuje stare połączenie do welcome nowego; ponowna subskrypcja tylko przy świeżym połączeniu. Watchdog, ograniczona deduplikacja w pamięci i backoff.
+Pobieranie nagród wymaga konta z dostępem do punktów kanału. Nie wszystkie subskrypcje muszą być dostępne; szczegóły stanu pokazują niepowodzenia.
+Źródła: https://dev.twitch.tv/docs/eventsub/handling-websocket-events/ ; https://dev.twitch.tv/docs/eventsub/reference/chat ; https://dev.twitch.tv/docs/authentication/validate-tokens/ .
+Test rzeczywistego konta Twitch i rozłączenia sieci pozostaje wymagany. Nie logować tokenów, payloadów ani URL callback.
