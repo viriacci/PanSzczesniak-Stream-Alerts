@@ -2,8 +2,9 @@ import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { DatabaseSync } from 'node:sqlite'
 export const scopes=['moderator:read:followers','bits:read','channel:read:redemptions','user:read:chat']
+export const broadcastScope='channel:manage:broadcast'
 const redirect='http://localhost:3000'
-export interface Credentials {clientId:string;secret:string;access:string;refresh:string;userId:string;login:string}
+export interface Credentials {clientId:string;secret:string;access:string;refresh:string;userId:string;login:string;grantedScopes?:string[]}
 export interface AuthDependencies {
  storage:{isEncryptionAvailable():boolean;encryptString(value:string):Buffer;decryptString(value:Buffer):string}
  openExternal(url:string):Promise<void>
@@ -17,6 +18,7 @@ export class Auth {
  private cancel?:()=>void
  private generation=0
  constructor(db:DatabaseSync,deps:AuthDependencies){this.db=db;this.deps=deps}
+ get canManage(){return this.credentials?.grantedScopes?.includes(broadcastScope)===true}
  get identity(){return this.credentials?{userId:this.credentials.userId,login:this.credentials.login}:undefined}
  private assertGeneration(g:number){if(g!==this.generation)throw Error('Sesja przerwana')}
  load(){
@@ -48,7 +50,7 @@ export class Auth {
   if(!response.ok)throw Error('Walidacja Twitch niedostępna')
   const v=await response.json() as any
   if(v.client_id!==clientId||typeof v.user_id!=='string'||typeof v.login!=='string'||!Array.isArray(v.scopes)||!scopes.every(s=>v.scopes.includes(s)))throw Error('Brak wymaganych uprawnień Twitch. Zaloguj ponownie.')
-  return {userId:v.user_id as string,login:v.login as string}
+  return {userId:v.user_id as string,login:v.login as string,grantedScopes:v.scopes.filter((s:unknown)=>typeof s==='string') as string[]}
  }
  async login(clientId:string,secret:string){
   if(!/^[a-zA-Z0-9]{10,128}$/.test(clientId)||!/^[a-zA-Z0-9]{10,128}$/.test(secret))throw Error('Sprawdź Client ID i Client Secret')
@@ -72,7 +74,7 @@ export class Auth {
    server.listen(3000,'127.0.0.1',()=>{
     if(done){server.close();return}
     const url=new URL('https://id.twitch.tv/oauth2/authorize')
-    url.search=new URLSearchParams({client_id:clientId,redirect_uri:redirect,response_type:'code',scope:scopes.join(' '),state,force_verify:'true'}).toString()
+    url.search=new URLSearchParams({client_id:clientId,redirect_uri:redirect,response_type:'code',scope:[...scopes,broadcastScope].join(' '),state,force_verify:'true'}).toString()
     this.deps.openExternal(url.href).catch(()=>finish(Error('Nie można otworzyć przeglądarki')))
    })
   })
@@ -89,6 +91,7 @@ export class Auth {
   const v=await this.validate(c.access,c.clientId);this.assertGeneration(g)
   if(!v){if(this.credentials?.access===c.access)await this.refresh(g)}
   else if(v.userId!==c.userId)throw Error('Nieprawidłowa tożsamość Twitch')
+  else if(this.credentials===c&&JSON.stringify(c.grantedScopes)!==JSON.stringify(v.grantedScopes))this.persist({...c,grantedScopes:v.grantedScopes})
   this.assertGeneration(g)
  }
  private async refresh(g:number){
@@ -99,12 +102,12 @@ export class Auth {
   this.refreshTask=task
   try{await task}finally{if(this.refreshTask===task)this.refreshTask=undefined}
  }
- async helix(path:string,body?:unknown):Promise<any>{
+ async helix(path:string,body?:unknown,method?:'GET'|'POST'|'PATCH'):Promise<any>{
   const g=this.generation
-  const request=()=>{this.assertGeneration(g);const c=this.credentials;if(!c)throw Error('Zaloguj Twitch');return {access:c.access,response:this.deps.request('https://api.twitch.tv/helix/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+c.access,'Client-Id':c.clientId,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(15000)})}}
+  const request=()=>{this.assertGeneration(g);const c=this.credentials;if(!c)throw Error('Zaloguj Twitch');return {access:c.access,response:this.deps.request('https://api.twitch.tv/helix/'+path,{method:method??(body?'POST':'GET'),headers:{Authorization:'Bearer '+c.access,'Client-Id':c.clientId,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(15000)})}}
   const first=request();let res=await first.response;this.assertGeneration(g)
   if(res.status===401){if(this.credentials?.access===first.access)await this.refresh(g);res=await request().response;this.assertGeneration(g)}
   if(!res.ok)throw Error('Twitch API: '+res.status)
-  const result=await res.json();this.assertGeneration(g);return result
+  const result=res.status===204?null:await res.json();this.assertGeneration(g);return result
  }
 }

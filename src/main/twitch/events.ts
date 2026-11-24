@@ -5,7 +5,10 @@ export function subscriptions(id:string) {
  {type:'channel.raid',version:'1',condition:{to_broadcaster_user_id:id}},
  {type:'channel.cheer',version:'1',condition:{broadcaster_user_id:id}},
  {type:'channel.channel_points_custom_reward_redemption.add',version:'1',condition:{broadcaster_user_id:id}},
- {type:'channel.chat.notification',version:'1',condition:{broadcaster_user_id:id,user_id:id}}
+ {type:'channel.chat.notification',version:'1',condition:{broadcaster_user_id:id,user_id:id}},
+ {type:'channel.chat.message',version:'1',condition:{broadcaster_user_id:id,user_id:id}},
+ {type:'stream.online',version:'1',condition:{broadcaster_user_id:id}},
+ {type:'stream.offline',version:'1',condition:{broadcaster_user_id:id}}
  ]
 }
 const name=(v:unknown)=>typeof v==='string'&&v.length?v.slice(0,200):'Anonim'

@@ -1,5 +1,5 @@
 export interface ObsMetrics {cpu:number|null;memory:number|null;fps:number|null;renderSkipped:number|null;outputSkipped:number|null;streaming:boolean;recording:boolean;streamBytes:number|null;streamMs:number|null}
-export interface ObsState {phase:'offline'|'connecting'|'connected'|'error';port:number;configured:boolean;detail:string;scene:string;scenes:string[];metrics:ObsMetrics|null}
+export interface ObsState {sampledAt?:number;phase:'offline'|'connecting'|'connected'|'error';port:number;configured:boolean;detail:string;scene:string;scenes:string[];metrics:ObsMetrics|null}
 export interface AgentState {online:boolean;running:boolean;dockUrl:string;autoLaunch:boolean;startup:boolean;detail:string}
 export type ObsAction={type:'connect';port:number;password:string}|{type:'disconnect'}|{type:'scene';name:string}|{type:'refresh'}
 export type AgentAction='enable'|'startup-on'|'startup-off'|'auto-on'|'auto-off'

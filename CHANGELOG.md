@@ -1,4 +1,10 @@
 # Changelog
+## 2.0.0-dev.6
+- Live Center: odczyty widzów, średnia i szczyt z próbek, sesje, kategorie, wykres, aktywność i statystyki czatu.
+- SQLite schema 3, telemetria OBS i wyliczany bitrate; rozłączenia pozostawiają luki.
+- Wyszukiwanie kategorii, edycja tytułu i kategorii, markery Twitch przy dodatkowym scope.
+- Testy sesji, dedup, prywatności, bitrate i uprawnień.
+
 ## 2.0.0-dev.5
 - OBS WebSocket 5, szyfrowane hasło, sceny, stan transmisji/nagrania, telemetria i odświeżanie źródeł PSSA.
 - PSSA Agent i dock, start/stop/restart/refresh, opcjonalny autostart Windows i start z OBS, ograniczony watchdog.

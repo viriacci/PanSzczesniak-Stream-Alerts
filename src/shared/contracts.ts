@@ -1,9 +1,12 @@
+import type {LiveState,LiveAction,Category} from './live'
 import type { ObsState,ObsAction,AgentState,AgentAction } from './obs'
 import type { QueueCommand, QueueState } from './queue'
 import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  liveState:'pssa:live:state',
+  liveAction:'pssa:live:action',
   obsState:'pssa:obs:state',
   obsAction:'pssa:obs:action',
   agentState:'pssa:agent:state',
@@ -32,6 +35,8 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  liveState():Promise<LiveState>
+  liveAction(command:LiveAction):Promise<Category[]|null>
   obsState():Promise<ObsState>
   obsAction(command:ObsAction):Promise<number>
   agentState():Promise<AgentState>

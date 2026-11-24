@@ -1,3 +1,5 @@
+import {LiveCenter} from './live'
+import type {LiveState} from '../../../shared/live'
 import {ObsPage} from './obs'
 import type {ObsState,AgentState} from '../../../shared/obs'
 import { QueuePage } from './queue'
@@ -8,20 +10,9 @@ import type { LayoutPreferences } from '../../../shared/layout'
 import type { NavItem } from '../navigation'
 import { Button, Empty, Panel, Status } from '../components/ui'
 import { Icon, type IconName } from '../components/icons'
-type Props={obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onIntegrations:()=>void}
-const metrics:{label:string;icon:IconName;detail:string}[]=[
- {label:'Aktualni widzowie',icon:'users',detail:'Brak połączenia z Twitch'},
- {label:'Średnia widzów',icon:'chart',detail:'Brak zarejestrowanej sesji'},
- {label:'Czas transmisji',icon:'clock',detail:'Brak zarejestrowanej sesji'},
- {label:'Alerty w kolejce',icon:'bolt',detail:'Silnik w przygotowaniu'}
-]
-export function PageContent({obs,agent,alertState,item,status,layout,busy,onCompact,onReset,onIntegrations}:Props) {
- if(item.id==='dashboard')return <>
-  <section className="hero"><div><span className="eyebrow">STREAM CONTROL / 05</span><h2>Twoje centrum transmisji.</h2><p>Alerty, statystyki i kontrola OBS w jednym miejscu.</p><Button variant="primary" onClick={onIntegrations}>Przejdź do integracji <Icon name="chevron" size={16}/></Button></div><div className="hero-emblem" aria-hidden="true"><span>P</span></div></section>
-  <div className="metric-grid">{metrics.map(m=><section className="metric" key={m.label}><header><span>{m.label}</span><Icon name={m.icon}/></header><strong>{m.label==='Alerty w kolejce'?(alertState?.queue.pendingCount??'—'):'—'}</strong><small>{m.label==='Alerty w kolejce'?'Oczekujące alerty':m.detail}</small></section>)}</div>
-  <Panel title="Oglądalność" detail="Bieżąca transmisja"><Empty title="Brak danych transmisji">Wykres pojawi się po uruchomieniu modułu Live Center w etapie 6.</Empty></Panel>
-  <Panel title="Ostatnia aktywność" detail="Zdarzenia kanału">{alertState?.queue.history.length?alertState.queue.history.slice(0,4).map(x=><div className="setting-row" key={x.id}><span>{x.text}</span><small className="muted">{x.status}</small></div>):<Empty title="Brak zarejestrowanych zdarzeń">Ostatnie zakończone alerty pojawią się tutaj.</Empty>}</Panel>
- </>
+type Props={live?:LiveState;obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onIntegrations:()=>void}
+export function PageContent({live,obs,agent,alertState,item,status,layout,busy,onCompact,onReset,onIntegrations}:Props) {
+ if(item.id==='dashboard')return <><LiveCenter state={live} obs={obs} pending={alertState?.queue.pendingCount??null} onIntegrations={onIntegrations}/><Panel title="Ostatnia aktywność">{alertState?.queue.history.length?alertState.queue.history.slice(0,4).map(x=><div className="setting-row" key={x.id}><span>{x.text}</span><small className="muted">{x.status}</small></div>):<Empty title="Brak zarejestrowanych zdarzeń">Ostatnie zakończone alerty pojawią się tutaj.</Empty>}</Panel></>
  if(item.id==='settings')return <>
   <Panel title="Wygląd i układ" detail="Preferencje są zapisywane lokalnie w SQLite.">
    <div className="setting-row"><div><h3>Tryb kompaktowy</h3><p>Mniejsza ilość wolnej przestrzeni między elementami.</p></div><Button role="switch" aria-checked={status?.compact??false} disabled={!status||busy} onClick={onCompact}>{status?.compact?'Włączony':'Wyłączony'}</Button></div>

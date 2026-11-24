@@ -30,11 +30,13 @@ let cleaned = false
 let alerts:AlertsService|undefined
 let obs:ObsService|undefined
 let agent:AgentBridge|undefined
+let liveObsTimer:ReturnType<typeof setInterval>|undefined
 
 function cleanup(): void {
   if (cleaned) return
   cleaned = true
   try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
+  clearInterval(liveObsTimer)
   try{agent?.stop()}catch{console.warn('PSSA: agent bridge cleanup failed')}
   try{obs?.stop()}catch{console.warn('PSSA: OBS cleanup failed')}
   try{alerts?.stop()}catch{console.warn('PSSA: service cleanup failed')}
@@ -93,7 +95,8 @@ async function start(): Promise<void> {
   await alerts.start(!smoke)
   obs=new ObsService(db)
   if(!smoke)obs.start()
-  const activeAlerts=alerts
+  const activeAlerts=alerts,activeObs=obs
+  if(!smoke)liveObsTimer=setInterval(()=>{try{activeAlerts.observeObs(activeObs.state())}catch{console.warn('PSSA: telemetry write failed')}},1000)
   if(!smoke){agent=new AgentBridge(directory,async()=>activeAlerts.reloadOverlay());agent.start()}
   disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts,obs,agent)
   if (devUrl) await window.loadURL(document)
@@ -102,7 +105,7 @@ async function start(): Promise<void> {
   if (smoke) {
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 2 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline")'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 3 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected")'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     app.quit()

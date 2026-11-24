@@ -14,8 +14,9 @@ export class EventSub {
  private state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void
  private emit:(e:AlertEvent)=>void
  private makeSocket:(url:string)=>WebSocket
+ private observe:(id:string,type:string,event:unknown,at:number,normalized:AlertEvent|undefined)=>void
  private subscriptionDetail='EventSub aktywny'
- constructor(auth:Pick<Auth,'identity'|'helix'>,state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void,emit:(e:AlertEvent)=>void,makeSocket=(url:string)=>new WebSocket(url)){this.auth=auth;this.state=state;this.emit=emit;this.makeSocket=makeSocket}
+ constructor(auth:Pick<Auth,'identity'|'helix'>,state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void,emit:(e:AlertEvent)=>void,makeSocket=(url:string)=>new WebSocket(url),observe:(id:string,type:string,event:unknown,at:number,normalized:AlertEvent|undefined)=>void=()=>{}){this.auth=auth;this.state=state;this.emit=emit;this.makeSocket=makeSocket;this.observe=observe}
  start(){this.stop();this.stopped=false;this.attempts=0;this.subscriptionDetail='EventSub aktywny';this.seen.clear();this.connect('wss://eventsub.wss.twitch.tv/ws',false)}
  stop(){this.stopped=true;clearTimeout(this.retry);this.retry=undefined;for(const s of this.sockets)this.close(s);this.current=undefined;this.pending=undefined}
  private close(s:WebSocket){clearTimeout(this.timers.get(s));this.timers.delete(s);this.sockets.delete(s);try{s.close()}catch{}}
@@ -60,6 +61,7 @@ export class EventSub {
      const id=m.metadata?.message_id;if(!welcomed||typeof id!=='string'||!id||id.length>256||this.seen.has(id))return
      this.seen.set(id,Date.now());if(this.seen.size>10000){const first=this.seen.keys().next().value;if(first)this.seen.delete(first)}
      const normalized=normalizeEvent(id,m.metadata.subscription_type,m.payload?.event);if(normalized)this.emit(normalized)
+     const timestamp=Date.parse(m.metadata.message_timestamp??'');this.observe(id,m.metadata.subscription_type,m.payload?.event,Number.isFinite(timestamp)?timestamp:Date.now(),normalized)
     }
    }
   })().catch(()=>{if(this.sockets.has(s)){this.close(s);this.lost(s)}})})

@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 const migrations: readonly string[] = [
   `CREATE TABLE settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
@@ -49,7 +49,24 @@ const migrations: readonly string[] = [
   ) STRICT;
   CREATE INDEX alert_queue_pending ON alert_queue(status,priority DESC,position,id);
   CREATE INDEX alert_queue_cooldown ON alert_queue(rule_key,source,created_at DESC);
-  CREATE UNIQUE INDEX alert_queue_one_playing ON alert_queue(status) WHERE status='playing';`
+  CREATE UNIQUE INDEX alert_queue_one_playing ON alert_queue(status) WHERE status='playing';`,
+  `ALTER TABLE stream_sessions ADD COLUMN title TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stream_sessions ADD COLUMN category_id TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stream_sessions ADD COLUMN category TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stream_sessions ADD COLUMN last_seen_at INTEGER;
+  ALTER TABLE stream_sessions ADD COLUMN end_quality TEXT NOT NULL DEFAULT 'unknown';
+  ALTER TABLE viewer_samples ADD COLUMN category_id TEXT NOT NULL DEFAULT '';
+  ALTER TABLE viewer_samples ADD COLUMN category TEXT NOT NULL DEFAULT '';
+  ALTER TABLE stream_events ADD COLUMN channel_id TEXT;
+  ALTER TABLE stream_events ADD COLUMN chatter_key TEXT;
+  CREATE INDEX events_channel_time ON stream_events(channel_id,occurred_at);
+  CREATE TABLE obs_samples (
+    session_id INTEGER NOT NULL REFERENCES stream_sessions(id) ON DELETE CASCADE,
+    sampled_at INTEGER NOT NULL,
+    metrics_json TEXT NOT NULL CHECK(json_valid(metrics_json)),
+    bitrate_kbps REAL CHECK(bitrate_kbps IS NULL OR bitrate_kbps>=0),
+    PRIMARY KEY(session_id,sampled_at)
+  ) STRICT;`
 ]
 
 export function schemaVersion(db: DatabaseSync): number {

@@ -1,3 +1,5 @@
+import {LiveService} from '../live/service'
+import type {ObsState} from '../../shared/obs'
 import { dialog, safeStorage, shell, type BrowserWindow } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
@@ -12,6 +14,7 @@ import { importLegacy } from './import'
 import { defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
 export class AlertsService {
  private auth:Auth
+ private live:LiveService
  private events:EventSub
  private overlay:Overlay
  private queue:AlertQueue
@@ -24,8 +27,8 @@ export class AlertsService {
  private generation=0
  private validation?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,dir:string,private window:BrowserWindow,private documents:string){
-  this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
-  this.events=new EventSub(this.auth,(phase,detail)=>{this.phase=phase;this.detail=detail},e=>this.dispatch(e))
+  this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.live=new LiveService(db,this.auth);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
+  this.events=new EventSub(this.auth,(phase,detail)=>{this.phase=phase;this.detail=detail},e=>this.dispatch(e),undefined,(id,type,event,at,normalized)=>{try{this.live.event(id,type,event,at,normalized)}catch{this.detail='Błąd zapisu statystyk'}})
  }
  async start(auto=true){
   const raw=this.db.prepare("SELECT value FROM settings WHERE key='overlay.key'").get()?.value
@@ -33,19 +36,20 @@ export class AlertsService {
   this.db.prepare("INSERT INTO settings(key,value) VALUES ('overlay.key',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key)
   try{await this.overlay.start(key)}catch{this.detail='Port overlay 18766 zajęty'}
   if(auto){try{if(this.auth.load())void this.connect().catch(()=>{})}catch{this.phase='error';this.detail='Zapisana sesja wymaga ponownego logowania'}}
+  this.live.start()
   this.ticker=setInterval(()=>{try{this.queue.tick()}catch{this.detail='Błąd silnika kolejki'}},250)
   this.validation=setInterval(()=>{const generation=this.generation;if(this.auth.identity)void this.auth.ensure().catch(()=>{if(this.stopped||generation!==this.generation)return;this.events.stop();this.phase='error';this.detail='Sesja Twitch wymaga ponownego połączenia'})},3600000)
  }
- stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
+ stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.live.stop();try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
  state():AlertState{return {twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  async login(clientId:string,secret:string){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
-  this.generation++;const g=this.generation;this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
+  this.generation++;const g=this.generation;this.live.reset();this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
   try{await this.auth.login(clientId,secret);if(g!==this.generation||this.stopped)return;this.phase='connecting';await this.connect()}
   catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Logowanie nie powiodło się. Sprawdź dane i redirect URI.'}throw Error('Logowanie Twitch nie powiodło się')}
  }
- async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start()}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
- logout(){this.generation++;this.events.stop();this.auth.logout();this.rewards=[];this.phase='disconnected';this.detail=''}
+ async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start();void this.live.poll()}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
+ logout(){this.generation++;this.live.reset();this.events.stop();this.auth.logout();this.rewards=[];this.phase='disconnected';this.detail=''}
  async sync(){const id=this.auth.identity?.userId;if(!id)throw Error('Zaloguj Twitch');const g=this.generation
   const data=await this.auth.helix('channel_points/custom_rewards?broadcaster_id='+encodeURIComponent(id))
   if(this.stopped||g!==this.generation)throw Error('Sesja zmieniona')
@@ -66,6 +70,9 @@ export class AlertsService {
   const map=new Map(rules(this.db).map(x=>[x.key,x]));for(const rule of data.rules)map.set(rule.key,rule);saveRules(this.db,[...map.values()])
   return {count:data.rules.length,warnings:data.warnings}
  }
+ liveState(){return this.live.snapshot()}
+ liveAction(value:unknown){return this.live.action(value)}
+ observeObs(state:ObsState){this.live.obs(state)}
  reloadOverlay(){return this.overlay.reload()}
  queueCommand(command:unknown){return this.queue.command(command)}
  test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const kind=key.startsWith('reward:')?'redemption':key as AlertEvent['kind'];const event:AlertEvent={id:randomUUID(),kind,user:'Test PSSA',reward:rule.title,count:5,months:3};return this.queue.enqueue(event,rule,'test')?1:0}

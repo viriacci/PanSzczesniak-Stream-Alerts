@@ -1,6 +1,6 @@
 # PanSzczesniak Stream Alerts 2.0
 
-Lokalna aplikacja Windows dla Twitcha i OBS. Etap 4: integracja Twitch i silnik alertów, nie gotowy następca PSSA 1.x.
+Lokalna aplikacja Windows dla Twitcha i OBS. Etap 6: Live Center, Twitch, silnik alertów i OBS, nie gotowy następca PSSA 1.x.
 
 ## Uruchomienie
 
@@ -22,6 +22,6 @@ Instalator developerski (niepodpisany) ma trafić do `dist/`. Windows CI etapu 1
 - `develop/v2`: nowa aplikacja.
 - Dane v2: `%APPDATA%/PSSA 2 Dev` (osobna baza i log).
 - Lockfile jest przechowywany w repozytorium; użyj npm ci.
-- Etap 3: Twitch i nakładka OBS, import konfiguracji. Kolejka działa lokalnie; pełne sterowanie OBS w etapie 5. Przed nim audyt A. Zobacz docs/TWITCH.md i docs/OBS.md.
+- Etap 3: Twitch i nakładka OBS, import konfiguracji. Kolejka, OBS i Live Center działają lokalnie; statystyki historyczne w etapie 9. Zobacz docs/TWITCH.md i docs/OBS.md.
 
 Zobacz [architekturę](docs/ARCHITECTURE.md), [handoff](docs/HANDOFF.md), [roadmapę](ROADMAP.md) i [przewodnik do nauki](docs/LEARNING_GUIDE.md).

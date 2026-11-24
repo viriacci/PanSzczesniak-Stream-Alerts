@@ -10,7 +10,7 @@ import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 
 test('Twitch notifications normalize and group gifts',()=>{
- assert.equal(subscriptions('42').length,5)
+ assert.equal(subscriptions('42').length,8)
  assert.deepEqual(normalizeEvent('e','channel.raid',{from_broadcaster_user_name:'X',viewers:8}),{id:'e',kind:'raid',user:'X',count:8})
  assert.equal(normalizeEvent('e','channel.chat.notification',{notice_type:'sub',sub:{is_prime:true}})?.kind,'prime_sub')
  assert.equal(normalizeEvent('e','channel.chat.notification',{notice_type:'sub_gift',sub_gift:{community_gift_id:'batch'}}),undefined)
