@@ -21,9 +21,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
+      - name: Apply scoped minimatch security override
+        run: node -e 'const fs=require("node:fs"),p=require("./package.json"); p.overrides={...p.overrides,"minimatch@>=7.0.0 <11.0.1":"11.0.9"};fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")'
       - name: Resolve exact patched versions
         run: npm install --package-lock-only --ignore-scripts --save-dev --save-exact vite@7.3.8 electron-builder@26.18.0
       - run: npm ci
+      - run: npm ls minimatch --all
       - name: Full and production advisory reports
         shell: pwsh
         run: |
@@ -45,6 +48,9 @@ jobs:
             $report = Get-Content $path -Raw | ConvertFrom-Json
             if ($null -eq $report.metadata.vulnerabilities.total) { throw "Invalid audit: $path" }
             Write-Host "$path : $($report.metadata.vulnerabilities | ConvertTo-Json -Compress)"
+          }
+          foreach ($path in @('audit-full.json','audit-production.json')) {
+            $report = Get-Content $path -Raw | ConvertFrom-Json
             if ($report.metadata.vulnerabilities.total -ne 0) { throw "Remaining vulnerabilities: $path" }
           }
       - run: npm run typecheck
@@ -52,6 +58,15 @@ jobs:
       - run: npm run build
       - run: npm run smoke
       - run: npx electron-builder --win nsis --x64 --publish never
+      - name: Smoke test packaged executable
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'dist/win-unpacked/PSSA 2 Dev.exe'
+          if (-not (Test-Path $exe)) { throw 'Packaged executable missing' }
+          $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Packaged smoke exit $($p.ExitCode)" }
+          Write-Host 'Packaged executable smoke PASS'
       - uses: actions/upload-artifact@v4
         with:
           name: verified-dependency-manifest
@@ -87,10 +102,10 @@ jobs:
           test "$(git rev-parse origin/develop/v2)" = "$GITHUB_SHA" || { echo "Branch changed; refusing to overwrite"; exit 1; }
           cp verified/package.json package.json
           cp verified/package-lock.json package-lock.json
-          node -e 'const p=require("./package.json"),l=require("./package-lock.json"); for(const [k,v] of Object.entries({"vite":"7.3.8","electron-builder":"26.18.0"})){if(p.devDependencies[k]!==v||l.packages[""].devDependencies[k]!==v||l.packages["node_modules/"+k].version!==v)process.exit(1)}'
+          node -e 'const p=require("./package.json"),l=require("./package-lock.json"); for(const [k,v] of Object.entries({"vite":"7.3.8","electron-builder":"26.18.0"})){if(p.devDependencies[k]!==v||l.packages[""].devDependencies[k]!==v||l.packages["node_modules/"+k].version!==v)process.exit(1)};if(p.overrides?.["minimatch@>=7.0.0 <11.0.1"]!=="11.0.9")process.exit(1);for(const [k,v] of Object.entries(l.packages)){if(k.endsWith("/minimatch")){const major=Number(v.version.split(".")[0]);if(major>=7&&v.version!=="11.0.9")process.exit(1)}}'
           git add -- package.json package-lock.json
           if git diff --cached --quiet; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(security): pin verified patched Vite and electron-builder'
+          git commit -m 'fix(security): pin tested Vite, electron-builder and scoped minimatch override'
           git push origin HEAD:refs/heads/develop/v2
