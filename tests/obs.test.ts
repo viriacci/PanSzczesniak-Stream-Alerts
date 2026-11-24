@@ -42,3 +42,19 @@ test('OBS v5 handshake, status polling, scene whitelist and refresh only PSSA so
   assert.equal(socket.sent.filter(x=>x.d.requestType==='PressInputPropertiesButton').length,1)
  }finally{client.disconnect()}
 })
+
+test('refresh cannot continue on a replacement OBS connection',async()=>{
+ const sockets:Socket[]=[],client=new ObsClient(()=>{const s=new Socket();sockets.push(s);return s as unknown as WebSocket})
+ try{
+  client.connect(4455,'');const first=sockets[0]!
+  first.receive(0,{rpcVersion:1});first.receive(2,{negotiatedRpcVersion:1})
+  const refresh=client.refreshOverlay('http://127.0.0.1:18766/key/')
+  const rejected=assert.rejects(refresh,/connection changed/)
+  const last=first.sent.at(-1)
+  first.receive(7,{requestId:last.d.requestId,requestStatus:{result:true},responseData:{inputs:[{inputName:'PSSA'}]}})
+  client.connect(4456,'');const next=sockets[1]!
+  next.receive(0,{rpcVersion:1});next.receive(2,{negotiatedRpcVersion:1})
+  await rejected
+  assert.equal(next.sent.some(x=>x.d.requestType==='GetInputSettings'),false)
+ }finally{client.disconnect()}
+})

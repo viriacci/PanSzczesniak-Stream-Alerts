@@ -30,3 +30,6 @@ Wszystkie wymienione pozycje mają poprawki w kodzie, ale status weryfikacji = o
 - Statystyki zdarzeń mają braki przy nieaktywnych subskrypcjach i rozłączeniu; nieprzypisane zdarzenia po ostatnim potwierdzeniu pozostają w bazie. Średnia z próbek, nie oficjalne Twitch Analytics; bitrate dotyczy OBS, nie potwierdza transmisji do konkretnego kanału. Czas końca dolne oszacowanie.
 - Szkice nie przeżywają restartu renderera/programu. Limit 50, najstarszy wypada. Pełna ochrona niezapisanych zmian, trwałe drafty, edycja keyframes i timeline drag do późniejszego UX. Brak SVG.
 - Nadal do wykonania: retencja, backup/restore, instalacja/upgrade na Windows, profilowanie CPU/RAM/GPU przy OBS+gra, długotrwały test i testy prawdziwych formatów wideo/audio. Nie raportować pomiarów, których nie wykonano.
+
+## Dodatkowe testy po przeglądzie
+Dodano regresję wymiany socketu OBS w trakcie refreshu oraz rozszerzony smoke rzeczywistego Chromium: poprawna wielowarstwowa scena z deterministycznym PNG, potwierdzenie renderowania i ACK, brakujący PNG musi zakończyć się failed/media-error. Preview oczekuje na ten sam readiness i ogranicza odświeżanie zegara React do ~15 Hz, pozostawiając renderowanie animacji w requestAnimationFrame. Wynik wymaga CI.

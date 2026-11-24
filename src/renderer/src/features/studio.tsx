@@ -34,12 +34,17 @@ function StudioEditor({rule,base}:{rule:AlertRule;base:string}){
  useEffect(()=>{const el=root.current;if(!el)return
   try{const p=createScenePlayer(el,scene,text,base?base+'media/':'',rule.volume,()=>{setNotice('Nie udało się załadować multimediów.');setPlaying(false)});player.current=p;p.paint(Math.min(time,scene.duration-1),false,editMode);return()=>{player.current=null;p.dispose()}}catch{setNotice('Błąd podglądu.')}
  },[signature,text,base,rule.volume])
- useEffect(()=>{player.current?.updateGeometry(scene);if(!playing)player.current?.paint(Math.min(time,scene.duration-1),false,editMode)},[scene,playing,editMode,time])
+ useEffect(()=>{player.current?.updateGeometry(scene)},[scene])
  useEffect(()=>{if(!playing){player.current?.paint(Math.min(time,scene.duration-1),false,editMode);return}
-  let frame=0;const begin=performance.now()-clock.current
-  const tick=(now:number)=>{const t=Math.min(scene.duration,now-begin);clock.current=t;setTime(t);player.current?.paint(t,t<scene.duration,false);if(t<scene.duration)frame=requestAnimationFrame(tick);else setPlaying(false)}
-  frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)
- },[playing,scene,editMode])
+  let frame=0,cancelled=false,lastUi=0
+  const p=player.current;if(!p){setPlaying(false);return}
+  const timeout=window.setTimeout(()=>{if(!cancelled){setNotice('Multimedia nie są gotowe.');setPlaying(false)}},7000)
+  void p.ready.then(()=>{if(cancelled)return;window.clearTimeout(timeout);const begin=performance.now()-clock.current
+   const tick=(now:number)=>{if(cancelled)return;const t=Math.min(scene.duration,now-begin);clock.current=t;if(now-lastUi>=66||t===scene.duration){lastUi=now;setTime(t)}p.paint(t,t<scene.duration,false);if(t<scene.duration)frame=requestAnimationFrame(tick);else setPlaying(false)}
+   frame=requestAnimationFrame(tick)
+  }).catch(()=>{if(!cancelled){setNotice('Błąd multimediów.');setPlaying(false)}})
+  return()=>{cancelled=true;window.clearTimeout(timeout);cancelAnimationFrame(frame)}
+ },[playing,scene,editMode,signature,text,base,rule.volume])
  useEffect(()=>{if(!playing){clock.current=time;player.current?.paint(Math.min(time,scene.duration-1),false,editMode)}},[time,playing,editMode,scene])
  useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(busy||drag.current)return;if(e.target instanceof HTMLElement&&(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable))return;if(e.ctrlKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if(e.ctrlKey&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)},[busy])
  function begin(e:ReactPointerEvent<HTMLButtonElement>,l:Layer,resize=false){e.stopPropagation();setSelected(l.id);if(l.locked||playing||!canvas.current)return;const bounds=canvas.current.getBoundingClientRect();if(!bounds.width||!bounds.height)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={pointer:e.pointerId,before:current.current,layer:l,px:e.clientX,py:e.clientY,w:bounds.width,h:bounds.height,resize};setEditMode(true)}
@@ -48,7 +53,7 @@ function StudioEditor({rule,base}:{rule:AlertRule;base:string}){
  async function media(){if(!layer||!['image','video','audio'].includes(layer.kind))return;const id=layer.id,kind=layer.kind as 'image'|'video'|'audio';setBusy(true);try{const asset=await window.pssa.chooseMedia(kind);if(asset){const s=current.current;change({...s,layers:s.layers.map(l=>l.id===id?{...l,asset}:l)})}}catch{setNotice('Nie udało się dodać pliku.')}finally{setBusy(false)}}
  async function save(test=false){setBusy(true);setPlaying(false);try{const valid=parseScene(current.current);await window.pssa.saveScene(rule.key,valid,rule.title);drafts.delete(rule.key);setDirty(false);if(test){const count=await window.pssa.testAlert(rule.key);setNotice(count?'Test dodany do kolejki OBS.':'Kolejka pełna.')}else setNotice('Zapisano scenę.')}catch{setNotice('Nie udało się zapisać sceny. Sprawdź zakres czasu i właściwości warstw.')}finally{setBusy(false)}}
  function seek(n:number){setPlaying(false);setEditMode(false);clock.current=n;setTime(n)}
- function togglePlay(){if(playing){setPlaying(false);return}if(clock.current>=scene.duration)clock.current=0;setEditMode(false);setPlaying(true)}
+ function togglePlay(){if(playing){setTime(clock.current);setPlaying(false);return}if(clock.current>=scene.duration)clock.current=0;setEditMode(false);setPlaying(true)}
  const locked=layer?.locked||busy
  return <div className="studio">
  <div className="studio-toolbar"><div className="alert-actions"><Button disabled={!past.current.length||busy} onClick={undo}>Cofnij</Button><Button disabled={!future.current.length||busy} onClick={redo}>Ponów</Button><Button disabled={busy} onClick={()=>{setPlaying(false);setEditMode(true)}}>Edycja</Button><Button disabled={busy} onClick={togglePlay}>{playing?'Pauza':'Odtwórz'}</Button><Button disabled={busy} onClick={()=>seek(0)}>Stop</Button></div><div className="alert-actions"><Button variant="primary" disabled={busy} onClick={()=>void save()}>Zapisz{dirty?' *':''}</Button><Button disabled={busy||!dirty} onClick={()=>{setPlaying(false);const saved=sceneForRule(rule);current.current=saved;setScene(saved);drafts.delete(rule.key);past.current=[];future.current=[];setDirty(false);setNotice('Przywrócono zapisaną scenę.')}}>Odrzuć szkic</Button><Button disabled={busy} onClick={()=>void save(true)}>Zapisz i testuj OBS</Button></div></div>

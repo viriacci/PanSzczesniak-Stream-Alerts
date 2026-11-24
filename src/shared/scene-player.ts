@@ -21,7 +21,7 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
    Object.assign(image.style,{width:'100%',height:'100%',objectFit:'contain'});el.append(image)
   }else if((layer.kind==='video'||layer.kind==='audio')&&layer.asset){
    media=document.createElement(layer.kind==='video'?'video':'audio')
-   media.preload=layer.visible?'auto':'none';if(layer.visible)readiness.push(new Promise<void>((resolve,reject)=>{media!.addEventListener('loadeddata',()=>resolve(),{once:true});media!.addEventListener('error',()=>reject(Error('Media load failed')),{once:true})}));media.src=mediaBase+layer.asset;media.onerror=()=>{if(!disposed&&layer.visible)onError()};media.volume=master*layer.volume/100
+   media.preload=layer.visible?'auto':'none';if(layer.visible)readiness.push(new Promise<void>((resolve,reject)=>{media!.addEventListener('loadeddata',()=>resolve(),{once:true});media!.addEventListener('error',()=>reject(Error('Media load failed')),{once:true})}));media.src=mediaBase+layer.asset;media.onerror=()=>{if(!disposed&&layer.visible)fail()};media.volume=master*layer.volume/100
    if(media instanceof HTMLVideoElement){media.playsInline=true;Object.assign(media.style,{width:'100%',height:'100%',objectFit:'contain'})}
    el.append(media)
   }else if(layer.kind==='particles'){

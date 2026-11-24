@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto'
+import { makeLayer,type Scene } from '../shared/scene'
 import { AgentBridge } from './agent/bridge'
 import { serveAgent,launchProcess } from './agent/server'
 import { ObsService } from './obs/service'
 import { AlertsService } from './alerts/service'
 import { app, BrowserWindow, dialog, session, screen } from 'electron'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
@@ -124,6 +126,29 @@ async function start(): Promise<void> {
         await new Promise(resolve=>setTimeout(resolve,100))
       }
       if(!done||!seen)throw Error('Overlay smoke missing render or ACK')
+      // Deterministic PNG in isolated smoke directory.
+      const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGN8fMCDgRTARJLqUQ2jGoaUBgAQ3wILGYFI4wAAAABJRU5ErkJggg==','base64')
+      const asset=createHash('sha256').update(png).digest('hex')+'.png'
+      mkdirSync(join(directory,'media'),{recursive:true});writeFileSync(join(directory,'media',asset),png)
+      const scene:Scene={version:1,width:1920,height:1080,duration:1500,layers:[{...makeLayer('image','smoke-image',1500),asset},{...makeLayer('text','smoke-text',1500),text:'Multi-layer smoke'}]}
+      const exercise=async(value:Scene,expected:'done'|'failed')=>{
+        const previous=new Set(activeAlerts.state().queue.history.map(x=>x.id))
+        const saved=await activeWindow.webContents.executeJavaScript('window.pssa.saveScene("raid",'+JSON.stringify(value)+',"Raid")')
+        if(!saved?.scene||activeAlerts.test('raid')!==1)throw Error('Scene smoke setup failed')
+        const until=Date.now()+12000;let rendered=false
+        while(Date.now()<until){
+          const completed=activeAlerts.state().queue.history.find(x=>x.source==='test'&&!previous.has(x.id))
+          if(completed){
+            if(completed.status!==expected||expected==='failed'&&completed.reason!=='media-error'||expected==='done'&&!rendered)throw Error('Scene media smoke failed')
+            return
+          }
+          if(expected==='done'&&await preview.webContents.executeJavaScript('(()=>{const i=document.querySelector("#stage img");return !!i&&i.naturalWidth===16&&i.parentElement.style.display!=="none"&&document.getElementById("stage").textContent.includes("Multi-layer smoke")})()'))rendered=true
+          await new Promise(resolve=>setTimeout(resolve,80))
+        }
+        throw Error('Scene media smoke timeout')
+      }
+      await exercise(scene,'done')
+      await exercise({...scene,layers:scene.layers.map(l=>l.kind==='image'?{...l,asset:'f'.repeat(64)+'.png'}:l)},'failed')
     }finally{preview.destroy()}
     app.quit()
   } else {
