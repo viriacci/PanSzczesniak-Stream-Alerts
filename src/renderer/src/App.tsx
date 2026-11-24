@@ -1,3 +1,4 @@
+import {useObs} from './features/obs'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { SystemStatus } from '../../shared/contracts'
 import { bounds, defaultLayout, type LayoutPreferences, type PageId } from '../../shared/layout'
@@ -10,6 +11,7 @@ import { PageContent } from './features/pages'
 
 export function App() {
  const alertState=useAlerts()
+ const {obs,agent}=useObs()
  const twitch=alertState?.twitch
  const [status,setStatus]=useState<SystemStatus>()
  const [layout,setLayout]=useState<LayoutPreferences>(defaultLayout)
@@ -74,11 +76,11 @@ export function App() {
    {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className="content" tabIndex={-1} ref={content} id="main-content">
     <header className="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div><Button variant="ghost" aria-label="Pokaż / ukryj inspektor" title={narrow?'Inspektor dostępny w szerszym oknie':'Inspektor (Ctrl+I)'} aria-pressed={layout.inspectorOpen} disabled={!ready||narrow} onClick={()=>patch({inspectorOpen:!layout.inspectorOpen})}><Icon name="inspector"/></Button></header>
-    <div className="page-body"><PageContent alertState={alertState} item={item} status={status} layout={layout} busy={busy||!ready} onCompact={toggleCompact} onReset={()=>setConfirm(true)} onIntegrations={()=>navigate('integrations')}/></div>
+    <div className="page-body"><PageContent obs={obs} agent={agent} alertState={alertState} item={item} status={status} layout={layout} busy={busy||!ready} onCompact={toggleCompact} onReset={()=>setConfirm(true)} onIntegrations={()=>navigate('integrations')}/></div>
    </main>
-   {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status>Offline</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
+   {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase??'Offline'}</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
   </div>
-  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status>OBS niepołączony</Status><span className="footer-right">PSSA DEV · ETAP 04</span></footer>
+  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">PSSA DEV · ETAP 05</span></footer>
   {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role={notice.error?'alert':'status'}><span>{notice.text}</span><Button variant="ghost" aria-label="Zamknij powiadomienie" onClick={()=>setNotice(null)}><Icon name="close" size={16}/></Button></div>}
   {confirm&&<ConfirmDialog title="Przywrócić domyślny układ?" onClose={()=>setConfirm(false)} onConfirm={reset}>Zresetuje szerokość paneli i ich widoczność. Nie zmieni statystyk ani ustawień alertów.</ConfirmDialog>}
  </div>

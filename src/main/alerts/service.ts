@@ -66,6 +66,7 @@ export class AlertsService {
   const map=new Map(rules(this.db).map(x=>[x.key,x]));for(const rule of data.rules)map.set(rule.key,rule);saveRules(this.db,[...map.values()])
   return {count:data.rules.length,warnings:data.warnings}
  }
+ reloadOverlay(){return this.overlay.reload()}
  queueCommand(command:unknown){return this.queue.command(command)}
  test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const kind=key.startsWith('reward:')?'redemption':key as AlertEvent['kind'];const event:AlertEvent={id:randomUUID(),kind,user:'Test PSSA',reward:rule.title,count:5,months:3};return this.queue.enqueue(event,rule,'test')?1:0}
  private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule)this.queue.enqueue(event,rule);else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,defaultRule(key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}

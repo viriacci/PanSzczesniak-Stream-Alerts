@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
+  obsState:()=>ipcRenderer.invoke(IPC.obsState),
+  obsAction:command=>ipcRenderer.invoke(IPC.obsAction,command),
+  agentState:()=>ipcRenderer.invoke(IPC.agentState),
+  agentAction:command=>ipcRenderer.invoke(IPC.agentAction,command),
   queueCommand:command=>ipcRenderer.invoke(IPC.queueCommand,command),
   alertState:()=>ipcRenderer.invoke(IPC.alertState),
   twitchLogin:(id,secret)=>ipcRenderer.invoke(IPC.twitchLogin,id,secret),

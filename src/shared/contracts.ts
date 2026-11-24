@@ -1,8 +1,13 @@
+import type { ObsState,ObsAction,AgentState,AgentAction } from './obs'
 import type { QueueCommand, QueueState } from './queue'
 import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  obsState:'pssa:obs:state',
+  obsAction:'pssa:obs:action',
+  agentState:'pssa:agent:state',
+  agentAction:'pssa:agent:action',
   queueCommand:'pssa:queue:command',
   alertState: 'pssa:alerts:state',
   twitchLogin: 'pssa:twitch:login',
@@ -27,6 +32,10 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  obsState():Promise<ObsState>
+  obsAction(command:ObsAction):Promise<number>
+  agentState():Promise<AgentState>
+  agentAction(command:AgentAction):Promise<void>
   queueCommand(command:QueueCommand):Promise<QueueState>
   alertState(): Promise<AlertState>
   twitchLogin(clientId:string,secret:string): Promise<void>

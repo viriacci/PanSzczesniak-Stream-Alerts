@@ -1,3 +1,6 @@
+import { AgentBridge } from './agent/bridge'
+import { serveAgent,launchProcess } from './agent/server'
+import { ObsService } from './obs/service'
 import { AlertsService } from './alerts/service'
 import { app, BrowserWindow, dialog, session, screen } from 'electron'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
@@ -10,12 +13,13 @@ import { openDatabase } from './database'
 import { registerIpc } from './ipc'
 import { createLogger } from './logger'
 
+const agentMode=process.argv.includes('--pssa-agent')
 const smoke = process.argv.includes('--smoke-test')
 const directory = smoke
   ? mkdtempSync(join(tmpdir(), 'pssa-smoke-'))
   : join(app.getPath('appData'), 'PSSA 2 Dev')
 mkdirSync(directory, { recursive: true })
-app.setPath('userData', directory)
+app.setPath('userData', agentMode?join(directory,'agent-runtime'):directory)
 app.setName('PSSA 2 Dev')
 const log = createLogger(directory)
 let window: BrowserWindow | undefined
@@ -23,11 +27,15 @@ let db: DatabaseSync | undefined
 let disposeIpc: (() => void) | undefined
 let cleaned = false
 let alerts:AlertsService|undefined
+let obs:ObsService|undefined
+let agent:AgentBridge|undefined
 
 function cleanup(): void {
   if (cleaned) return
   cleaned = true
   try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
+  try{agent?.stop()}catch{console.warn('PSSA: agent bridge cleanup failed')}
+  try{obs?.stop()}catch{console.warn('PSSA: OBS cleanup failed')}
   try{alerts?.stop()}catch{console.warn('PSSA: service cleanup failed')}
   try{db?.close()}catch{console.warn('PSSA: database cleanup failed')}
   log('shutdown')
@@ -82,14 +90,18 @@ async function start(): Promise<void> {
   if (state.maximized && !smoke) activeWindow.maximize()
   alerts=new AlertsService(db,directory,window,app.getPath('documents'))
   await alerts.start(!smoke)
-  disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts)
+  obs=new ObsService(db)
+  if(!smoke)obs.start()
+  const activeAlerts=alerts
+  if(!smoke){agent=new AgentBridge(directory,async()=>activeAlerts.reloadOverlay());agent.start()}
+  disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts,obs,agent)
   if (devUrl) await window.loadURL(document)
   else await window.loadFile(file)
   log('ready')
   if (smoke) {
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 2 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1)'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 2 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline")'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     app.quit()
@@ -98,7 +110,13 @@ async function start(): Promise<void> {
   }
 }
 
-if (!app.requestSingleInstanceLock()) {
+if(agentMode){
+ app.whenReady().then(async()=>{
+  const args=app.isPackaged?[]:[app.getAppPath()]
+  const server=await serveAgent(directory,()=>launchProcess(process.execPath,args))
+  app.on('before-quit',()=>server.close())
+ }).catch(()=>app.exit(1))
+} else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {

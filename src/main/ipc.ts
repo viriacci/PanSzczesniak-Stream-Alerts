@@ -1,3 +1,5 @@
+import type { ObsService } from './obs/service'
+import type { AgentBridge } from './agent/bridge'
 import type { AlertsService } from './alerts/service'
 import { validKey } from '../shared/alerts'
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
@@ -7,7 +9,7 @@ import { getCompact, setCompact, schemaVersion } from './database'
 import { getLayout, setLayout } from './database/layout'
 import { isTrustedDocument } from './security/ipc-policy'
 
-export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: string, version: string, alerts:AlertsService): () => void {
+export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: string, version: string, alerts:AlertsService,obs:ObsService,agent?:AgentBridge): () => void {
   function authorize(event: IpcMainInvokeEvent): void {
     const frame = event.senderFrame
     if (window.isDestroyed() || event.sender !== window.webContents ||
@@ -39,6 +41,10 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
    [IPC.alertState,0,()=>alerts.state()],
+   [IPC.obsState,0,()=>obs.state()],
+   [IPC.obsAction,1,command=>obs.action(command,alerts.state().twitch.overlayUrl)],
+   [IPC.agentState,0,()=>agent?.snapshot()??{online:false,running:false,dockUrl:'',autoLaunch:false,startup:false,detail:'Agent unavailable'}],
+   [IPC.agentAction,1,command=>{if(!agent||!['enable','startup-on','startup-off','auto-on','auto-off'].includes(command))throw Error('Invalid agent command');return agent.action(command)}],
    [IPC.queueCommand,1,command=>alerts.queueCommand(command)],
    [IPC.twitchLogin,2,(id,secret)=>{if(typeof id!=='string'||typeof secret!=='string')throw Error('Invalid credentials');return alerts.login(id,secret)}],
    [IPC.twitchLogout,0,()=>alerts.logout()],
