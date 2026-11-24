@@ -5,13 +5,15 @@ import type {MeasurementHeader,MeasurementSummary,MeasurementState,MetricSummary
 const intervalMs=10000,maxSamples=8640,maxFile=8*1024*1024
 type End={type:'end';at:number;status:'finished'|'limit'|'error'}
 type Session={header:MeasurementHeader;samples:Sample[];end?:End}
-export function metric(values:(number|null)[]):MetricSummary{
+export function metric(values:(number|null)[],weights?:number[]):MetricSummary{
  const v=values.filter((x):x is number=>typeof x==='number'&&Number.isFinite(x)).sort((a,b)=>a-b)
- return {mean:v.length?v.reduce((a,b)=>a+b,0)/v.length:null,p95:v.length?v[Math.ceil(v.length*.95)-1]!:null,peak:v.at(-1)??null,count:v.length}
+ const valid=values.map((value,i)=>({value,weight:weights?.[i]??1})).filter(x=>typeof x.value==='number'&&Number.isFinite(x.value)&&Number.isFinite(x.weight)&&x.weight>0),sum=valid.reduce((a,b)=>a+b.weight,0)
+ return {mean:sum?valid.reduce((a,b)=>a+b.value!*b.weight,0)/sum:null,p95:v.length?v[Math.ceil(v.length*.95)-1]!:null,peak:v.at(-1)??null,count:v.length}
 }
+export function counterIncrease(values:(number|null)[]){let prev:number|null=null,sum=0,intervals=0;for(const n of values){if(typeof n!=='number'||!Number.isFinite(n)||n<0){prev=null;continue}if(prev!==null&&n>=prev){sum+=n-prev;intervals++}prev=n}return intervals?sum:null}
 export function summarizeMeasurement(s:Session,active=false):MeasurementSummary{
  const a=s.samples,last=a.at(-1),first=a[0],gpu=new Map<number,number>();for(const x of a)if(x.gpuAt!==null&&Number.isFinite(x.gpuAt)&&x.gpu!==null&&Number.isFinite(x.gpu))gpu.set(x.gpuAt,x.gpu)
- return {...s.header,status:active?'running':s.end?.status??'interrupted',endedAt:s.end?.at??(active?null:last?.at??s.header.startedAt),samples:a.length,durationMs:Math.max(0,(s.end?.at??last?.at??s.header.startedAt)-s.header.startedAt),cpu:metric(a.map(x=>x.appCpu)),ram:metric(a.map(x=>x.appRamMB)),systemCpu:metric(a.map(x=>x.systemCpu)),systemRam:metric(a.map(x=>x.systemRamMB)),loop:metric(a.map(x=>x.eventLoop)),gpu:metric([...gpu.values()]),agentCpu:metric(a.map(x=>x.agentCpu)),agentRam:metric(a.map(x=>x.agentRamMB)),obsFps:metric(a.map(x=>x.obsFps)),done:Math.max(0,(last?.done??0)-(first?.done??0)),failed:Math.max(0,(last?.failed??0)-(first?.failed??0)),suppressed:Math.max(0,(last?.suppressed??0)-(first?.suppressed??0)),retried:Math.max(0,(last?.retried??0)-(first?.retried??0))}
+ return {...s.header,status:active?'running':s.end?.status??'interrupted',endedAt:s.end?.at??(active?null:last?.at??s.header.startedAt),samples:a.length,durationMs:Math.max(0,(s.end?.at??last?.at??s.header.startedAt)-s.header.startedAt),cpu:metric(a.map(x=>x.appCpu),a.map(x=>x.spanMs)),ram:metric(a.map(x=>x.appRamMB)),systemCpu:metric(a.map(x=>x.systemCpu),a.map(x=>x.spanMs)),systemRam:metric(a.map(x=>x.systemRamMB)),loop:metric(a.map(x=>x.eventLoop),a.map(x=>x.spanMs)),gpu:metric([...gpu.values()]),agentCpu:metric(a.map(x=>x.agentCpu)),agentRam:metric(a.map(x=>x.agentRamMB)),obsFps:metric(a.map(x=>x.obsFps)),obsCpu:metric(a.map(x=>x.obsCpu)),obsRam:metric(a.map(x=>x.obsRamMB)),timerLag:metric(a.map(x=>x.timerLateMs)),queuePeak:a.reduce((max,x)=>Math.max(max,x.queuePending),0),obsRenderDelta:counterIncrease(a.map(x=>x.obsRenderSkipped)),obsOutputDelta:counterIncrease(a.map(x=>x.obsOutputSkipped)),done:Math.max(0,(last?.done??0)-(first?.done??0)),failed:Math.max(0,(last?.failed??0)-(first?.failed??0)),suppressed:Math.max(0,(last?.suppressed??0)-(first?.suppressed??0)),retried:Math.max(0,(last?.retried??0)-(first?.retried??0))}
 }
 export function parseSession(raw:string):Session{
  const lines=raw.split('\n'),first=JSON.parse(lines.shift()??'null')
@@ -55,7 +57,7 @@ export class Measurement{
   try{this.append(s.header.id,{type:'end',status,at:this.now()})}finally{this.session=undefined;this.onFinish()}
  }
  stop(){this.finish('finished');return this.state()}
- shutdown(){this.stopped=true;try{this.finish('finished')}catch{/* persisted samples remain recoverable */}}
+ shutdown(failed=false){this.stopped=true;try{this.finish(failed?'error':'finished',!failed)}catch{/* persisted samples remain recoverable */}}
  state():MeasurementState{
   const recent:MeasurementSummary[]=[]
   if(existsSync(this.directory)){

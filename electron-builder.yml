@@ -4,6 +4,7 @@ directories:
   output: dist
 files:
   - out/**/*
+  - '!out/**/*.map'
   - package.json
 asar: true
 asarUnpack:

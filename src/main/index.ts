@@ -44,11 +44,11 @@ let alerts:AlertsService|undefined
 let obs:ObsService|undefined
 let agent:AgentBridge|undefined
 
-function cleanup(): void {
+function cleanup(failed=false): void {
   if (cleaned) return
   cleaned = true
   try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
-  try{runtime?.stop();tray?.destroy()}catch{console.warn('PSSA: runtime cleanup failed')}
+  try{runtime?.stop(failed);tray?.destroy()}catch{console.warn('PSSA: runtime cleanup failed')}
   try{agent?.stop()}catch{console.warn('PSSA: agent bridge cleanup failed')}
   try{obs?.stop()}catch{console.warn('PSSA: OBS cleanup failed')}
   try{alerts?.stop()}catch{console.warn('PSSA: service cleanup failed')}
@@ -59,7 +59,7 @@ function fail(error?:unknown): void {
   crashes.write('startup-failed','',null,error instanceof Error?error.stack:undefined)
   log('startup-failed')
   if (!smoke) dialog.showErrorBox(BRAND, 'Nie udało się uruchomić aplikacji. Sprawdź application.log w katalogu danych.')
-  cleanup()
+  cleanup(true)
   app.exit(1)
 }
 
@@ -206,11 +206,18 @@ async function start(): Promise<void> {
       await exercise(scene,'done')
       await exercise({...scene,layers:scene.layers.map(l=>l.kind==='image'?{...l,asset:'f'.repeat(64)+'.png'}:l)},'failed')
     }finally{preview.destroy()}
+    const measurement=runtime.beginMeasurement(false).active
+    if(!measurement||measurement.samples!==1)throw Error('Measurement start smoke failed')
     const oldId=activeWindow.id
     hibernate();if(window||!activeWindow.isDestroyed())throw Error('Background did not release window')
     await showWindow(false)
     const reopened:BrowserWindow|undefined=BrowserWindow.getAllWindows().find(w=>w.id!==oldId)
     if(!reopened||!(await reopened.webContents.executeJavaScript('window.pssa.getStatus().then(s=>s.database===\"ready\")')))throw Error('Background resume failed')
+    if(!runtime.measurementState().active)throw Error('Measurement did not survive Background')
+    const finished=runtime.measurementStop().recent.find(x=>x.id===measurement.id)
+    if(!finished||finished.status!=='finished'||finished.samples<2||finished.ram.count<2)throw Error('Measurement report smoke failed')
+    const logged=await reopened.webContents.executeJavaScript('window.pssa.rendererFault("error","Error: SECRET_SMOKE\\n at fn (C:/Private/index.js:22:4)").then(()=>window.pssa.crashState())')
+    if(!Array.isArray(logged)||!logged.some((x:any)=>x.event==="renderer-error"&&x.frames?.includes("index.js:22:4"))||JSON.stringify(logged).includes('SECRET_SMOKE')||JSON.stringify(logged).includes('Private'))throw Error('Crash redaction smoke failed')
     app.quit()
   } else applyMode(runtime.state())
 }
@@ -223,10 +230,10 @@ if(agentMode){
   app.quit()
 } else {
   process.on('uncaughtExceptionMonitor',error=>crashes.write('uncaught-exception','',null,error.stack))
-  process.on('unhandledRejection',error=>{crashes.write('unhandled-rejection','',null,error instanceof Error?error.stack:undefined);cleanup();app.exit(1)})
+  process.on('unhandledRejection',error=>{crashes.write('unhandled-rejection','',null,error instanceof Error?error.stack:undefined);cleanup(true);app.exit(1)})
   app.on('render-process-gone',(_e,_contents,details)=>{if(details.reason!=='clean-exit')crashes.write('render-process-gone',details.reason,details.exitCode)})
   app.on('child-process-gone',(_e,details)=>{if(details.reason!=='clean-exit')crashes.write('child-process-gone',details.reason,details.exitCode)})
-  try{const dumps=join(directory,'crash-dumps');mkdirSync(dumps,{recursive:true});app.setPath('crashDumps',dumps);crashReporter.start({uploadToServer:false,companyName:'Pan Szczesniak',productName:'PSSA',submitURL:''})}catch{crashes.write('crash-reporter-unavailable')}
+  try{const dumps=join(directory,'crash-dumps');mkdirSync(dumps,{recursive:true});app.setPath('crashDumps',dumps);crashReporter.start({uploadToServer:false,companyName:'Pan Szczesniak',productName:'PSSA'})}catch{crashes.write('crash-reporter-unavailable')}
   app.on('second-instance', () => {
     if(!cleaned)reveal()
   })

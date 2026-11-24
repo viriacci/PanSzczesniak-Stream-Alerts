@@ -41,7 +41,9 @@ export class RuntimeService{
   });this.measurement.onFinish=()=>this.stopCollectors()
  }
  measurementState(){return this.measurement.state()}
- async measurementStart(gpu:unknown){this.guard();if(typeof gpu!=='boolean')throw Error('Invalid GPU preference');if(this.measurement.active)throw Error('Measurement already active');const r=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Rozpocząć pomiar?',message:'PSSA będzie zapisywać rzeczywiste pomiary co 10 sekund, także w tle.',detail:'Pomiar sam nie uruchamia transmisji, nie symuluje alertów, kończy się po maks. 24 godzinach lub po zamknięciu PSSA. Dane pozostają na komputerze.',buttons:['Anuluj','Rozpocznij pomiar'],defaultId:0,cancelId:0});if(r.response!==1||this.stopped)return this.measurement.state();this.gpuEnabled=gpu;this.agentPrevious=undefined;this.agent?.setMeasurement(true);if(gpu)this.gpu.start();try{return this.measurement.start()}catch(e){this.stopCollectors();throw e}}
+ async measurementStart(gpu:unknown){this.guard();if(typeof gpu!=='boolean')throw Error('Invalid GPU preference');if(this.measurement.active)throw Error('Measurement already active');const r=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Rozpocząć pomiar?',message:'PSSA będzie zapisywać rzeczywiste pomiary co 10 sekund, także w tle.',detail:'Pomiar sam nie uruchamia transmisji, nie symuluje alertów, kończy się po maks. 24 godzinach lub po zamknięciu PSSA. Dane pozostają na komputerze.',buttons:['Anuluj','Rozpocznij pomiar'],defaultId:0,cancelId:0});if(r.response!==1||this.stopped)return this.measurement.state();return this.beginMeasurement(gpu)}
+ // Internal start path; renderer can only invoke the confirmation-gated IPC.
+ beginMeasurement(gpu:boolean){if(this.stopped||this.measurement.active)throw Error('Measurement unavailable');this.gpuEnabled=gpu;this.agentPrevious=undefined;this.agent?.setMeasurement(true);if(gpu)this.gpu.start();try{return this.measurement.start()}catch(e){this.stopCollectors();throw e}}
  private stopCollectors(){this.gpu.stop();this.agent?.setMeasurement(false);this.agentPrevious=undefined}
  measurementStop(){try{return this.measurement.stop()}finally{this.stopCollectors()}}
  async measurementExport(id:unknown,format:unknown){this.guard();const data=this.measurement.export(id,format);const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-measurement.'+format,filters:[{name:'Raport',extensions:[String(format)]}]});if(r.canceled||!r.filePath||this.stopped)return false;writeNew(this.outside(r.filePath),data);return true}
@@ -51,7 +53,7 @@ export class RuntimeService{
  state(){return preferences(this.db)}
  save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);return this.state()}
  start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
- stop(){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown();this.stopCollectors()}
+ stop(failed=false){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown(failed);this.stopCollectors()}
  private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
  private guard(){if(this.busy||this.stopped)throw Error('Runtime operation unavailable')}
  requireOffline(){const l=this.alerts.liveState(),a=this.alerts.state(),m=this.obs.state().metrics;if(a.queue.current||a.queue.pendingCount||l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}

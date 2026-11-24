@@ -42,3 +42,5 @@ Beta.2 run 45375146660: 73/73 PASS, audit clean, build/smoke, NSIS, installed, u
 Beta.3 run 45377162735 success; Beta.4 run 45378166188 success, 78/78, npm audit 0, worker/Agent Node, build/smoke/NSIS/install/upgrade/uninstall. RC.1: 5 nowych testów (83 łącznie), w tym migracja v4→v5, restore v4, nextDelay, awaria migracji EventSub i 8h wirtualny soak. Dodatkowy smoke Background destroy/recreate. CI oczekuje. Rzeczywiste testy stanowiska: docs/RELEASE_ACCEPTANCE.md.
 
 RC.1 run 45379912938: npm audit 0, benchmark i typecheck PASS, 82/83 testów PASS (w tym wirtualne 8h); FAIL plan historii używał alert_queue_pending i TEMP B-TREE. RC.2 jawnie wskazuje partial index w produkcyjnym SQL i testuje ten sam fragment zapytania. CI oczekuje.
+
+RC.2 run 45380348076 success, 83/83, full Windows CI. RC.3: 4 dodatkowe testy (87 łącznie), rzeczywisty smoke sesji pomiarowej w Background, IPC skórek i redakcji crash logu, source maps jako osobny artefakt. CI oczekuje. Realny stream i GPU counter na maszynie użytkownika jeszcze niezweryfikowane.

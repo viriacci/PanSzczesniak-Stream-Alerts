@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdtempSync,rmSync,readdirSync,readFileSync,appendFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {Measurement,metric,parseSession,summarizeMeasurement} from '../src/main/runtime/measurement.ts'
+import {Measurement,metric,counterIncrease,parseSession,summarizeMeasurement} from '../src/main/runtime/measurement.ts'
 import {cpuDelta,appCpuDelta} from '../src/main/runtime/counters.ts'
 import {CrashLog,safeFrames} from '../src/main/runtime/crashes.ts'
 import {parseRuntime,defaults} from '../src/shared/runtime.ts'
@@ -17,7 +17,7 @@ test('themes migrate old preferences and reject arbitrary theme IDs',()=>{
 })
 test('CPU delta uses actual counters, unavailable intervals remain null',()=>{
  assert.equal(cpuDelta(undefined,{idle:40,total:100}),null)
- assert.equal(cpuDelta({idle:0,total:0},{idle:80,total:100}),19.999999999999996)
+ assert.ok(Math.abs(cpuDelta({idle:0,total:0},{idle:80,total:100})!-20)<1e-9)
  const p={pid:1,creationTime:0,cpu:{cumulativeCPUUsage:3},memory:{workingSetSize:1024}}
  assert.equal(appCpuDelta(new Map([['1:0',1]]),[p],10,4),5)
  assert.equal(appCpuDelta(new Map([['1:0',1]]),[],10,4),null)
@@ -35,7 +35,7 @@ test('measurement opt in, persistence, summary, comparison data and interrupted 
   const file=join(root,s.id+'.jsonl'),lines=readFileSync(file,'utf8').trimEnd().split('\n')
   const recovered=parseSession(lines.slice(0,-1).join('\n')+'\n{"type":')
   assert.equal(summarizeMeasurement(recovered).status,'interrupted')
-  assert.equal(metric([null,2,4]).mean,3);assert.equal(metric([null]).peak,null)
+  assert.equal(metric([null,2,4]).mean,3);assert.equal(metric([null]).peak,null);assert.equal(metric([10,20],[1,3]).mean,17.5);assert.equal(counterIncrease([null,10,13,2,5,null,100,101]),7);assert.equal(counterIncrease([null,10]),null)
  }finally{m.shutdown();rmSync(root,{recursive:true,force:true})}
 })
 test('crash logs exclude error text and private paths',()=>{
