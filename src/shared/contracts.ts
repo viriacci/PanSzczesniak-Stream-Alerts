@@ -1,3 +1,4 @@
+import type {LibraryAction,LibraryState} from './library'
 import type {Scene} from './scene'
 import type {LiveState,LiveAction,Category} from './live'
 import type { ObsState,ObsAction,AgentState,AgentAction } from './obs'
@@ -6,6 +7,8 @@ import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  libraryState:'pssa:library:state',
+  libraryAction:'pssa:library:action',
   liveState:'pssa:live:state',
   liveAction:'pssa:live:action',
   obsState:'pssa:obs:state',
@@ -37,6 +40,8 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  libraryState():Promise<LibraryState>
+  libraryAction(value:LibraryAction):Promise<void>
   liveState():Promise<LiveState>
   liveAction(command:LiveAction):Promise<Category[]|null>
   obsState():Promise<ObsState>

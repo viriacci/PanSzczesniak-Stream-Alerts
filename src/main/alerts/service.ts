@@ -1,3 +1,6 @@
+import {libraryState,libraryAction,rememberAsset,activeProfile} from '../library/store'
+import {pickVariant} from '../../shared/variants'
+import {basename} from 'node:path'
 import {LiveService} from '../live/service'
 import type {ObsState} from '../../shared/obs'
 import { dialog, safeStorage, shell, type BrowserWindow } from 'electron'
@@ -42,7 +45,7 @@ export class AlertsService {
   this.validation=setInterval(()=>{const generation=this.generation;if(this.auth.identity)void this.auth.ensure().catch(()=>{if(this.stopped||generation!==this.generation)return;this.events.stop();this.phase='error';this.detail='Sesja Twitch wymaga ponownego połączenia'})},3600000)
  }
  stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.live.stop();try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
- state():AlertState{return {twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
+ state():AlertState{return {profileId:activeProfile(this.db),twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  async login(clientId:string,secret:string){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
   this.generation++;const g=this.generation;this.live.reset();this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
@@ -63,7 +66,7 @@ export class AlertsService {
   if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
   try{const result=await dialog.showOpenDialog(this.window,{properties:['openFile'],filters:[{name:kind==='image'?'Grafiki':kind==='video'?'Wideo':'Dźwięki',extensions:(kind==='image'?imageExt:kind==='video'?videoExt:audioExt).map(x=>x.slice(1))}]})
   if(result.canceled||!result.filePaths[0])return null
-  return await copyMedia(result.filePaths[0],this.media,kind)}finally{this.dialogBusy=false}
+  const id=await copyMedia(result.filePaths[0],this.media,kind);if(this.stopped)throw Error('App stopping');rememberAsset(this.db,id,basename(result.filePaths[0]));return id}finally{this.dialogBusy=false}
  }
  async import(){
   if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
@@ -75,11 +78,13 @@ export class AlertsService {
   return {count:data.rules.length,warnings:data.warnings}}finally{this.dialogBusy=false}
  }
  overlayUrl(){return this.overlay.url}
+ libraryState(){return libraryState(this.db,this.media)}
+ libraryAction(value:unknown){libraryAction(this.db,value)}
  liveState(){return this.live.snapshot()}
  liveAction(value:unknown){return this.live.action(value)}
  observeObs(state:ObsState){this.live.obs(state)}
  reloadOverlay(){return this.overlay.reload()}
  queueCommand(command:unknown){return this.queue.command(command)}
  test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const kind=key.startsWith('reward:')?'redemption':key as AlertEvent['kind'];const event:AlertEvent={id:randomUUID(),kind,user:'Test PSSA',reward:rule.title,count:5,months:3};return this.queue.enqueue(event,rule,'test')?1:0}
- private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule)this.queue.enqueue(event,rule);else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,defaultRule(key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}
+ private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule){const live=this.live.snapshot(),variant=pickVariant(rule.variants??[],event.count??0,event.months??0,live.phase==='live'?live.categoryId:'');this.queue.enqueue(event,variant?{...rule,scene:variant.scene,duration:variant.scene.duration/1000,variants:[]}:{...rule,variants:[]})}else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,defaultRule(key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}
 }

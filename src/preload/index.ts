@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
+  libraryState:()=>ipcRenderer.invoke(IPC.libraryState),
+  libraryAction:value=>ipcRenderer.invoke(IPC.libraryAction,value),
   liveState:()=>ipcRenderer.invoke(IPC.liveState),
   liveAction:command=>ipcRenderer.invoke(IPC.liveAction,command),
   obsState:()=>ipcRenderer.invoke(IPC.obsState),

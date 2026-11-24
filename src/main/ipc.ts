@@ -41,6 +41,8 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
    [IPC.alertState,0,()=>alerts.state()],
+   [IPC.libraryState,0,()=>alerts.libraryState()],
+   [IPC.libraryAction,1,value=>alerts.libraryAction(value)],
    [IPC.liveState,0,()=>alerts.liveState()],
    [IPC.liveAction,1,command=>alerts.liveAction(command)],
    [IPC.obsState,0,()=>obs.state()],
