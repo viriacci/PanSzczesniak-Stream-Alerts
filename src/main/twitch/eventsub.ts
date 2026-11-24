@@ -10,8 +10,13 @@ export class EventSub {
  private stopped=true
  private attempts=0
  private seen=new Map<string,number>()
- constructor(private auth:Auth,private state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void,private emit:(e:AlertEvent)=>void){}
- start(){this.stop();this.stopped=false;this.attempts=0;this.seen.clear();this.connect('wss://eventsub.wss.twitch.tv/ws',false)}
+ private auth:Pick<Auth,'identity'|'helix'>
+ private state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void
+ private emit:(e:AlertEvent)=>void
+ private makeSocket:(url:string)=>WebSocket
+ private subscriptionDetail='EventSub aktywny'
+ constructor(auth:Pick<Auth,'identity'|'helix'>,state:(phase:'connecting'|'connected'|'retrying'|'error',detail:string)=>void,emit:(e:AlertEvent)=>void,makeSocket=(url:string)=>new WebSocket(url)){this.auth=auth;this.state=state;this.emit=emit;this.makeSocket=makeSocket}
+ start(){this.stop();this.stopped=false;this.attempts=0;this.subscriptionDetail='EventSub aktywny';this.seen.clear();this.connect('wss://eventsub.wss.twitch.tv/ws',false)}
  stop(){this.stopped=true;clearTimeout(this.retry);this.retry=undefined;for(const s of this.sockets)this.close(s);this.current=undefined;this.pending=undefined}
  private close(s:WebSocket){clearTimeout(this.timers.get(s));this.timers.delete(s);this.sockets.delete(s);try{s.close()}catch{}}
  private watchdog(s:WebSocket,seconds:number){clearTimeout(this.timers.get(s));this.timers.set(s,setTimeout(()=>{this.close(s);this.lost(s)},seconds*1000+2000))}
@@ -26,13 +31,14 @@ export class EventSub {
  }
  private connect(url:string,migrated:boolean){
   if(this.stopped)return
-  try{const u=new URL(url);if(u.protocol!=='wss:'||u.hostname!=='eventsub.wss.twitch.tv'||u.username||u.password||u.port)throw Error('Invalid reconnect URL')}catch{this.state('error','Nieprawidłowy adres EventSub');return}
-  const s=new WebSocket(url);this.sockets.add(s);if(migrated)this.pending=s;else{this.current=s;this.state('connecting','Łączenie EventSub…')}
+  try{const u=new URL(url);if(u.protocol!=='wss:'||u.hostname!=='eventsub.wss.twitch.tv'||u.username||u.password||u.port)throw Error('Invalid reconnect URL')}catch{if(this.current){this.state('connected','Odrzucono nieprawidłowy adres migracji');return}this.state('error','Nieprawidłowy adres EventSub');return}
+  let s:WebSocket;try{s=this.makeSocket(url)}catch{this.state('error','Nie można utworzyć połączenia EventSub');return}this.sockets.add(s);if(migrated)this.pending=s;else{this.current=s;this.state('connecting','Łączenie EventSub…')}
   let interval=10,welcomed=false
   this.watchdog(s,15)
   s.addEventListener('message',event=>{void (async()=>{
-   if(this.stopped||!this.sockets.has(s)||typeof event.data!=='string')return
+   if(this.stopped||!this.sockets.has(s)||typeof event.data!=='string'||event.data.length>1048576)return
    let m:any;try{m=JSON.parse(event.data)}catch{return}
+   if(!m||typeof m!=='object')return
    if(welcomed)this.watchdog(s,interval)
    switch(m.metadata?.message_type){
     case 'session_welcome':{
@@ -44,14 +50,14 @@ export class EventSub {
       if(!this.sockets.has(s)||this.stopped)return
       const failed=results.filter(x=>x.status==='rejected').length
       if(failed===results.length){this.state('error','Twitch odrzucił wszystkie subskrypcje');this.stop();return}
-      this.attempts=0;this.state('connected',failed?('Nieaktywne subskrypcje: '+failed):'EventSub aktywny');return
+      this.subscriptionDetail=failed?('Nieaktywne subskrypcje: '+failed):'EventSub aktywny';this.attempts=0;this.state('connected',this.subscriptionDetail);return
      }
-     this.attempts=0;this.state('connected','EventSub aktywny');return
+     this.attempts=0;this.state('connected',this.subscriptionDetail);return
     }
     case 'session_reconnect':if(s===this.current&&!this.pending&&typeof m.payload?.session?.reconnect_url==='string')this.connect(m.payload.session.reconnect_url,true);return
     case 'revocation':this.state('error','Twitch cofnął subskrypcję. Połącz ponownie.');this.stop();return
     case 'notification':{
-     const id=m.metadata?.message_id;if(typeof id!=='string'||this.seen.has(id))return
+     const id=m.metadata?.message_id;if(!welcomed||typeof id!=='string'||!id||id.length>256||this.seen.has(id))return
      this.seen.set(id,Date.now());if(this.seen.size>10000){const first=this.seen.keys().next().value;if(first)this.seen.delete(first)}
      const normalized=normalizeEvent(id,m.metadata.subscription_type,m.payload?.event);if(normalized)this.emit(normalized)
     }

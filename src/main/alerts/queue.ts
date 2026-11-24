@@ -73,25 +73,25 @@ export class AlertQueue {
   const item=this.decode(row),attempt=randomUUID()
   this.db.prepare("UPDATE alert_queue SET status='playing',attempts=attempts+1,reason='' WHERE id=?").run(item.id)
   this.current={id:item.id,attempt,deadline:now+item.rule.duration*1000+10000,rule:item.rule}
-  if(!this.transport.send({attempt,rule:item.rule,text:item.text,volume:this.effective(item.rule)}))this.interrupted('overlay-disconnected')
+  try{if(!this.transport.send({attempt,rule:item.rule,text:item.text,volume:this.effective(item.rule)}))this.interrupted('overlay-disconnected')}catch{if(this.current)this.interrupted('transport-error')}
  }
- acknowledge(attempt:string){
+ acknowledge(attempt:string,result:'done'|'media-error'='done'){
   if(this.current?.attempt!==attempt)return false
-  this.finish('done','',false);return true
+  this.finish(result==='done'?'done':'failed',result==='done'?'':'media-error',false);return true
  }
  private interrupted(reason:string){
   const active=this.current;if(!active)return
-  this.current=undefined;this.transport.cancel(active.attempt)
   const item=this.get(active.id)
   if(item&&item.attempts<3)this.db.prepare("UPDATE alert_queue SET status='pending',reason=? WHERE id=?").run(reason,active.id)
   else this.db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason=? WHERE id=?").run(this.now(),reason,active.id)
+  this.current=undefined;try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
   this.nextAt=this.now()+this.settings.gapMs
  }
  private finish(status:QueueStatus,reason:string,cancel:boolean){
   const active=this.current;if(!active)return
   this.db.prepare('UPDATE alert_queue SET status=?,finished_at=?,reason=? WHERE id=?').run(status,this.now(),reason,active.id)
   this.current=undefined
-  if(cancel)this.transport.cancel(active.attempt)
+  if(cancel)try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
   this.nextAt=this.now()+this.settings.gapMs
  }
  command(input:unknown){

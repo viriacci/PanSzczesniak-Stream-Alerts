@@ -26,7 +26,7 @@ export function normalizeLayout(value:unknown):AlertLayout|undefined {
 export function parseRule(value:unknown):AlertRule {
  if(!value||typeof value!=='object')throw Error('Nieprawidłowy alert')
  const v=value as Record<string,unknown>
- if(typeof v.key!=='string'||!validKey(v.key)||typeof v.enabled!=='boolean'||typeof v.title!=='string'||v.title.length>200||typeof v.template!=='string'||v.template.length>500||typeof v.image!=='string'||!validMedia(v.image)||typeof v.audio!=='string'||!validMedia(v.audio)||typeof v.duration!=='number'||!Number.isFinite(v.duration)||v.duration<1||v.duration>120)throw Error('Nieprawidłowe ustawienia alertu')
+ if(typeof v.key!=='string'||!validKey(v.key)||typeof v.enabled!=='boolean'||typeof v.title!=='string'||v.title.length>200||typeof v.template!=='string'||v.template.length>500||typeof v.image!=='string'||!validMedia(v.image)||(v.image!==''&&!/\.(png|jpg|jpeg|gif|webp)$/i.test(v.image))||typeof v.audio!=='string'||!validMedia(v.audio)||(v.audio!==''&&!/\.(mp3|wav|ogg|m4a)$/i.test(v.audio))||typeof v.duration!=='number'||!Number.isFinite(v.duration)||v.duration<1||v.duration>120)throw Error('Nieprawidłowe ustawienia alertu')
  const integer=(value:unknown,fallback:number,min:number,max:number)=>{if(value===undefined)return fallback;if(typeof value!=='number'||!Number.isInteger(value)||value<min||value>max)throw Error('Nieprawidłowe parametry kolejki');return value}
  return {priority:integer(v.priority,5,0,10),cooldown:integer(v.cooldown,0,0,3600),volume:integer(v.volume,100,0,100),minCount:integer(v.minCount,0,0,1000000),key:v.key,enabled:v.enabled,title:v.title,template:v.template,image:v.image,audio:v.audio,duration:v.duration,layout:normalizeLayout(v.layout)}
 }

@@ -27,9 +27,9 @@ let alerts:AlertsService|undefined
 function cleanup(): void {
   if (cleaned) return
   cleaned = true
-  disposeIpc?.()
-  alerts?.stop()
-  db?.close()
+  try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
+  try{alerts?.stop()}catch{console.warn('PSSA: service cleanup failed')}
+  try{db?.close()}catch{console.warn('PSSA: database cleanup failed')}
   log('shutdown')
 }
 function fail(): void {

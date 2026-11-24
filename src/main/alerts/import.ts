@@ -7,6 +7,7 @@ export async function importLegacy(file:string,target:string){
  const raw=JSON.parse((await readFile(file,'utf8')).replace(/^\uFEFF/,'')) as any
  if(!raw||typeof raw!=='object'||(!raw.alerts&&!raw.rewards))throw Error('Nie rozpoznano konfiguracji PSSA')
  const result:AlertRule[]=[],warnings:string[]=[]
+ const rewardEntries=Object.entries(raw.rewards??{});if(rewardEntries.length>1000)throw Error('Zbyt wiele reguł w konfiguracji')
  const add=async(key:string,v:any,layout:any)=>{
   if(!validKey(key)||!v||typeof v!=='object')return
   const rule=defaultRule(key,typeof v.title==='string'?v.title.slice(0,200):key)
@@ -20,6 +21,6 @@ export async function importLegacy(file:string,target:string){
   result.push(parseRule(rule))
  }
  for(const kind of kinds)if(kind!=='redemption'&&raw.alerts?.[kind])await add(kind,raw.alerts[kind],raw.layouts?.[kind])
- for(const [id,value] of Object.entries(raw.rewards??{}))await add('reward:'+id,value,raw.layouts?.redemption)
+ for(const [id,value] of rewardEntries)await add('reward:'+id,value,raw.layouts?.redemption)
  return {rules:result,warnings}
 }

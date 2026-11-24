@@ -21,10 +21,13 @@ export function normalizeEvent(id:string,type:string,e:any):AlertEvent|undefined
   if(typeof e.reward?.id!=='string')return
   return {id,kind:'redemption',user,rewardId:e.reward.id,reward:name(e.reward.title)}
  case 'channel.chat.notification':{
+  if(e.source_broadcaster_user_id&&e.source_broadcaster_user_id!==e.broadcaster_user_id)return
   const chatter=e.chatter_is_anonymous?'Anonim':name(e.chatter_user_name)
   switch(e.notice_type){
   case 'sub':return {id,kind:e.sub?.is_prime?'prime_sub':'sub',user:chatter}
   case 'resub':return {id,kind:'resub',user:chatter,months:count(e.resub?.cumulative_months)}
+  case 'prime_paid_upgrade':return {id,kind:'sub',user:chatter}
+  case 'gift_paid_upgrade':return {id,kind:'sub',user:chatter}
   case 'sub_gift':if(e.sub_gift?.community_gift_id)return;return {id,kind:'gift',user:chatter,count:1}
   case 'community_sub_gift':return {id,kind:'mass_gift',user:chatter,count:count(e.community_sub_gift?.total)}
   default:return

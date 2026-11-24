@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
-import { mkdir, readFile, stat, writeFile, realpath } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, readFile, stat, writeFile, realpath, rename, rm } from 'node:fs/promises'
 import { basename, extname, join, relative, isAbsolute } from 'node:path'
 export const imageExt=['.png','.jpg','.jpeg','.gif','.webp']
 export const audioExt=['.mp3','.wav','.ogg','.m4a']
@@ -10,7 +10,10 @@ export async function copyMedia(source:string,target:string,kind:'image'|'audio'
  const st=await stat(source);if(!st.isFile()||st.size>50*1024*1024)throw Error('Plik przekracza 50 MB lub nie jest plikiem')
  const bytes=await readFile(source);if(bytes.length>50*1024*1024)throw Error('Plik przekracza 50 MB')
  const name=createHash('sha256').update(bytes).digest('hex')+ext
- await mkdir(target,{recursive:true});await writeFile(join(target,name),bytes,{flag:'wx'}).catch(e=>{if(e.code!=='EEXIST')throw e})
+ await mkdir(target,{recursive:true})
+ const destination=join(target,name),temporary=join(target,'.'+randomUUID()+'.tmp')
+ try{const old=await readFile(destination);if(createHash('sha256').update(old).digest('hex')===name.slice(0,64))return name}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}
+ try{await writeFile(temporary,bytes,{flag:'wx'});await rename(temporary,destination)}finally{await rm(temporary,{force:true}).catch(()=>{})}
  return name
 }
 export async function legacyMedia(root:string,url:unknown,target:string,kind:'image'|'audio'){
