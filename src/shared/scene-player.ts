@@ -16,10 +16,10 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   if(layer.kind==='text'){
    el.textContent=layer.text.replaceAll('{alert}',text)
    Object.assign(el.style,{color:layer.color,fontFamily:layer.font+', sans-serif',fontSize:layer.fontSize+'px',whiteSpace:'pre-wrap',overflowWrap:'anywhere',alignItems:'center',justifyContent:'center',textAlign:'center'})
-  }else if(layer.kind==='image'&&layer.asset){
+  }else if(layer.kind==='image'&&layer.asset&&layer.visible){
    const image=document.createElement('img');image.alt='';image.onerror=()=>{if(!disposed&&layer.visible)fail()};if(layer.visible)readiness.push(new Promise<void>((resolve,reject)=>{image.addEventListener('load',()=>resolve(),{once:true});image.addEventListener('error',()=>reject(Error('Image load failed')),{once:true})}));image.src=mediaBase+layer.asset
    Object.assign(image.style,{width:'100%',height:'100%',objectFit:'contain'});el.append(image)
-  }else if((layer.kind==='video'||layer.kind==='audio')&&layer.asset){
+  }else if((layer.kind==='video'||layer.kind==='audio')&&layer.asset&&layer.visible){
    media=document.createElement(layer.kind==='video'?'video':'audio')
    media.preload=layer.visible?'auto':'none';if(layer.visible)readiness.push(new Promise<void>((resolve,reject)=>{media!.addEventListener('loadeddata',()=>resolve(),{once:true});media!.addEventListener('error',()=>reject(Error('Media load failed')),{once:true})}));media.src=mediaBase+layer.asset;media.onerror=()=>{if(!disposed&&layer.visible)fail()};media.volume=master*layer.volume/100
    if(media instanceof HTMLVideoElement){media.playsInline=true;Object.assign(media.style,{width:'100%',height:'100%',objectFit:'contain'})}
@@ -27,7 +27,7 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   }else if(layer.kind==='particles'){
    for(let i=0;i<24;i++){const dot=document.createElement('span');Object.assign(dot.style,{position:'absolute',left:((i*37)%100)+'%',top:((i*61)%100)+'%',width:(3+i%5)+'%',aspectRatio:'1',borderRadius:'50%',background:layer.color});el.append(dot)}
   }
-  board.append(el);return {layer,el,media,playing:false,started:false}
+  board.append(el);return {layer,el,media,playing:false,started:false,lastDisplay:'none',lastOpacity:'',lastTransform:'',lastParticles:-Infinity}
  })
  function scale(){const s=Math.min(root.clientWidth/scene.width,root.clientHeight/scene.height);board.style.transform='translate(-50%, -50%) scale('+s+')'}
  const observer=new ResizeObserver(scale);observer.observe(root);scale()
@@ -47,12 +47,12 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   for(const node of nodes){
    const {layer:l,el,media}=node
    const active=l.visible&&(edit||time>=l.start&&time<l.end)
-   el.style.display=active&&l.kind!=='audio'?(l.kind==='text'?'flex':'block'):'none'
+   const display=active&&l.kind!=='audio'?(l.kind==='text'?'flex':'block'):'none';if(node.lastDisplay!==display){el.style.display=display;node.lastDisplay=display}
    if(active){
     const a=effect(l.enter,edit||!l.enterMs?1:(time-l.start)/l.enterMs),b=effect(l.exit,edit||!l.exitMs?1:(l.end-time)/l.exitMs)
-    el.style.opacity=String(l.opacity/100*a.a*b.a)
-    el.style.transform='translate(-50%,-50%) translate('+(a.x+b.x)+'%,'+(a.y+b.y)+'%) rotate('+l.rotation+'deg) scale('+a.s*b.s+')'
-    if(l.kind==='particles')for(let i=0;i<el.children.length;i++){const dot=el.children[i] as HTMLElement;dot.style.transform='translateY('+(-((time/30+i*7)%100))+'%)';dot.style.opacity=String(.3+.7*Math.abs(Math.sin(time/500+i)))}
+    const opacity=String(l.opacity/100*a.a*b.a),transform='translate(-50%,-50%) translate('+(a.x+b.x)+'%,'+(a.y+b.y)+'%) rotate('+l.rotation+'deg) scale('+a.s*b.s+')'
+    if(node.lastOpacity!==opacity){el.style.opacity=opacity;node.lastOpacity=opacity}if(node.lastTransform!==transform){el.style.transform=transform;node.lastTransform=transform}
+    if(l.kind==='particles'&&(Math.abs(time-node.lastParticles)>=33||edit)){node.lastParticles=time;for(let i=0;i<el.children.length;i++){const dot=el.children[i] as HTMLElement;dot.style.transform='translateY('+(-((time/30+i*7)%100))+'%)';dot.style.opacity=String(.3+.7*Math.abs(Math.sin(time/500+i)))}}
    }
    if(media){
     const should=active&&play&&time>=l.start&&time<l.end

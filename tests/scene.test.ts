@@ -1,3 +1,4 @@
+import {nextSceneFrame} from '../src/shared/scene-schedule.ts'
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {makeLayer,parseScene,resizeDuration,snap,type Scene} from '../src/shared/scene.ts'
@@ -45,4 +46,24 @@ test('saving scene preserves the latest alert settings',()=>{
  const saved=saveScene(db,'raid',fixture(),'Old title')
  assert.equal(saved.enabled,true);assert.equal(saved.priority,9);assert.equal(saved.volume,32);assert.equal(saved.template,'New {user}');assert.deepEqual(saved.scene,fixture())
  }finally{db.close()}
+})
+
+test('scene scheduler sleeps through static layers and wakes at precise boundaries',()=>{
+ const base=fixture(),layer={...base.layers[0]!,enter:'none' as const,exit:'none' as const,start:1000,end:4000}
+ const scene={...base,layers:[layer]}
+ assert.equal(nextSceneFrame(scene,0),1000)
+ assert.equal(nextSceneFrame(scene,1000),3000)
+ assert.equal(nextSceneFrame(scene,4000),1000)
+ const animated={...scene,layers:[{...layer,enter:'fade' as const,enterMs:300,exit:'fade' as const,exitMs:300}]}
+ assert.equal(nextSceneFrame(animated,1000),16)
+ assert.equal(nextSceneFrame(animated,1300),2400)
+ assert.equal(nextSceneFrame(animated,3700),16)
+ const particles={...scene,layers:[{...layer,kind:'particles' as const}]}
+ assert.equal(nextSceneFrame(particles,1200),33)
+ assert.equal(typeof new Function('return ('+nextSceneFrame.toString()+')')(),'function')
+})
+test('rules cache invalidates after update and does not retain rolled back profile data',()=>{
+ const db=openDatabase(':memory:')
+ try{const a=rules(db);assert.equal(a,rules(db));db.exec('BEGIN IMMEDIATE');saveRule(db,{...defaultRule('raid'),volume:27});assert.equal(rules(db).find(x=>x.key==='raid')?.volume,27);db.exec('ROLLBACK');assert.equal(rules(db).find(x=>x.key==='raid')?.volume,100)}
+ finally{db.close()}
 })

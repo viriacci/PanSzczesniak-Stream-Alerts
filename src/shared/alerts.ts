@@ -35,5 +35,5 @@ export function parseRule(value:unknown):AlertRule {
 }
 export function renderText(template:string,event:AlertEvent):string {
  const vars:Record<string,string>={user:event.user,reward:event.reward??'',viewers:String(event.count??0),bits:String(event.count??0),count:String(event.count??0),months:String(event.months??0)}
- return template.replace(/\{([a-z_]+)\}/g,(token,key:string)=>vars[key]??token)
+ return template.replace(/\{([a-z_]+)\}/g,(token,key:string)=>Object.hasOwn(vars,key)?vars[key]!:token)
 }

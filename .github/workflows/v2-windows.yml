@@ -14,10 +14,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v5
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '24'
       - run: npm ci
@@ -28,7 +29,7 @@ jobs:
           $auditExit = $LASTEXITCODE
           if ($auditExit -ne 0) { Write-Warning "npm audit returned $auditExit; report requires triage" }
           exit 0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pssa-npm-audit
           path: npm-audit.json
@@ -38,6 +39,29 @@ jobs:
         run: |
           $r = Get-Content npm-audit.json -Raw | ConvertFrom-Json
           if ($null -eq $r.metadata.vulnerabilities.total -or $r.metadata.vulnerabilities.total -ne 0) { throw 'Dependency audit failed' }
+      - name: Complete source and dependency inventory
+        run: node scripts/audit-inventory.mjs
+      - name: SBOM
+        shell: pwsh
+        run: npm sbom --package-lock-only --sbom-format cyclonedx | Set-Content -Encoding utf8 sbom.json
+      - name: Compare synthetic CPU and SQL workload with beta.2
+        shell: pwsh
+        run: |
+          git worktree add --detach baseline f19ab6417ca0fe17edde0ab02bb88dd1e6f5a9fe
+          node --experimental-strip-types scripts/performance.mjs baseline | Set-Content -Encoding utf8 perf-before.json
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline benchmark failed' }
+          node --experimental-strip-types scripts/performance.mjs . | Set-Content -Encoding utf8 perf-after.json
+          if ($LASTEXITCODE -ne 0) { throw 'Current benchmark failed' }
+          git worktree remove baseline
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pssa-technical-audit
+          path: |
+            audit-inventory.json
+            sbom.json
+            perf-before.json
+            perf-after.json
+          if-no-files-found: error
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -51,7 +75,7 @@ jobs:
           $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged smoke timeout' }
           if ($p.ExitCode -ne 0) { throw "Packaged smoke exit $($p.ExitCode)" }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: PSSA-2-Dev-Windows
           run-id: 45374474420
@@ -100,7 +124,7 @@ jobs:
           if ($uninstaller.Count -ne 1) { throw 'Uninstaller missing after upgrade' }
           Run-Installer $uninstaller[0].FullName '/S'
           if (-not (Test-Path $marker)) { throw 'Uninstall removed data after upgrade' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: PSSA-2-Dev-Windows
           path: dist/*.exe

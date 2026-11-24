@@ -24,6 +24,7 @@ const api: PssaApi = {
   agentState:()=>ipcRenderer.invoke(IPC.agentState),
   agentAction:command=>ipcRenderer.invoke(IPC.agentAction,command),
   queueCommand:command=>ipcRenderer.invoke(IPC.queueCommand,command),
+  alertPoll:revision=>ipcRenderer.invoke(IPC.alertPoll,revision),
   alertState:()=>ipcRenderer.invoke(IPC.alertState),
   twitchLogin:(id,secret)=>ipcRenderer.invoke(IPC.twitchLogin,id,secret),
   twitchLogout:()=>ipcRenderer.invoke(IPC.twitchLogout),

@@ -27,6 +27,7 @@ export class LiveService{
  private lastObs?:{at:number;bytes:number;duration:number}
  private lastObsAt=0
  private lastSummary=0
+ private summaryDirty=false
  private pollAgain=false
  constructor(db:DatabaseSync,auth:LiveAuth,now=Date.now){
   this.db=db;this.auth=auth;this.now=now
@@ -36,9 +37,10 @@ export class LiveService{
  }
  start(){if(this.timer)return;this.stopped=false;void this.poll();this.timer=setInterval(()=>void this.poll(),30000)}
  stop(){this.stopped=true;clearInterval(this.timer);this.timer=undefined;this.reset()}
- reset(){this.generation++;this.task=undefined;this.id=null;this.current=blank();this.lastObs=undefined;this.lastObsAt=0;this.lastSummary=0;this.pollAgain=false}
+ reset(){this.generation++;this.task=undefined;this.id=null;this.current=blank();this.lastObs=undefined;this.lastObsAt=0;this.lastSummary=0;this.summaryDirty=false;this.pollAgain=false}
+ categoryId(){return this.current.phase==='live'?this.current.categoryId:''}
  snapshot():LiveState{
-  if(this.id!==null&&this.now()-this.lastSummary>=5000){Object.assign(this.current,summarize(this.db,this.id));this.lastSummary=this.now()}
+  if(this.id!==null&&this.summaryDirty&&this.now()-this.lastSummary>=5000){Object.assign(this.current,summarize(this.db,this.id));this.lastSummary=this.now();this.summaryDirty=false}
   return {...this.current,canManage:this.auth.canManage,points:[...this.current.points],counts:this.current.counts?{...this.current.counts}:null}
  }
  poll(force=false):Promise<void>{
@@ -61,7 +63,7 @@ export class LiveService{
     if(previous!==this.id){this.lastObs=undefined;this.lastObsAt=0}
     if(stream&&this.id!==null){
      this.current={...blank(),phase:'live',channel:identity.login,title:stream.title,category:stream.category,categoryId:stream.categoryId,startedAt:stream.startedAt,lastSampleAt:at,viewers:stream.viewers,...summarize(this.db,this.id),bitrate:previous===this.id?this.current.bitrate:null}
-     this.lastSummary=at
+     this.lastSummary=at;this.summaryDirty=false
     }else{
      this.current={...blank(),phase:'offline',channel:identity.login,lastSampleAt:at,detail:'Kanał nie nadaje'}
      try{const result=await this.auth.helix('channels?broadcaster_id='+encodeURIComponent(channel));if(!valid())return;const info=result?.data?.[0];if(info?.broadcaster_id===channel){this.current.title=typeof info.title==='string'?info.title:'';this.current.category=typeof info.game_name==='string'?info.game_name:'';this.current.categoryId=typeof info.game_id==='string'?info.game_id:''}}catch{/* offline remains confirmed */}
@@ -80,13 +82,13 @@ export class LiveService{
    if(e.broadcaster_user_id!==channel||typeof e.chatter_user_id!=='string'||!e.chatter_user_id)return
    if(e.source_broadcaster_user_id&&e.source_broadcaster_user_id!==channel)return
    const chatter=createHash('sha256').update(this.salt+':'+channel+':'+e.chatter_user_id).digest('hex')
-   recordEvent(this.db,channel,{id,kind:'chat',at,chatter});return
+   if(recordEvent(this.db,channel,{id,kind:'chat',at,chatter}))this.summaryDirty=true;return
   }
   if(!normalized)return
   const broadcaster=type==='channel.raid'?e.to_broadcaster_user_id:e.broadcaster_user_id
   if(broadcaster!==channel)return
   const cost=e.reward?.cost
-  recordEvent(this.db,channel,{id,kind:normalized.kind,at,count:normalized.count,points:typeof cost==='number'&&Number.isSafeInteger(cost)&&cost>=0?cost:0})
+  if(recordEvent(this.db,channel,{id,kind:normalized.kind,at,count:normalized.count,points:typeof cost==='number'&&Number.isSafeInteger(cost)&&cost>=0?cost:0}))this.summaryDirty=true
  }
  obs(state:ObsState){
   const m=state.metrics,at=state.sampledAt

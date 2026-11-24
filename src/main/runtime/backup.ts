@@ -4,14 +4,13 @@ import {parseLayout} from '../../shared/layout.ts'
 import {DatabaseSync,type SQLInputValue} from 'node:sqlite'
 import {createHash,randomUUID} from 'node:crypto'
 import {mkdirSync,readdirSync,readFileSync,writeFileSync,renameSync,rmSync,lstatSync,existsSync,copyFileSync,statSync,mkdtempSync} from 'node:fs'
-import {join,resolve,dirname,extname} from 'node:path'
+import {join,resolve} from 'node:path'
 import {openDatabase,SCHEMA_VERSION,schemaVersion} from '../database/index.ts'
 import {parseRule,validMedia} from '../../shared/alerts.ts'
 import {parseQueueSettings} from '../../shared/queue.ts'
 import {parseRuntime} from '../../shared/runtime.ts'
 import {config,activeProfile} from '../library/store.ts'
 const tables=['stream_sessions','viewer_samples','stream_events','obs_samples','imported_summaries','alert_queue'] as const
-const archiveTables=[...tables,'settings','backup_manifest','backup_media']
 const settingKeys=['compact','layout.v1','window.v1','alerts.v1','queue.v1','library.v1','library.active','live.chat.salt','runtime.v1']
 const maxArchive=1024*1024*1024,maxFile=50*1024*1024
 const hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex')

@@ -122,3 +122,17 @@ test('queue summary excludes heavyweight scene snapshots without losing replay',
  f.q.command({type:'skip',id:item.id});f.q.command({type:'replay',id:item.id});assert.equal(f.q.state().pendingCount,1)
  }finally{f.q.stop();f.db.close()}
 })
+
+test('idle queue performs no SQL and reuses snapshots; mutation and reconnect invalidate cache',()=>{
+ const f=fixture()
+ try{
+  f.connect(true);const before=f.q.state(),prepare=f.db.prepare.bind(f.db);let reads=0
+  f.db.prepare=((sql:string)=>{reads++;return prepare(sql)}) as typeof f.db.prepare
+  for(let i=0;i<14400;i++)f.q.tick()
+  for(let i=0;i<1000;i++)assert.equal(f.q.state(),before)
+  assert.equal(reads,0)
+  f.q.enqueue(f.event('new'),f.rule);assert.notEqual(f.q.state(),before);assert.ok(f.q.state().current)
+  f.ack();assert.equal(f.q.state().history[0]?.status,'done')
+  f.connect(false);assert.equal(f.q.state().online,false)
+ }finally{f.q.stop();f.db.close()}
+})

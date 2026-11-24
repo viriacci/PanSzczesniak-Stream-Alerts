@@ -36,6 +36,8 @@ export class AlertsService {
  private dialogBusy=false
  private stopped=false
  private generation=0
+ private snapshotVersion=0
+ private lastSnapshot?:AlertState
  private validation?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,dir:string,private window:BrowserWindow,private documents:string){
   this.directory=dir;this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.live=new LiveService(db,this.auth);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
@@ -53,6 +55,12 @@ export class AlertsService {
  }
  stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.live.stop();try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
  state():AlertState{return {profileId:activeProfile(this.db),twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
+ poll(since:unknown){
+  if(typeof since!=='number'||!Number.isSafeInteger(since)||since< -1)throw Error('Invalid snapshot revision')
+  const next=this.state(),last=this.lastSnapshot
+  if(!last||next.profileId!==last.profileId||next.rules!==last.rules||next.rewards!==last.rewards||next.queue!==last.queue||JSON.stringify(next.twitch)!==JSON.stringify(last.twitch)){this.lastSnapshot=next;this.snapshotVersion++}
+  return {revision:this.snapshotVersion,state:since===this.snapshotVersion?null:this.lastSnapshot!}
+ }
  async login(clientId:string,secret:string){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
   this.generation++;const g=this.generation;this.live.reset();this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
@@ -76,11 +84,11 @@ export class AlertsService {
   const id=await copyMedia(result.filePaths[0],this.media,kind);if(this.stopped)throw Error('App stopping');rememberAsset(this.db,id,basename(result.filePaths[0]));return id}finally{this.dialogBusy=false}
  }
  async import(){
-  if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
+  if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true;const profile=activeProfile(this.db)
   try{const result=await dialog.showOpenDialog(this.window,{title:'Import konfiguracji PSSA 1.x',defaultPath:join(this.documents,'PanSzczesniak Stream Alerts','config.json'),properties:['openFile'],filters:[{name:'Konfiguracja JSON',extensions:['json']}]})
   if(result.canceled||!result.filePaths[0])return null
   const data=await importLegacy(result.filePaths[0],this.media)
-  if(this.stopped)throw Error('Aplikacja zamykana')
+  if(this.stopped)throw Error('Aplikacja zamykana');assertActiveProfile(this.db,profile)
   const map=new Map(rules(this.db).map(x=>[x.key,x]));for(const rule of data.rules)map.set(rule.key,rule);saveRules(this.db,[...map.values()])
   return {count:data.rules.length,warnings:data.warnings}}finally{this.dialogBusy=false}
  }
@@ -108,5 +116,5 @@ export class AlertsService {
  reloadOverlay(){return this.overlay.reload()}
  queueCommand(command:unknown){return this.queue.command(command)}
  test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const kind=key.startsWith('reward:')?'redemption':key as AlertEvent['kind'];const event:AlertEvent={id:randomUUID(),kind,user:'Test PSSA',reward:rule.title,count:5,months:3};return this.queue.enqueue(event,rule,'test')?1:0}
- private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule){const live=rule.variants?.length?this.live.snapshot():undefined,variant=pickVariant(rule.variants??[],event.count??0,event.months??0,live?.phase==='live'?live.categoryId:'');this.queue.enqueue(event,variant?{...rule,scene:variant.scene,duration:variant.scene.duration/1000,variants:[]}:{...rule,variants:[]})}else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,defaultRule(key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}
+ private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule){const category=rule.variants?.length?this.live.categoryId(): '',variant=pickVariant(rule.variants??[],event.count??0,event.months??0,category);this.queue.enqueue(event,variant?{...rule,scene:variant.scene,duration:variant.scene.duration/1000,variants:[]}:{...rule,variants:[]})}else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,defaultRule(key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}
 }

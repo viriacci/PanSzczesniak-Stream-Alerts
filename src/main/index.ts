@@ -1,3 +1,4 @@
+import {launchNodeAgent} from './agent/launch'
 import {BRAND} from '../shared/brand'
 import {RuntimeService} from './runtime/service'
 import {pendingRestore} from './runtime/backup'
@@ -6,7 +7,6 @@ import type {RuntimePreferences} from '../shared/runtime'
 import { createHash } from 'node:crypto'
 import { makeLayer,type Scene } from '../shared/scene'
 import { AgentBridge } from './agent/bridge'
-import { serveAgent,launchProcess } from './agent/server'
 import { ObsService } from './obs/service'
 import { AlertsService } from './alerts/service'
 import { app, BrowserWindow, dialog, session, screen, Tray, Menu, nativeImage } from 'electron'
@@ -144,6 +144,8 @@ async function start(): Promise<void> {
   else await window.loadFile(file)
   log('ready')
   if (smoke) {
+    const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true)
+    await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{child.kill();reject(Error('Node Agent smoke timeout'))},12000);child.once('error',e=>{clearTimeout(timer);reject(e)});child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(Error('Node Agent smoke failed'))})})
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
       'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 4 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 4)'
@@ -196,11 +198,9 @@ async function start(): Promise<void> {
 }
 
 if(agentMode){
- app.whenReady().then(async()=>{
-  const args=app.isPackaged?[]:[app.getAppPath()]
-  const server=await serveAgent(directory,()=>launchProcess(process.execPath,args))
-  app.on('before-quit',()=>server.close())
- }).catch(()=>app.exit(1))
+ const args=app.isPackaged?[]:[app.getAppPath()]
+ const child=launchNodeAgent(directory,process.execPath,args,__dirname)
+ child.once('error',()=>app.exit(1));child.once('spawn',()=>{child.unref();app.exit(0)})
 } else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {

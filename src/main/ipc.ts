@@ -51,6 +51,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.updateInfo,0,()=>runtime.updateInfo()],
    [IPC.updateOpen,0,()=>runtime.openUpdate()],
    [IPC.alertState,0,()=>alerts.state()],
+   [IPC.alertPoll,1,revision=>alerts.poll(revision)],
    [IPC.analyticsChannels,0,()=>alerts.analyticsChannels()],
    [IPC.analyticsReport,1,filter=>alerts.analyticsReport(filter)],
    [IPC.analyticsImport,0,()=>alerts.analyticsImport()],

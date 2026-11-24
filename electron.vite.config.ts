@@ -1,7 +1,8 @@
+import {resolve} from 'node:path'
 import { defineConfig } from 'electron-vite'
 
 export default defineConfig({
-  main: {},
+  main: {build:{rollupOptions:{input:{index:resolve('src/main/index.ts'),agent:resolve('src/main/agent/entry.ts')}}}},
   preload: {},
   renderer: {
     server: { host: '127.0.0.1' },

@@ -32,6 +32,7 @@ export const IPC = {
   agentAction:'pssa:agent:action',
   queueCommand:'pssa:queue:command',
   alertState: 'pssa:alerts:state',
+  alertPoll:'pssa:alerts:poll',
   twitchLogin: 'pssa:twitch:login',
   twitchLogout: 'pssa:twitch:logout',
   twitchConnect: 'pssa:twitch:connect',
@@ -78,6 +79,7 @@ export interface PssaApi {
   agentAction(command:AgentAction):Promise<void>
   queueCommand(command:QueueCommand):Promise<QueueState>
   alertState(): Promise<AlertState>
+  alertPoll(revision:number):Promise<{revision:number;state:AlertState|null}>
   twitchLogin(clientId:string,secret:string): Promise<void>
   twitchLogout(): Promise<void>
   twitchConnect(): Promise<void>

@@ -19,13 +19,18 @@ export class AlertQueue {
  private current?:Active
  private nextAt=0
  private stopped=false
+ private hasPending=false
+ private revision=0
+ private cached?:{revision:number;online:boolean;state:QueueState}
+ get version(){return this.revision}
+ private changed(){this.revision++;this.cached=undefined}
  constructor(db:DatabaseSync,transport:Transport,now=Date.now){
   this.db=db;this.transport=transport;this.now=now
   const raw=db.prepare("SELECT value FROM settings WHERE key='queue.v1'").get()?.value
   try{this.settings=typeof raw==='string'?parseQueueSettings(JSON.parse(raw)):{...defaultQueueSettings}}catch{this.settings={...defaultQueueSettings}}
   // A crash may have interrupted playback; it cannot prove that OBS finished.
   db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason='restart-limit' WHERE status='playing' AND attempts>=3").run(this.now())
-  db.exec("UPDATE alert_queue SET status='pending',reason='restart' WHERE status='playing'")
+  db.exec("UPDATE alert_queue SET status='pending',reason='restart' WHERE status='playing'");this.hasPending=this.pendingCount()>0
  }
  private decode(row:any):QueueItem{
   const rule=parseRule(JSON.parse(row.rule_json))
@@ -35,11 +40,12 @@ export class AlertQueue {
  private pendingCount(){return Number(this.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='pending'").get()?.n??0)}
  private summary(row:any):QueueSummary{return {id:Number(row.id),source:row.source,key:row.rule_key,title:typeof row.title==='string'?row.title:row.rule_key,text:row.text,status:row.status,priority:row.priority,position:row.position,attempts:row.attempts,createdAt:row.created_at,finishedAt:row.finished_at,reason:row.reason}}
  state():QueueState{
+  const online=this.transport.online();if(this.cached?.revision===this.revision&&this.cached.online===online)return this.cached.state
   const fields="id,source,rule_key,json_extract(rule_json,'$.title') AS title,text,status,priority,position,attempts,created_at,finished_at,reason"
   const current=this.current?this.db.prepare('SELECT '+fields+' FROM alert_queue WHERE id=?').get(this.current.id):undefined
   const pending=this.db.prepare('SELECT '+fields+" FROM alert_queue WHERE status='pending' ORDER BY priority DESC,position,id LIMIT 100").all().map(r=>this.summary(r))
   const history=this.db.prepare('SELECT '+fields+" FROM alert_queue WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100").all().map(r=>this.summary(r))
-  return {settings:{...this.settings},current:current?this.summary(current):null,pending,pendingCount:this.pendingCount(),history,online:this.transport.online()}
+  const state={settings:{...this.settings},current:current?this.summary(current):null,pending,pendingCount:this.pendingCount(),history,online};this.cached={revision:this.revision,online,state};return state
  }
  enqueue(event:AlertEvent,rule:AlertRule,source:QueueSource='twitch'){
   return this.insert(source+':'+event.id,source,parseRule(rule),renderText(rule.template,event),event.count??event.months??0)
@@ -60,7 +66,7 @@ export class AlertQueue {
   const position=Number(this.db.prepare('SELECT coalesce(max(id),0)+1 AS n FROM alert_queue').get()?.n??1)
   this.db.prepare('INSERT INTO alert_queue(event_id,source,rule_key,rule_json,text,status,priority,position,created_at,finished_at,reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
    .run(eventId,source,rule.key,JSON.stringify(rule),text,reason?'suppressed':'pending',rule.priority,position,now,reason?now:null,reason)
-  this.tick()
+  if(!reason)this.hasPending=true;this.changed();this.tick()
   return !reason
  }
  private effective(rule:AlertRule){return this.settings.muted?0:Math.round(rule.volume*this.settings.volume/100)}
@@ -72,12 +78,12 @@ export class AlertQueue {
    if(now>=this.current.deadline){this.finish('failed','ack-timeout',true);return}
    return
   }
-  if(this.settings.paused||now<this.nextAt||!this.transport.online())return
+  if(!this.hasPending||this.settings.paused||now<this.nextAt||!this.transport.online())return
   const row=this.db.prepare("SELECT * FROM alert_queue WHERE status='pending' ORDER BY priority DESC,position,id LIMIT 1").get()
-  if(!row)return
+  if(!row){this.hasPending=false;return}
   const item=this.decode(row),attempt=randomUUID()
   this.db.prepare("UPDATE alert_queue SET status='playing',attempts=attempts+1,reason='' WHERE id=?").run(item.id)
-  this.current={id:item.id,attempt,deadline:now+item.rule.duration*1000+10000,rule:item.rule}
+  this.current={id:item.id,attempt,deadline:now+item.rule.duration*1000+10000,rule:item.rule};this.changed()
   try{if(!this.transport.send({attempt,rule:item.rule,text:item.text,volume:this.effective(item.rule)}))this.interrupted('overlay-disconnected')}catch{if(this.current)this.interrupted('transport-error')}
  }
  acknowledge(attempt:string,result:'done'|'media-error'='done'){
@@ -89,13 +95,13 @@ export class AlertQueue {
   const item=this.get(active.id)
   if(item&&item.attempts<3)this.db.prepare("UPDATE alert_queue SET status='pending',reason=? WHERE id=?").run(reason,active.id)
   else this.db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason=? WHERE id=?").run(this.now(),reason,active.id)
-  this.current=undefined;try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
+  this.hasPending=true;this.changed();this.current=undefined;try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
   this.nextAt=this.now()+this.settings.gapMs
  }
  private finish(status:QueueStatus,reason:string,cancel:boolean){
   const active=this.current;if(!active)return
   this.db.prepare('UPDATE alert_queue SET status=?,finished_at=?,reason=? WHERE id=?').run(status,this.now(),reason,active.id)
-  this.current=undefined
+  this.current=undefined;this.changed()
   if(cancel)try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
   this.nextAt=this.now()+this.settings.gapMs
  }
@@ -129,7 +135,7 @@ export class AlertQueue {
     }
    }
   }
-  this.tick();return this.state()
+  this.changed();this.tick();return this.state()
  }
  stop(){this.stopped=true;if(this.current)this.interrupted('shutdown')}
 }

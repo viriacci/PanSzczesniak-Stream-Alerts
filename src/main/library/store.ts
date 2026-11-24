@@ -1,8 +1,8 @@
 import {parseVariants} from '../../shared/variants.ts'
 import {randomUUID} from 'node:crypto'
 import type {DatabaseSync} from 'node:sqlite'
-import {defaultRule,parseRule,validKey,validMedia,type AlertRule} from '../../shared/alerts.ts'
-import {parseScene,type Scene} from '../../shared/scene.ts'
+import {parseRule,validKey,validMedia,type AlertRule} from '../../shared/alerts.ts'
+import {parseScene} from '../../shared/scene.ts'
 import {sceneForRule} from '../../shared/scene-legacy.ts'
 import {rules,saveRules,saveScene,saveRule} from '../alerts/store.ts'
 import {mediaKind,type LibraryAction,type LibraryState,type Asset,type Profile,type SceneTemplate} from '../../shared/library.ts'
@@ -27,7 +27,7 @@ export function config(db:DatabaseSync):Config{
  if(!v||!Array.isArray(v.profiles)||v.profiles.length<1||v.profiles.length>30||!Array.isArray(v.templates)||v.templates.length>100||!v.metadata||typeof v.metadata!=='object')throw Error('Invalid library configuration')
  const profiles:ProfileRecord[]=v.profiles.map((p:any)=>{if(!validId(p.id)||!Array.isArray(p.rules)||p.rules.length>1024)throw Error('Invalid profile');return {id:p.id,name:label(p.name),categoryId:category(p.categoryId),rules:p.rules.map(parseRule)}})
  const templates:SceneTemplate[]=v.templates.map((t:any)=>{if(!validId(t.id))throw Error('Invalid template');return {id:t.id,name:label(t.name),scene:parseScene(t.scene)}})
- if(!profiles.some(p=>p.id===v.active)||new Set(profiles.map(p=>p.id)).size!==profiles.length)throw Error('Invalid active profile')
+ if(new Set(templates.map(t=>t.id)).size!==templates.length||!profiles.some(p=>p.id===v.active)||new Set(profiles.map(p=>p.id)).size!==profiles.length)throw Error('Invalid active profile')
  const entries=Object.entries(v.metadata);if(entries.length>10000)throw Error('Too many asset records')
  const meta:Record<string,Metadata>={}
  for(const [id,m] of entries)if(validAsset(id))meta[id]=metadata(m)

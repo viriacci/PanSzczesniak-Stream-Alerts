@@ -67,7 +67,7 @@ function reply(res:ServerResponse,code:number,data:unknown){res.writeHead(code,{
 export async function serveAgent(dir:string,launch:()=>ChildProcess,port=AGENT_PORT,watchObs=true){
  const key=agentKey(dir),controller=new AgentController(launch),settings=join(dir,'agent-settings.json')
  try{controller.autoLaunch=JSON.parse(readFileSync(settings,'utf8')).autoLaunch===true}catch{}
- let bound=port,obs=false,checking=false
+ let bound=port,obs=false,checking=false,lastCheck=0
  const server=createServer({headersTimeout:5000,requestTimeout:8000},(req,res)=>{void (async()=>{
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer')
   res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'")
@@ -85,7 +85,7 @@ export async function serveAgent(dir:string,launch:()=>ChildProcess,port=AGENT_P
    if(req.headers.origin){reply(res,403,{});return}
    if(req.url==='/api/closing'){controller.closing(input.instance);reply(res,200,{});return}
    if(req.url==='/api/ack'){if(typeof input.id!=='string'||!controller.ack(input.instance,input.id)){reply(res,409,{});return}reply(res,200,{});return}
-   reply(res,200,{command:controller.heartbeat(input.instance)});return
+   const command=controller.heartbeat(input.instance);reply(res,200,{command,...controller.state()});return
   }
   if(req.url==='/api/command'){
    if(!['start','stop','restart','refresh','auto-on','auto-off'].includes(input.command)){reply(res,400,{});return}
@@ -96,9 +96,9 @@ export async function serveAgent(dir:string,launch:()=>ChildProcess,port=AGENT_P
   reply(res,404,{})
  })().catch(()=>{if(!res.headersSent)reply(res,400,{error:'Invalid request'});else res.end()})})
  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',()=>{server.removeListener('error',reject);const a=server.address();if(a&&typeof a!=='string')bound=a.port;resolve()})})
- const timer=setInterval(()=>{controller.tick();if(!watchObs||process.platform!=='win32'||!controller.autoLaunch||checking)return
-  checking=true;execFile(join(process.env.SystemRoot||'C:\\Windows','System32','tasklist.exe'),['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000},(error,stdout)=>{checking=false;if(error)return;const active=/"obs64\.exe"/i.test(stdout);if(active&&!obs)controller.obsStarted();obs=active})
+ const timer=setInterval(()=>{controller.tick();if(!watchObs||process.platform!=='win32'||!controller.autoLaunch||checking||Date.now()-lastCheck<15000)return
+  lastCheck=Date.now();checking=true;execFile(join(process.env.SystemRoot||'C:\\Windows','System32','tasklist.exe'),['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000},(error,stdout)=>{checking=false;if(error)return;const active=/"obs64\.exe"/i.test(stdout);if(active&&!obs)controller.obsStarted();obs=active})
  },2000)
  return {url:'http://127.0.0.1:'+bound,dock:'http://127.0.0.1:'+bound+'/dock#'+key,close:()=>{clearInterval(timer);server.close();server.closeAllConnections()}}
 }
-export function launchProcess(exe:string,args:string[]){return spawn(exe,args,{detached:true,stdio:'ignore',windowsHide:true})}
+export function launchProcess(exe:string,args:string[]){const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;return spawn(exe,args,{env,detached:true,stdio:'ignore',windowsHide:true})}
