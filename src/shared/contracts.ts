@@ -48,7 +48,7 @@ export interface PssaApi {
   twitchConnect(): Promise<void>
   syncRewards(): Promise<Reward[]>
   saveAlert(rule:AlertRule): Promise<AlertRule>
-  chooseMedia(kind:'image'|'audio'): Promise<string|null>
+  chooseMedia(kind:'image'|'audio'|'video'): Promise<string|null>
   importLegacy(): Promise<{count:number;warnings:string[]}|null>
   testAlert(key:string): Promise<number>
   getLayout(): Promise<LayoutPreferences>

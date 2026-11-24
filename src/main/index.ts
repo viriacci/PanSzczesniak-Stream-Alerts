@@ -108,6 +108,23 @@ async function start(): Promise<void> {
       'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 3 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected")'
     )
     if (passed !== true) throw new Error('Smoke test failed')
+    // Load the real served overlay in a separate isolated Chromium window and wait for ACK.
+    const preview=new BrowserWindow({show:false,width:640,height:360,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
+    preview.webContents.setWindowOpenHandler(()=>({action:'deny'}))
+    preview.webContents.on('will-navigate',event=>event.preventDefault())
+    try{
+      await preview.loadURL(activeAlerts.state().twitch.overlayUrl)
+      const deadline=Date.now()+20000
+      let done=false,seen=false
+      while(Date.now()<deadline){
+        const history=activeAlerts.state().queue.history
+        if(history.some(x=>x.source==='test'&&x.status==='failed'))throw Error('Overlay smoke failed')
+        if(history.some(x=>x.source==='test'&&x.status==='done')){done=true;break}
+        if(await preview.webContents.executeJavaScript('document.getElementById("stage")?.textContent?.includes("Test PSSA") === true'))seen=true
+        await new Promise(resolve=>setTimeout(resolve,100))
+      }
+      if(!done||!seen)throw Error('Overlay smoke missing render or ACK')
+    }finally{preview.destroy()}
     app.quit()
   } else {
     window.show()

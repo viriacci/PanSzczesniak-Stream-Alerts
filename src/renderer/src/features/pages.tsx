@@ -1,3 +1,4 @@
+import {StudioPage} from './studio'
 import {LiveCenter} from './live'
 import type {LiveState} from '../../../shared/live'
 import {ObsPage} from './obs'
@@ -13,6 +14,7 @@ import { Icon, type IconName } from '../components/icons'
 type Props={live?:LiveState;obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onIntegrations:()=>void}
 export function PageContent({live,obs,agent,alertState,item,status,layout,busy,onCompact,onReset,onIntegrations}:Props) {
  if(item.id==='dashboard')return <><LiveCenter state={live} obs={obs} pending={alertState?.queue.pendingCount??null} onIntegrations={onIntegrations}/><Panel title="Ostatnia aktywność">{alertState?.queue.history.length?alertState.queue.history.slice(0,4).map(x=><div className="setting-row" key={x.id}><span>{x.text}</span><small className="muted">{x.status}</small></div>):<Empty title="Brak zarejestrowanych zdarzeń">Ostatnie zakończone alerty pojawią się tutaj.</Empty>}</Panel></>
+ if(item.id==='studio')return <StudioPage state={alertState}/>
  if(item.id==='settings')return <>
   <Panel title="Wygląd i układ" detail="Preferencje są zapisywane lokalnie w SQLite.">
    <div className="setting-row"><div><h3>Tryb kompaktowy</h3><p>Mniejsza ilość wolnej przestrzeni między elementami.</p></div><Button role="switch" aria-checked={status?.compact??false} disabled={!status||busy} onClick={onCompact}>{status?.compact?'Włączony':'Wyłączony'}</Button></div>

@@ -26,7 +26,7 @@ export class Auth {
   if(typeof raw!=='string')return false
   if(!this.deps.storage.isEncryptionAvailable())throw Error('Bezpieczny magazyn niedostępny')
   const data=JSON.parse(this.deps.storage.decryptString(Buffer.from(raw,'base64'))) as Credentials
-  if(!data||!['clientId','secret','access','refresh','userId','login'].every(key=>typeof data[key as keyof Credentials]==='string'&&data[key as keyof Credentials].length>0))throw Error('Nieprawidłowe dane logowania')
+  if(!data||!['clientId','secret','access','refresh','userId','login'].every(key=>typeof data[key as keyof Credentials]==='string'&&String(data[key as keyof Credentials]).length>0))throw Error('Nieprawidłowe dane logowania')
   this.credentials=data;return true
  }
  private persist(data:Credentials){

@@ -14,3 +14,6 @@ Prześledź kliknięcie przycisku compact od JSX przez preload i IPC do SQLite, 
 - components/ResizeHandle.tsx: pointer events, useRef, klawiatura i dostępność.
 - navigation.ts i features/pages.tsx: mapowanie danych na interfejs, rozdział modułów.
 - App.tsx i shared/layout.ts: stan, serializacja zapisów oraz kontrakt walidowany przez main.
+
+## Visual Studio
+Prześledź studio.tsx → scene.ts → scene-player.ts → overlay/server.ts. Model oddzielony od renderowania, immutable updates i historia undo/redo, pointer capture, transformacje CSS, ResizeObserver, requestAnimationFrame, synchronizacja zegara. Zwróć uwagę na walidację modelu w main i brak innerHTML z danych użytkownika. 

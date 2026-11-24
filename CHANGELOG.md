@@ -1,4 +1,10 @@
 # Changelog
+## 2.0.0-dev.7
+- Visual Studio: warstwy, pozycje, skalowanie, prowadnice, snap, właściwości, undo/redo, timeline, animacje.
+- Wspólny renderer sceny dla preview i overlay, wideo MP4/WebM, kształty i proste cząsteczki.
+- Konwersja starego layoutu, zapis sceny w regule, testy modelu i smoke Chromium overlay.
+- Poprawka TypeScript w auth.ts wykryta przez CI etapu 6.
+
 ## 2.0.0-dev.6
 - Live Center: odczyty widzów, średnia i szczyt z próbek, sesje, kategorie, wykres, aktywność i statystyki czatu.
 - SQLite schema 3, telemetria OBS i wyliczany bitrate; rozłączenia pozostawiają luki.

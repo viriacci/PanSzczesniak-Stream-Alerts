@@ -9,7 +9,7 @@ import { EventSub } from '../twitch/eventsub'
 import { AlertQueue } from './queue'
 import { Overlay } from '../overlay/server'
 import { rules,saveRule,saveRules } from './store'
-import { copyMedia,imageExt,audioExt } from './media'
+import { copyMedia,imageExt,audioExt,videoExt } from './media'
 import { importLegacy } from './import'
 import { defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
 export class AlertsService {
@@ -57,8 +57,8 @@ export class AlertsService {
   return this.rewards
  }
  save(value:unknown){return saveRule(this.db,value)}
- async choose(kind:'image'|'audio'){
-  const result=await dialog.showOpenDialog(this.window,{properties:['openFile'],filters:[{name:kind==='image'?'Grafiki':'Dźwięki',extensions:(kind==='image'?imageExt:audioExt).map(x=>x.slice(1))}]})
+ async choose(kind:'image'|'audio'|'video'){
+  const result=await dialog.showOpenDialog(this.window,{properties:['openFile'],filters:[{name:kind==='image'?'Grafiki':kind==='video'?'Wideo':'Dźwięki',extensions:(kind==='image'?imageExt:kind==='video'?videoExt:audioExt).map(x=>x.slice(1))}]})
   if(result.canceled||!result.filePaths[0])return null
   return copyMedia(result.filePaths[0],this.media,kind)
  }

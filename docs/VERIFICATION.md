@@ -22,3 +22,5 @@ Run 45360806153: success, 20/20 testów, typecheck, build, smoke i installer. Au
 Audyt A zamknięty automatycznie, run 45364375474: 29/29, full/production npm audit 0, packaged EXE smoke PASS. Etap 5: 4 nowe testy OBS i Agenta, smoke IPC OBS; CI oczekuje. Rzeczywisty OBS i proces Agenta poza aplikacją wymagają testu na Windows.
 
 Etap 5: run 45365741505 success. Etap 6: 7 nowych testów Live Center (sesje, dedup i agregacja, luki API, bitrate, prywatność czatu, akcje i scope, spóźniona odpowiedź), regresje schema 3 i EventSub; smoke rozszerzony o liveState. CI oczekuje. Realny Twitch/OBS nieprzetestowany.
+
+Etap 6 run 45368803283: npm audit clean, typecheck FAIL TS2532 auth.ts:29; poprawka w etapie 7. Etap 7: 5 nowych testów sceny i rozszerzony smoke nakładki Chromium z ACK. Pełny CI oczekuje; nie uznawać nieuruchomionych testów za PASS.

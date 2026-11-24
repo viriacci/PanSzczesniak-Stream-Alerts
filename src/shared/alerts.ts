@@ -1,8 +1,9 @@
+import {parseScene,type Scene} from './scene.ts'
 import type { QueueState } from './queue.ts'
 export const kinds = ['redemption','raid','follow','sub','prime_sub','resub','gift','mass_gift','bits'] as const
 export type AlertKind = typeof kinds[number]
 export interface AlertEvent { id:string; kind:AlertKind; user:string; rewardId?:string; reward?:string; count?:number; months?:number }
-export interface AlertRule { key:string; enabled:boolean; title:string; image:string; audio:string; duration:number; template:string; layout?:AlertLayout; priority:number; cooldown:number; volume:number; minCount:number }
+export interface AlertRule { key:string; enabled:boolean; title:string; image:string; audio:string; duration:number; template:string; layout?:AlertLayout; scene?:Scene; priority:number; cooldown:number; volume:number; minCount:number }
 export interface Border {border_width:number;border_color:string;border_style:string}
 export interface AlertLayout { image:{x:number;y:number;width:number;height:number}&Border; caption:{x:number;y:number;width:number;height:number;font_size:number;font_color:string;bg_color:string;bg_opacity:number;font_family:string}&Border; anim_in:string;anim_out:string;anim_duration_ms:number }
 export interface TwitchState { phase:'disconnected'|'authorizing'|'connecting'|'connected'|'retrying'|'error'; login:string; detail:string; overlayUrl:string; clients:number }
@@ -28,7 +29,8 @@ export function parseRule(value:unknown):AlertRule {
  const v=value as Record<string,unknown>
  if(typeof v.key!=='string'||!validKey(v.key)||typeof v.enabled!=='boolean'||typeof v.title!=='string'||v.title.length>200||typeof v.template!=='string'||v.template.length>500||typeof v.image!=='string'||!validMedia(v.image)||(v.image!==''&&!/\.(png|jpg|jpeg|gif|webp)$/i.test(v.image))||typeof v.audio!=='string'||!validMedia(v.audio)||(v.audio!==''&&!/\.(mp3|wav|ogg|m4a)$/i.test(v.audio))||typeof v.duration!=='number'||!Number.isFinite(v.duration)||v.duration<1||v.duration>120)throw Error('Nieprawidłowe ustawienia alertu')
  const integer=(value:unknown,fallback:number,min:number,max:number)=>{if(value===undefined)return fallback;if(typeof value!=='number'||!Number.isInteger(value)||value<min||value>max)throw Error('Nieprawidłowe parametry kolejki');return value}
- return {priority:integer(v.priority,5,0,10),cooldown:integer(v.cooldown,0,0,3600),volume:integer(v.volume,100,0,100),minCount:integer(v.minCount,0,0,1000000),key:v.key,enabled:v.enabled,title:v.title,template:v.template,image:v.image,audio:v.audio,duration:v.duration,layout:normalizeLayout(v.layout)}
+ const scene=v.scene===undefined?undefined:parseScene(v.scene)
+ return {scene,priority:integer(v.priority,5,0,10),cooldown:integer(v.cooldown,0,0,3600),volume:integer(v.volume,100,0,100),minCount:integer(v.minCount,0,0,1000000),key:v.key,enabled:v.enabled,title:v.title,template:v.template,image:v.image,audio:v.audio,duration:scene?scene.duration/1000:v.duration,layout:normalizeLayout(v.layout)}
 }
 export function renderText(template:string,event:AlertEvent):string {
  const vars:Record<string,string>={user:event.user,reward:event.reward??'',viewers:String(event.count??0),bits:String(event.count??0),count:String(event.count??0),months:String(event.months??0)}

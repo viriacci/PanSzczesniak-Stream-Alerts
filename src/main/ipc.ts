@@ -53,7 +53,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.twitchConnect,0,()=>alerts.connect()],
    [IPC.syncRewards,0,()=>alerts.sync()],
    [IPC.saveAlert,1,rule=>alerts.save(rule)],
-   [IPC.chooseMedia,1,kind=>{if(kind!=='image'&&kind!=='audio')throw Error('Invalid media kind');return alerts.choose(kind)}],
+   [IPC.chooseMedia,1,kind=>{if(kind!=='image'&&kind!=='audio'&&kind!=='video')throw Error('Invalid media kind');return alerts.choose(kind)}],
    [IPC.importLegacy,0,()=>alerts.import()],
    [IPC.testAlert,1,key=>{if(typeof key!=='string'||!validKey(key))throw Error('Invalid alert');return alerts.test(key)}]
   ]
