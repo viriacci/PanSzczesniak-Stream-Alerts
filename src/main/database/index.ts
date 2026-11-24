@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 const migrations: readonly string[] = [
   `CREATE TABLE settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
@@ -66,6 +66,12 @@ const migrations: readonly string[] = [
     metrics_json TEXT NOT NULL CHECK(json_valid(metrics_json)),
     bitrate_kbps REAL CHECK(bitrate_kbps IS NULL OR bitrate_kbps>=0),
     PRIMARY KEY(session_id,sampled_at)
+  ) STRICT;`,
+  `CREATE TABLE imported_summaries (
+    session_id INTEGER PRIMARY KEY REFERENCES stream_sessions(id) ON DELETE CASCADE,
+    average REAL CHECK(average IS NULL OR average>=0),
+    peak INTEGER CHECK(peak IS NULL OR peak>=0),
+    provenance TEXT NOT NULL
   ) STRICT;`
 ]
 

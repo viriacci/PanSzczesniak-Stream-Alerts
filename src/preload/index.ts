@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
+  analyticsChannels:()=>ipcRenderer.invoke(IPC.analyticsChannels),
+  analyticsReport:filter=>ipcRenderer.invoke(IPC.analyticsReport,filter),
+  analyticsImport:()=>ipcRenderer.invoke(IPC.analyticsImport),
+  analyticsExport:(filter,format)=>ipcRenderer.invoke(IPC.analyticsExport,filter,format),
   libraryState:()=>ipcRenderer.invoke(IPC.libraryState),
   libraryAction:value=>ipcRenderer.invoke(IPC.libraryAction,value),
   liveState:()=>ipcRenderer.invoke(IPC.liveState),

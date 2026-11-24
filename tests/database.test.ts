@@ -41,7 +41,7 @@ test('foreign keys, sample validation and event deduplication', () => {
 test('failed migration rolls back schema and version', () => {
   const db = openDatabase(':memory:')
   try {
-    assert.throws(() => migrate(db, ['unused', 'unused', 'unused', 'CREATE TABLE temporary_test(x); INVALID SQL;']))
+    assert.throws(() => migrate(db, ['unused', 'unused', 'unused', 'unused', 'CREATE TABLE temporary_test(x); INVALID SQL;']))
     assert.equal(schemaVersion(db), SCHEMA_VERSION)
     assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE name='temporary_test'").get(), undefined)
   } finally { db.close() }
@@ -61,7 +61,7 @@ test('schema 1 upgrades to latest schema without losing settings',()=>{
  const db=openDatabase(':memory:')
  try{
   setCompact(db,true)
-  db.exec('DROP TABLE obs_samples; DROP INDEX events_channel_time; ALTER TABLE stream_events DROP COLUMN chatter_key; ALTER TABLE stream_events DROP COLUMN channel_id; ALTER TABLE viewer_samples DROP COLUMN category; ALTER TABLE viewer_samples DROP COLUMN category_id; ALTER TABLE stream_sessions DROP COLUMN end_quality; ALTER TABLE stream_sessions DROP COLUMN last_seen_at; ALTER TABLE stream_sessions DROP COLUMN category; ALTER TABLE stream_sessions DROP COLUMN category_id; ALTER TABLE stream_sessions DROP COLUMN title; DROP TABLE alert_queue; PRAGMA user_version=1')
+  db.exec('DROP TABLE imported_summaries; DROP TABLE obs_samples; DROP INDEX events_channel_time; ALTER TABLE stream_events DROP COLUMN chatter_key; ALTER TABLE stream_events DROP COLUMN channel_id; ALTER TABLE viewer_samples DROP COLUMN category; ALTER TABLE viewer_samples DROP COLUMN category_id; ALTER TABLE stream_sessions DROP COLUMN end_quality; ALTER TABLE stream_sessions DROP COLUMN last_seen_at; ALTER TABLE stream_sessions DROP COLUMN category; ALTER TABLE stream_sessions DROP COLUMN category_id; ALTER TABLE stream_sessions DROP COLUMN title; DROP TABLE alert_queue; PRAGMA user_version=1')
   migrate(db)
   assert.equal(schemaVersion(db),SCHEMA_VERSION)
   assert.equal(getCompact(db),true)

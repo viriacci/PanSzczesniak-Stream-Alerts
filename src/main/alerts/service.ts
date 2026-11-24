@@ -1,3 +1,7 @@
+import {channels,report} from '../analytics/store'
+import {decodeHistory,importHistory,exportHistory} from '../analytics/transfer'
+import {readFile,stat,writeFile} from 'node:fs/promises'
+import {extname} from 'node:path'
 import {libraryState,libraryAction,rememberAsset,activeProfile} from '../library/store'
 import {pickVariant} from '../../shared/variants'
 import {basename} from 'node:path'
@@ -80,6 +84,21 @@ export class AlertsService {
  overlayUrl(){return this.overlay.url}
  libraryState(){return libraryState(this.db,this.media)}
  libraryAction(value:unknown){libraryAction(this.db,value)}
+ analyticsChannels(){return [...new Set([...channels(this.db),...(this.auth.identity?[this.auth.identity.userId]:[])])]}
+ analyticsReport(value:unknown){return report(this.db,value)}
+ async analyticsImport(){
+  if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
+  try{const result=await dialog.showOpenDialog(this.window,{title:'Import historii transmisji PSSA',properties:['openFile'],filters:[{name:'Historia CSV / JSON',extensions:['csv','json']}]});const path=result.filePaths[0];if(result.canceled||!path)return null
+   const ext=extname(path).toLowerCase();if(ext!=='.csv'&&ext!=='.json')throw Error('Invalid format')
+   const info=await stat(path);if(!info.isFile()||info.size>10*1024*1024)throw Error('Import too large')
+   const content=await readFile(path,'utf8');if(this.stopped)throw Error('App stopping')
+   const format=ext==='.csv'?'csv':'json';return importHistory(this.db,decodeHistory(content,format),format)
+  }finally{this.dialogBusy=false}
+ }
+ async analyticsExport(value:unknown,format:unknown){
+  if(this.dialogBusy||this.stopped||format!=='csv'&&format!=='json')throw Error('Invalid export');this.dialogBusy=true
+  try{const data=exportHistory(this.db,value,format);const result=await dialog.showSaveDialog(this.window,{title:'Eksport statystyk PSSA',defaultPath:'pssa-history.'+format,filters:[{name:format.toUpperCase(),extensions:[format]}]});if(result.canceled||!result.filePath)return false;if(this.stopped)throw Error('App stopping');await writeFile(result.filePath,data,'utf8');return true}finally{this.dialogBusy=false}
+ }
  liveState(){return this.live.snapshot()}
  liveAction(value:unknown){return this.live.action(value)}
  observeObs(state:ObsState){this.live.obs(state)}

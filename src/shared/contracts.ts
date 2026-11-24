@@ -1,3 +1,4 @@
+import type {AnalyticsFilter,AnalyticsReport,ImportResult} from './analytics'
 import type {LibraryAction,LibraryState} from './library'
 import type {Scene} from './scene'
 import type {LiveState,LiveAction,Category} from './live'
@@ -7,6 +8,10 @@ import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  analyticsChannels:'pssa:analytics:channels',
+  analyticsReport:'pssa:analytics:report',
+  analyticsImport:'pssa:analytics:import',
+  analyticsExport:'pssa:analytics:export',
   libraryState:'pssa:library:state',
   libraryAction:'pssa:library:action',
   liveState:'pssa:live:state',
@@ -40,6 +45,10 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  analyticsChannels():Promise<string[]>
+  analyticsReport(filter:AnalyticsFilter):Promise<AnalyticsReport>
+  analyticsImport():Promise<ImportResult|null>
+  analyticsExport(filter:AnalyticsFilter,format:'csv'|'json'):Promise<boolean>
   libraryState():Promise<LibraryState>
   libraryAction(value:LibraryAction):Promise<void>
   liveState():Promise<LiveState>
