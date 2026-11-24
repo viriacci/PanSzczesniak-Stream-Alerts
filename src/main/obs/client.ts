@@ -15,13 +15,15 @@ export class ObsClient{
  private poll?:ReturnType<typeof setInterval>
  private config?:{port:number;password:string}
  private factory:(url:string)=>WebSocket
+ private onTelemetry:(state:ObsState)=>void
  private state:ObsState={phase:'offline',port:4455,configured:false,detail:'',scene:'',scenes:[],metrics:null}
- constructor(factory=(url:string)=>new WebSocket(url)){this.factory=factory}
+ constructor(factory=(url:string)=>new WebSocket(url),onTelemetry:(state:ObsState)=>void=()=>{}){this.factory=factory;this.onTelemetry=onTelemetry}
+ private notify(){try{this.onTelemetry(this.snapshot())}catch{/* telemetry must not break OBS transport */}}
  snapshot():ObsState{return {...this.state,scenes:[...this.state.scenes],metrics:this.state.metrics?{...this.state.metrics}:null}}
  connect(port:number,password:string){this.disconnect();this.config={port,password};this.state={...this.state,port,configured:true};this.open()}
- disconnect(){this.config=undefined;this.close();this.state={...this.state,phase:'offline',configured:false,detail:'',scene:'',scenes:[],metrics:null,sampledAt:undefined}}
+ disconnect(){this.config=undefined;this.close();this.state={...this.state,phase:'offline',configured:false,detail:'',scene:'',scenes:[],metrics:null,sampledAt:undefined};this.notify()}
  private close(){clearTimeout(this.reconnect);clearTimeout(this.deadline);clearInterval(this.poll);const s=this.socket;this.socket=undefined;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('OBS disconnected'))}this.pending.clear();try{s?.close()}catch{}}
- private lost(s:WebSocket,detail:string,retry=true){if(s!==this.socket)return;this.close();this.state={...this.state,phase:'error',detail,metrics:null,sampledAt:undefined,scene:'',scenes:[]};if(retry&&this.config)this.reconnect=setTimeout(()=>this.open(),5000)}
+ private lost(s:WebSocket,detail:string,retry=true){if(s!==this.socket)return;this.close();this.state={...this.state,phase:'error',detail,metrics:null,sampledAt:undefined,scene:'',scenes:[]};this.notify();if(retry&&this.config)this.reconnect=setTimeout(()=>this.open(),5000)}
  private open(){
   const config=this.config;if(!config)return
   this.state={...this.state,phase:'connecting',detail:'Łączenie z OBS'}
@@ -58,7 +60,7 @@ export class ObsClient{
  private async refresh(s:WebSocket){
   const [stats,stream,record,scenes]=await Promise.all([this.request('GetStats'),this.request('GetStreamStatus'),this.request('GetRecordStatus'),this.request('GetSceneList')])
   if(s!==this.socket)return
-  this.state={...this.state,metrics:metrics(stats,stream,record),sampledAt:Date.now(),scene:typeof scenes.currentProgramSceneName==='string'?scenes.currentProgramSceneName:'',scenes:Array.isArray(scenes.scenes)?scenes.scenes.map((x:any)=>x.sceneName).filter((x:unknown)=>typeof x==='string').slice(0,500):[]}
+  this.state={...this.state,metrics:metrics(stats,stream,record),sampledAt:Date.now(),scene:typeof scenes.currentProgramSceneName==='string'?scenes.currentProgramSceneName:'',scenes:Array.isArray(scenes.scenes)?scenes.scenes.map((x:any)=>x.sceneName).filter((x:unknown)=>typeof x==='string').slice(0,500):[]};this.notify()
  }
  async setScene(name:string){if(!this.state.scenes.includes(name))throw Error('Unknown scene');await this.request('SetCurrentProgramScene',{sceneName:name})}
  async refreshOverlay(url:string){

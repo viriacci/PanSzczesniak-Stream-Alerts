@@ -58,3 +58,14 @@ test('refresh cannot continue on a replacement OBS connection',async()=>{
   assert.equal(next.sent.some(x=>x.d.requestType==='GetInputSettings'),false)
  }finally{client.disconnect()}
 })
+
+test('telemetry is delivered on fresh OBS samples and disconnect, not by a separate timer',async()=>{
+ const socket=new Socket(),received:import('../src/shared/obs.ts').ObsState[]=[]
+ const client=new ObsClient(()=>socket as unknown as WebSocket,s=>received.push(s))
+ try{
+  client.connect(4455,'');socket.receive(0,{rpcVersion:1});socket.receive(2,{negotiatedRpcVersion:1})
+  for(const r of socket.sent.slice(1))socket.receive(7,{requestId:r.d.requestId,requestStatus:{result:true},responseData:{}})
+  await settle();assert.equal(received.filter(s=>s.sampledAt!==undefined).length,1)
+  client.disconnect();assert.equal(received.at(-1)?.metrics,null)
+ }finally{client.disconnect()}
+})

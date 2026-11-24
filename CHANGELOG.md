@@ -1,4 +1,8 @@
 # Changelog
+## 2.0.0-beta.3
+- Reaudyt techniczny, cache reguł/kolejki, revision IPC, Node Agent, oszczędny harmonogram renderowania, callback telemetrii OBS.
+- Inwentarz źródeł i pakietów, SBOM, pinning CI i benchmark Windows.
+
 ## 2.0.0-beta.2
 - Audyt C: bezpieczne eksporty i kopie, izolacja profili, wspólny guard dialogów, reconnect, limity aktualizacji i fallback Background.
 - Branding Pan Szczesniak Stream Alerts.

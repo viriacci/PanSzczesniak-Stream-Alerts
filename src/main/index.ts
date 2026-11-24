@@ -40,13 +40,11 @@ let reveal:()=>void=()=>{}
 let alerts:AlertsService|undefined
 let obs:ObsService|undefined
 let agent:AgentBridge|undefined
-let liveObsTimer:ReturnType<typeof setInterval>|undefined
 
 function cleanup(): void {
   if (cleaned) return
   cleaned = true
   try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
-  clearInterval(liveObsTimer)
   try{runtime?.stop();tray?.destroy()}catch{console.warn('PSSA: runtime cleanup failed')}
   try{agent?.stop()}catch{console.warn('PSSA: agent bridge cleanup failed')}
   try{obs?.stop()}catch{console.warn('PSSA: OBS cleanup failed')}
@@ -105,10 +103,9 @@ async function start(): Promise<void> {
   if (state.maximized && !smoke) activeWindow.maximize()
   alerts=new AlertsService(db,directory,window,app.getPath('documents'))
   await alerts.start(!smoke)
-  obs=new ObsService(db)
+  const activeAlerts=alerts
+  obs=new ObsService(db,state=>{try{activeAlerts.observeObs(state)}catch{console.warn('PSSA: telemetry write failed')}})
   if(!smoke)obs.start()
-  const activeAlerts=alerts,activeObs=obs
-  if(!smoke)liveObsTimer=setInterval(()=>{try{activeAlerts.observeObs(activeObs.state())}catch{console.warn('PSSA: telemetry write failed')}},1000)
   if(!smoke){agent=new AgentBridge(directory,async()=>activeAlerts.reloadOverlay());agent.start()}
   let blank=false,modeGeneration=0
   const loadRenderer=()=>devUrl?activeWindow.loadURL(document):activeWindow.loadFile(file)
@@ -147,6 +144,8 @@ async function start(): Promise<void> {
     const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true)
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{child.kill();reject(Error('Node Agent smoke timeout'))},12000);child.once('error',e=>{clearTimeout(timer);reject(e)});child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(Error('Node Agent smoke failed'))})})
     // Exercise the actual preload and IPC bridge in the loaded renderer.
+    const revisionCheck=await window.webContents.executeJavaScript('window.pssa.alertPoll(-1).then(async first=>!!first.state&&(await window.pssa.alertPoll(first.revision)).state===null)')
+    if(revisionCheck!==true)throw Error('Alert snapshot revision smoke failed')
     const passed = await window.webContents.executeJavaScript(
       'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 4 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 4)'
     )

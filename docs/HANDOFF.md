@@ -1,4 +1,4 @@
-# Handoff — 2.0.0-beta.2
-Pracować na develop/v2 od aktualnego HEAD. Beta.1 run 45374474420 success, 68/68 testów, npm audit clean, build, Chromium smoke, NSIS, packaged smoke, clean install. Audyt C: C01–C10, kod poprawiony i regresje dodane, CI beta.2 oczekuje. Raport docs/audits/AUDIT_C.md, BUG_TRACKER, PERFORMANCE. Przed zamknięciem sprawdzić wyniki CI i usunąć regresje. Manualne testy Twitch/OBS, tray/autostart, performance i długotrwałe nadal otwarte. Nie publikować stable/main bez akceptacji.
-Branding: Szcześniak po polsku, Szczesniak w oprogramowaniu, pełna nazwa Pan Szczesniak Stream Alerts. Nie zmieniać istniejących identyfikatorów instalacji/danych. 
-Po roadmapie przypomnieć o trybie testowym i skórkach z docs/POST_ROADMAP.md. Nie wdrażać w audycie C.
+# Handoff — 2.0.0-beta.3
+Gałąź develop/v2, main/legacy bez zmian. Beta.2 run 45375146660: 73/73 PASS, audit clean, build/smoke, NSIS, clean install, upgrade/uninstall marker.
+Użytkownik zamówił odrębny pełny audyt i maksymalną optymalizację streamingu, bez nowych funkcji. Branding Pan Szczesniak Stream Alerts. Pierwsza część reaudytu T01–T14: cache reguł/kolejki, skip SQL idle, revision IPC, live, Agent Node, mniej heartbeat/tasklist, scheduler scen, media cache, callback OBS, guard importu, piny CI. Raport docs/audits/TECHNICAL_REAUDIT.md. 4 dodatkowe testy (77 łącznie), smoke Agent Node i revision IPC, benchmark, inwentarz i SBOM. CI oczekuje; sprawdzić i naprawić przed kontynuacją. Nie deklarować ręcznego audytu każdej linii wszystkich pakietów; dalsze bramki w raporcie. Pomiar Windows przez scripts/profile-stream.ps1.
+Tryb testowy i skórki nadal odłożone. Nie publikować stable/main bez akceptacji.

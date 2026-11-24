@@ -36,3 +36,5 @@ Etap 8 run 45372844349 success (57 testów, clean audit, build/smoke/NSIS/packag
 Etap 9 run 45373639990 success, 63/63, audit 0, build i smoke, NSIS i packaged smoke. Etap 10 beta.1: 5 testów runtime/backup, smoke IPC diagnostics, clean install smoke dodany. CI oczekuje. Realny Twitch/OBS, upgrade, autostart, wydajność pozostają otwarte.
 
 Beta.1 run 45374474420 success: 68/68, audit 0, build, smoke, NSIS, packaged i clean install PASS. Audyt C beta.2: 5 nowych testów (73 łącznie) oraz test upgrade/uninstall, CI oczekuje. Realne środowisko streamera nadal nieprzetestowane.
+
+Beta.2 run 45375146660: 73/73 PASS, audit clean, build/smoke, NSIS, installed, upgrade/uninstall marker. Beta.3: 4 nowe testy (77), smoke Node Agent/revision, benchmark, inventory, SBOM. CI oczekuje.

@@ -8,3 +8,6 @@ Run 45370241006: kolejka 1000 zdarzeń 119.3399 ms; pełne przejście 1000 zdarz
 
 ## Beta.2
 Walidacja archiwum przechodzi na tymczasową bazę dyskową z ograniczeniem cache, aby nie duplikować całej historii w pamięci. Nie jest to pomiar. Raport diagnostyczny pozwoli zmierzyć Studio/Streaming/Background na realnym Windows. Pomiary podczas OBS+gra i długiej sesji nie zostały jeszcze wykonane.
+
+## Reaudyt beta.3
+Porównanie beta.2/beta.3 na tym samym runnerze Windows (scripts/performance.mjs). Testy liczby SQL i harmonogramu, wynik oczekuje. scripts/profile-stream.ps1 do realnych pomiarów. Agent Node wymaga packaged smoke i pomiaru RAM. Nie podawać szacunków jako pomiarów.
