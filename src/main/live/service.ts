@@ -27,6 +27,7 @@ export class LiveService{
  private lastObs?:{at:number;bytes:number;duration:number}
  private lastObsAt=0
  private lastSummary=0
+ private pollAgain=false
  constructor(db:DatabaseSync,auth:LiveAuth,now=Date.now){
   this.db=db;this.auth=auth;this.now=now
   const row=db.prepare("SELECT value FROM settings WHERE key='live.chat.salt'").get()
@@ -35,14 +36,14 @@ export class LiveService{
  }
  start(){if(this.timer)return;this.stopped=false;void this.poll();this.timer=setInterval(()=>void this.poll(),30000)}
  stop(){this.stopped=true;clearInterval(this.timer);this.timer=undefined;this.reset()}
- reset(){this.generation++;this.task=undefined;this.id=null;this.current=blank();this.lastObs=undefined;this.lastObsAt=0;this.lastSummary=0}
+ reset(){this.generation++;this.task=undefined;this.id=null;this.current=blank();this.lastObs=undefined;this.lastObsAt=0;this.lastSummary=0;this.pollAgain=false}
  snapshot():LiveState{
   if(this.id!==null&&this.now()-this.lastSummary>=5000){Object.assign(this.current,summarize(this.db,this.id));this.lastSummary=this.now()}
   return {...this.current,canManage:this.auth.canManage,points:[...this.current.points],counts:this.current.counts?{...this.current.counts}:null}
  }
- poll():Promise<void>{
+ poll(force=false):Promise<void>{
   if(this.stopped)return Promise.resolve()
-  if(this.task)return this.task
+  if(this.task){if(force)this.pollAgain=true;return this.task}
   const identity=this.auth.identity
   if(!identity){this.reset();return Promise.resolve()}
   const g=this.generation,channel=identity.userId
@@ -51,7 +52,7 @@ export class LiveService{
    try{
     const data=await this.auth.helix('streams?user_id='+encodeURIComponent(channel))
     if(!valid())return
-    if(!Array.isArray(data?.data)||data.data.length>1)throw Error('Invalid stream response')
+    if(!Array.isArray(data?.data)||data.data.length>1||data.data.length===1&&(!data.data[0]||typeof data.data[0]!=='object'))throw Error('Invalid stream response')
     const at=this.now(),raw=data.data[0]
     if(raw&&raw.user_id!==channel)throw Error('Invalid stream channel')
     const stream=raw?parseStream(raw,at):null
@@ -68,13 +69,13 @@ export class LiveService{
    }catch{if(valid()){this.current={...this.current,phase:'unknown',channel:identity.login,viewers:null,bitrate:null,detail:'Brak aktualnych danych Twitch; zapis nie jest uzupełniany zerami'};this.lastObs=undefined}}
   }
   const task=work();this.task=task
-  void task.finally(()=>{if(this.task===task)this.task=undefined})
+  void task.finally(()=>{if(this.task===task){this.task=undefined;if(this.pollAgain&&!this.stopped){this.pollAgain=false;void this.poll()}}})
   return task
  }
  event(id:string,type:string,raw:unknown,at:number,normalized?:AlertEvent){
   const identity=this.auth.identity;if(this.stopped||!identity||!raw||typeof raw!=='object'||!Number.isSafeInteger(at)||at>this.now()+60000)return
   const e=raw as Record<string,any>,channel=identity.userId
-  if(type==='stream.online'||type==='stream.offline'){if(e.broadcaster_user_id===channel)void this.poll();return}
+  if(type==='stream.online'||type==='stream.offline'){if(e.broadcaster_user_id===channel)void this.poll(true);return}
   if(type==='channel.chat.message'){
    if(e.broadcaster_user_id!==channel||typeof e.chatter_user_id!=='string'||!e.chatter_user_id)return
    if(e.source_broadcaster_user_id&&e.source_broadcaster_user_id!==channel)return
@@ -89,7 +90,7 @@ export class LiveService{
  }
  obs(state:ObsState){
   const m=state.metrics,at=state.sampledAt
-  if(this.stopped||this.id===null||this.current.phase!=='live'||!m||!m.streaming||!at||this.now()-at>15000||this.now()-(this.current.lastSampleAt??0)>90000){this.lastObs=undefined;this.current.bitrate=null;return}
+  if(this.stopped||this.id===null||this.current.phase!=='live'||!m||!m.streaming||!at||at>this.now()+1000||at<(this.current.startedAt??0)||this.now()-at>15000||this.now()-(this.current.lastSampleAt??0)>90000){this.lastObs=undefined;this.current.bitrate=null;return}
   if(at<=this.lastObsAt)return
   this.lastObsAt=at
   let bitrate:number|null=null
@@ -102,7 +103,7 @@ export class LiveService{
  }
  async action(value:unknown):Promise<Category[]|null>{
   const action=parseLiveAction(value)
-  if(action.type==='refresh'){await this.poll();return null}
+  if(action.type==='refresh'){await this.poll();if(this.current.phase==='unknown'||this.current.phase==='disconnected')throw Error('No fresh Twitch data');return null}
   const identity=this.auth.identity;if(!identity)throw Error('Twitch not connected')
   const g=this.generation,channel=identity.userId
   if(action.type==='search'){
@@ -117,6 +118,6 @@ export class LiveService{
    await this.auth.helix('streams/markers',{user_id:channel,description:action.description},'POST')
   }
   if(g!==this.generation||this.auth.identity?.userId!==channel)throw Error('Session changed')
-  await this.poll();return null
+  await this.poll(true);return null
  }
 }

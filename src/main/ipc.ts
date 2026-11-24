@@ -44,7 +44,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.liveState,0,()=>alerts.liveState()],
    [IPC.liveAction,1,command=>alerts.liveAction(command)],
    [IPC.obsState,0,()=>obs.state()],
-   [IPC.obsAction,1,command=>obs.action(command,alerts.state().twitch.overlayUrl)],
+   [IPC.obsAction,1,command=>obs.action(command,alerts.overlayUrl())],
    [IPC.agentState,0,()=>agent?.snapshot()??{online:false,running:false,dockUrl:'',autoLaunch:false,startup:false,detail:'Agent unavailable'}],
    [IPC.agentAction,1,command=>{if(!agent||!['enable','startup-on','startup-off','auto-on','auto-off'].includes(command))throw Error('Invalid agent command');return agent.action(command)}],
    [IPC.queueCommand,1,command=>alerts.queueCommand(command)],

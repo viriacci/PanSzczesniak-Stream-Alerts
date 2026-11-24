@@ -44,9 +44,9 @@ export class EventSub {
    switch(m.metadata?.message_type){
     case 'session_welcome':{
      if(welcomed)return;welcomed=true;interval=Math.max(5,Math.min(120,Number(m.payload?.session?.keepalive_timeout_seconds)||10));this.watchdog(s,interval)
-     if(migrated){const old=this.current;this.current=s;this.pending=undefined;if(old&&old!==s)this.close(old)}
+     if(migrated){if(typeof m.payload?.session?.id!=='string'||!m.payload.session.id)throw Error('Invalid migration session');const old=this.current;this.current=s;this.pending=undefined;if(old&&old!==s)this.close(old)}
      else{
-      const identity=this.auth.identity,session=m.payload?.session?.id;if(!identity||typeof session!=='string')throw Error('Brak sesji Twitch')
+      const identity=this.auth.identity,session=m.payload?.session?.id;if(!identity||typeof session!=='string'||!session)throw Error('Brak sesji Twitch')
       const results=await Promise.allSettled(subscriptions(identity.userId).map(sub=>this.auth.helix('eventsub/subscriptions',{...sub,transport:{method:'websocket',session_id:session}})))
       if(!this.sockets.has(s)||this.stopped)return
       const failed=results.filter(x=>x.status==='rejected').length

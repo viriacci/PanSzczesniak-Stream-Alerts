@@ -23,6 +23,7 @@ export class AlertsService {
  private detail=''
  private rewards:Reward[]=[]
  private media:string
+ private dialogBusy=false
  private stopped=false
  private generation=0
  private validation?:ReturnType<typeof setInterval>
@@ -58,18 +59,21 @@ export class AlertsService {
  }
  save(value:unknown){return saveRule(this.db,value)}
  async choose(kind:'image'|'audio'|'video'){
-  const result=await dialog.showOpenDialog(this.window,{properties:['openFile'],filters:[{name:kind==='image'?'Grafiki':kind==='video'?'Wideo':'Dźwięki',extensions:(kind==='image'?imageExt:kind==='video'?videoExt:audioExt).map(x=>x.slice(1))}]})
+  if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
+  try{const result=await dialog.showOpenDialog(this.window,{properties:['openFile'],filters:[{name:kind==='image'?'Grafiki':kind==='video'?'Wideo':'Dźwięki',extensions:(kind==='image'?imageExt:kind==='video'?videoExt:audioExt).map(x=>x.slice(1))}]})
   if(result.canceled||!result.filePaths[0])return null
-  return copyMedia(result.filePaths[0],this.media,kind)
+  return await copyMedia(result.filePaths[0],this.media,kind)}finally{this.dialogBusy=false}
  }
  async import(){
-  const result=await dialog.showOpenDialog(this.window,{title:'Import konfiguracji PSSA 1.x',defaultPath:join(this.documents,'PanSzczesniak Stream Alerts','config.json'),properties:['openFile'],filters:[{name:'Konfiguracja JSON',extensions:['json']}]})
+  if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
+  try{const result=await dialog.showOpenDialog(this.window,{title:'Import konfiguracji PSSA 1.x',defaultPath:join(this.documents,'PanSzczesniak Stream Alerts','config.json'),properties:['openFile'],filters:[{name:'Konfiguracja JSON',extensions:['json']}]})
   if(result.canceled||!result.filePaths[0])return null
   const data=await importLegacy(result.filePaths[0],this.media)
   if(this.stopped)throw Error('Aplikacja zamykana')
   const map=new Map(rules(this.db).map(x=>[x.key,x]));for(const rule of data.rules)map.set(rule.key,rule);saveRules(this.db,[...map.values()])
-  return {count:data.rules.length,warnings:data.warnings}
+  return {count:data.rules.length,warnings:data.warnings}}finally{this.dialogBusy=false}
  }
+ overlayUrl(){return this.overlay.url}
  liveState(){return this.live.snapshot()}
  liveAction(value:unknown){return this.live.action(value)}
  observeObs(state:ObsState){this.live.obs(state)}

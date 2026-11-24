@@ -25,7 +25,7 @@ export class ObsClient{
  private open(){
   const config=this.config;if(!config)return
   this.state={...this.state,phase:'connecting',detail:'Łączenie z OBS'}
-  let s:WebSocket;try{s=this.factory('ws://127.0.0.1:'+config.port)}catch{this.state={...this.state,phase:'error',detail:'Nie można otworzyć WebSocket'};return}
+  let s:WebSocket;try{s=this.factory('ws://127.0.0.1:'+config.port)}catch{this.state={...this.state,phase:'error',detail:'Nie można otworzyć WebSocket'};this.reconnect=setTimeout(()=>this.open(),5000);return}
   this.socket=s;this.deadline=setTimeout(()=>this.lost(s,'Timeout OBS'),8000)
   s.addEventListener('close',e=>this.lost(s,e.code===4009?'Błędne hasło OBS':'OBS rozłączony',e.code!==4009))
   s.addEventListener('error',()=>this.lost(s,'OBS niedostępny'))
@@ -35,7 +35,7 @@ export class ObsClient{
    if(!m||typeof m.d!=='object'||!m.d)return
    const d=m.d
    if(m.op===0&&this.state.phase==='connecting'){
-    if(d.rpcVersion<1){this.lost(s,'Wymagany OBS WebSocket 5',false);return}
+    if(!Number.isInteger(d.rpcVersion)||d.rpcVersion<1){this.lost(s,'Wymagany OBS WebSocket 5',false);return}
     const identify:Record<string,unknown>={rpcVersion:1,eventSubscriptions:0}
     if(d.authentication){if(typeof d.authentication.salt!=='string'||typeof d.authentication.challenge!=='string'){this.lost(s,'Nieprawidłowa autoryzacja',false);return}identify.authentication=authentication(config.password,d.authentication.salt,d.authentication.challenge)}
     try{s.send(JSON.stringify({op:1,d:identify}))}catch{this.lost(s,'Błąd identyfikacji')}
@@ -63,13 +63,15 @@ export class ObsClient{
  async setScene(name:string){if(!this.state.scenes.includes(name))throw Error('Unknown scene');await this.request('SetCurrentProgramScene',{sceneName:name})}
  async refreshOverlay(url:string){
   if(!url)throw Error('Overlay unavailable')
-  const list=await this.request('GetInputList',{inputKind:'browser_source'})
+  const socket=this.socket
+  const request=(type:string,data:Record<string,unknown>={})=>{if(!socket||socket!==this.socket)throw Error('OBS connection changed');return this.request(type,data)}
+  const list=await request('GetInputList',{inputKind:'browser_source'})
   let count=0
   for(const input of (Array.isArray(list.inputs)?list.inputs:[]).slice(0,500)){
-   if(typeof input.inputName!=='string')continue
-   const settings=await this.request('GetInputSettings',{inputName:input.inputName})
+   if(!input||typeof input.inputName!=='string')continue
+   const settings=await request('GetInputSettings',{inputName:input.inputName})
    if(settings.inputSettings?.url!==url)continue
-   await this.request('PressInputPropertiesButton',{inputName:input.inputName,propertyName:'refreshnocache'});count++
+   await request('PressInputPropertiesButton',{inputName:input.inputName,propertyName:'refreshnocache'});count++
   }
   return count
  }

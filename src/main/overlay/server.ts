@@ -9,7 +9,15 @@ import type { Playback } from '../../shared/queue.ts'
 import {createScenePlayer} from '../../shared/scene-player.ts'
 import {sceneForRule} from '../../shared/scene-legacy.ts'
 const html=`<!doctype html><html><head><meta charset="utf-8"><style>html,body,#stage{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}</style></head><body><div id="stage"></div><script src="client.js"></script></body></html>`
-const js=`const createScenePlayer=${createScenePlayer.toString()};const stage=document.getElementById('stage');let player,attempt,frame,start;function clear(){cancelAnimationFrame(frame);player?.dispose();player=undefined;attempt=undefined}function finish(result='done'){const id=attempt;clear();if(id)fetch('ack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt:id,result})}).catch(()=>{})}const source=new EventSource('events');source.onmessage=e=>{let p;try{p=JSON.parse(e.data)}catch{return}if(p.type==='reload'){clear();source.close();location.reload();return}if(p.type==='cancel'){if(p.attempt===attempt)clear();return}if(p.type==='volume'){if(p.attempt===attempt)player?.setVolume(p.volume);return}if(p.type!=='play'||typeof p.attempt!=='string'||!p.scene)return;clear();attempt=p.attempt;const id=attempt;try{player=createScenePlayer(stage,p.scene,p.text,'media/',p.volume,()=>{if(id===attempt)finish('media-error')});start=performance.now();const tick=now=>{if(id!==attempt)return;const elapsed=now-start;if(elapsed>=p.scene.duration){finish();return}player.paint(elapsed,true);frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick)}catch{finish('media-error')}};source.onerror=clear;`
+const js=`const createScenePlayer=${createScenePlayer.toString()};const stage=document.getElementById('stage');let player,attempt,frame,start,readyTimer;function clear(){clearTimeout(readyTimer);cancelAnimationFrame(frame);player?.dispose();player=undefined;attempt=undefined}function finish(result='done'){const id=attempt;clear();if(id)fetch('ack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attempt:id,result})}).catch(()=>{})}const source=new EventSource('events');source.onmessage=e=>{let p;try{p=JSON.parse(e.data)}catch{return}if(p.type==='reload'){clear();source.close();location.reload();return}if(p.type==='cancel'){if(p.attempt===attempt)clear();return}if(p.type==='volume'){if(p.attempt===attempt)player?.setVolume(p.volume);return}if(p.type!=='play'||typeof p.attempt!=='string'||!p.scene)return;clear();attempt=p.attempt;const id=attempt;try{player=createScenePlayer(stage,p.scene,p.text,'media/',p.volume,()=>{if(id===attempt)finish('media-error')});readyTimer=setTimeout(()=>{if(id===attempt)finish('media-error')},7000);player.ready.then(()=>{if(id!==attempt)return;clearTimeout(readyTimer);start=performance.now();const tick=now=>{if(id!==attempt)return;const elapsed=now-start;if(elapsed>=p.scene.duration){finish();return}player.paint(elapsed,true);frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick)}).catch(()=>{if(id===attempt)finish('media-error')})}catch{finish('media-error')}};source.onerror=clear;`
+export function mediaRange(value:string|undefined,size:number):{start:number;end:number}|null|false{
+ if(value===undefined)return null
+ const m=/^bytes=(\d*)-(\d*)$/.exec(value);if(!m||!size||(!m[1]&&!m[2]))return false
+ let start:number,end:number
+ if(!m[1]){const suffix=Number(m[2]);if(!Number.isSafeInteger(suffix)||suffix<=0)return false;start=Math.max(0,size-suffix);end=size-1}
+ else{start=Number(m[1]);end=m[2]?Number(m[2]):size-1;if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>=size||end<start)return false;end=Math.min(end,size-1)}
+ return {start,end}
+}
 export class Overlay {
  private server?:Server
  private streams=new Set<ServerResponse>()
@@ -39,7 +47,7 @@ export class Overlay {
  private write(stream:ServerResponse,value:unknown){if(stream.destroyed||stream.writableLength>65536){stream.destroy();this.streams.delete(stream);return false}try{stream.write('data: '+JSON.stringify(value)+'\n\n');return true}catch{stream.destroy();this.streams.delete(stream);return false}}
  send(value:Playback){
   if(this.playback)return false
-  for(const stream of this.streams){if(this.write(stream,{type:'play',...value,scene:sceneForRule(value.rule)})){this.playback={attempt:value.attempt,stream};return true}}
+  for(const stream of this.streams){if(this.write(stream,{type:'play',attempt:value.attempt,text:value.text,volume:value.volume,scene:sceneForRule(value.rule)})){this.playback={attempt:value.attempt,stream};return true}}
   return false
  }
  cancel(attempt:string){const p=this.playback;if(p?.attempt!==attempt)return;this.playback=undefined;this.write(p.stream,{type:'cancel',attempt})}
@@ -63,10 +71,10 @@ export class Overlay {
   if(method!=='GET'){res.writeHead(405);res.end();return}
   if(path===''){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(html);return}
   if(path==='client.js'){res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8'});res.end(js);return}
-  if(path==='events'){if(this.streams.size>=10){res.writeHead(503);res.end();return}res.writeHead(200,{'Content-Type':'text/event-stream','Connection':'keep-alive'});res.write(': connected\n\n');this.streams.add(res);res.on('close',()=>this.streams.delete(res));res.on('error',()=>{this.streams.delete(res);res.destroy()});return}
+  if(path==='events'){if(req.headers.origin&&req.headers.origin!=='http://127.0.0.1:'+this.boundPort){res.writeHead(403);res.end();return}if(this.streams.size>=10){res.writeHead(503);res.end();return}res.writeHead(200,{'Content-Type':'text/event-stream','Connection':'keep-alive'});res.write(': connected\n\n');this.streams.add(res);res.on('close',()=>this.streams.delete(res));res.on('error',()=>{this.streams.delete(res);res.destroy()});return}
   if(path.startsWith('media/')){
    const name=path.slice(6),type=mediaTypes[extname(name).toLowerCase()]
-   if(name&&validMedia(name)&&type){const root=await realpath(this.media),file=await realpath(join(root,name)),rel=relative(root,file);if(rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid path');const st=await stat(file);if(!st.isFile())throw Error('Invalid file');res.writeHead(200,{'Content-Type':type,'Content-Length':st.size});const stream=createReadStream(file);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);return}
+   if(name&&validMedia(name)&&type){const root=await realpath(this.media),file=await realpath(join(root,name)),rel=relative(root,file);if(rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid path');const st=await stat(file);if(!st.isFile())throw Error('Invalid file');const range=mediaRange(req.headers.range,st.size);if(range===false){res.writeHead(416,{'Content-Range':'bytes */'+st.size});res.end();return}const headers:Record<string,string|number>={'Content-Type':type,'Content-Length':range?range.end-range.start+1:st.size,'Accept-Ranges':'bytes'};if(range)headers['Content-Range']='bytes '+range.start+'-'+range.end+'/'+st.size;res.writeHead(range?206:200,headers);const stream=createReadStream(file,range||undefined);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);return}
   }
   res.writeHead(404);res.end()
  }

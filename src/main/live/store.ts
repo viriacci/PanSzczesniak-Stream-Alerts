@@ -8,8 +8,11 @@ export function parseStream(value:any,now:number):StreamObservation{
  return {id:value.id,startedAt:Math.min(startedAt,now),title:typeof value.title==='string'?value.title:'',categoryId:typeof value.game_id==='string'?value.game_id:'',category:typeof value.game_name==='string'?value.game_name:'',viewers:value.viewer_count}
 }
 export function observe(db:DatabaseSync,channel:string,stream:StreamObservation|null,at:number){
+ if(!Number.isSafeInteger(at)||at<0||stream&&stream.startedAt>at)throw Error('Invalid observation time')
  db.exec('BEGIN IMMEDIATE')
  try{
+  const latest=db.prepare("SELECT max(last_seen_at) AS at FROM stream_sessions WHERE channel_id=? AND source='twitch'").get(channel)?.at
+  if(typeof latest==='number'&&at<latest)throw Error('Stale observation')
   if(!stream){
    db.prepare("UPDATE stream_sessions SET ended_at=max(started_at,coalesce(last_seen_at,started_at)),end_quality='last-seen' WHERE channel_id=? AND source='twitch' AND ended_at IS NULL").run(channel)
    db.exec('COMMIT');return null
@@ -18,7 +21,7 @@ export function observe(db:DatabaseSync,channel:string,stream:StreamObservation|
   db.prepare("INSERT INTO stream_sessions(channel_id,external_id,source,started_at,title,category_id,category,last_seen_at) VALUES (?,?,'twitch',?,?,?,?,?) ON CONFLICT(channel_id,source,external_id) DO UPDATE SET title=excluded.title,category_id=excluded.category_id,category=excluded.category,last_seen_at=max(coalesce(stream_sessions.last_seen_at,0),excluded.last_seen_at),ended_at=NULL,end_quality='unknown'").run(channel,stream.id,stream.startedAt,stream.title,stream.categoryId,stream.category,at)
   const id=Number(db.prepare("SELECT id FROM stream_sessions WHERE channel_id=? AND external_id=? AND source='twitch'").get(channel,stream.id)?.id)
   db.prepare('INSERT OR IGNORE INTO viewer_samples(session_id,sampled_at,viewers,category_id,category) VALUES (?,?,?,?,?)').run(id,at,stream.viewers,stream.categoryId,stream.category)
-  db.prepare('UPDATE stream_events SET session_id=? WHERE channel_id=? AND session_id IS NULL AND occurred_at>=? AND occurred_at<=?').run(id,channel,stream.startedAt,at)
+  db.prepare("UPDATE stream_events SET session_id=? WHERE source='twitch' AND channel_id=? AND session_id IS NULL AND occurred_at>=? AND occurred_at<=?").run(id,channel,stream.startedAt,at)
   db.exec('COMMIT');return id
  }catch(e){db.exec('ROLLBACK');throw e}
 }

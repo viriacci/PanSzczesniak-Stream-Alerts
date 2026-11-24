@@ -21,6 +21,7 @@ export function parseScene(input:unknown):Scene{
   const a=item as Record<string,unknown>,id=str(a.id,80),kind=one(a.kind,layerKinds)
   if(!/^[a-zA-Z0-9_-]+$/.test(id)||ids.has(id))throw Error('Duplicate or invalid layer ID');ids.add(id)
   const start=number(a.start,0,duration),end=number(a.end,start+1,duration),asset=str(a.asset,80)
+  if(kind!=='text'&&kind!=='shape'&&kind!=='particles'&&a.visible===true&&!asset)throw Error('Visible media layer requires an asset')
   const formats=kind==='image'?'png|jpg|jpeg|gif|webp':kind==='video'?'mp4|webm':kind==='audio'?'mp3|wav|ogg|m4a':''
   if(asset&&(!formats||!new RegExp('^[a-f0-9]{64}\\.('+formats+')$','i').test(asset)))throw Error('Invalid layer media')
   const font=str(a.font,80);if(!/^[\p{L}\p{N} _-]+$/u.test(font))throw Error('Invalid font')
