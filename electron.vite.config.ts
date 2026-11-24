@@ -4,6 +4,7 @@ export default defineConfig({
   main: {},
   preload: {},
   renderer: {
+    server: { host: '127.0.0.1' },
     esbuild: { jsx: 'automatic' },
     plugins: [{
       name: 'pssa-development-csp',

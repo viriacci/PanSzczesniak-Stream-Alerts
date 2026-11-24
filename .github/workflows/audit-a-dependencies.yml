@@ -1,0 +1,96 @@
+name: Audit A dependency remediation
+on:
+  push:
+    branches: [develop/v2]
+    paths: ['.github/workflows/audit-a-dependencies.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: audit-a-dependencies-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/develop/v2'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Resolve exact patched versions
+        run: npm install --package-lock-only --ignore-scripts --save-dev --save-exact vite@7.3.8 electron-builder@26.18.0
+      - run: npm ci
+      - name: Full and production advisory reports
+        shell: pwsh
+        run: |
+          npm audit --json | Set-Content -Encoding utf8 audit-full.json
+          npm audit --omit=dev --json | Set-Content -Encoding utf8 audit-production.json
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-a-dependency-reports
+          path: |
+            audit-full.json
+            audit-production.json
+          if-no-files-found: warn
+      - name: Require no reported vulnerabilities
+        shell: pwsh
+        run: |
+          foreach ($path in @('audit-full.json','audit-production.json')) {
+            $report = Get-Content $path -Raw | ConvertFrom-Json
+            if ($null -eq $report.metadata.vulnerabilities.total) { throw "Invalid audit: $path" }
+            Write-Host "$path : $($report.metadata.vulnerabilities | ConvertTo-Json -Compress)"
+            if ($report.metadata.vulnerabilities.total -ne 0) { throw "Remaining vulnerabilities: $path" }
+          }
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run smoke
+      - run: npx electron-builder --win nsis --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-dependency-manifest
+          path: |
+            package.json
+            package-lock.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PSSA-2-Dev-Windows-patched
+          path: dist/*.exe
+          if-no-files-found: error
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/develop/v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-dependency-manifest
+          path: verified
+      - name: Commit only tested manifest and lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin develop/v2
+          test "$(git rev-parse origin/develop/v2)" = "$GITHUB_SHA" || { echo "Branch changed; refusing to overwrite"; exit 1; }
+          cp verified/package.json package.json
+          cp verified/package-lock.json package-lock.json
+          node -e 'const p=require("./package.json"),l=require("./package-lock.json"); for(const [k,v] of Object.entries({"vite":"7.3.8","electron-builder":"26.18.0"})){if(p.devDependencies[k]!==v||l.packages[""].devDependencies[k]!==v||l.packages["node_modules/"+k].version!==v)process.exit(1)}'
+          git add -- package.json package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(security): pin verified patched Vite and electron-builder'
+          git push origin HEAD:refs/heads/develop/v2

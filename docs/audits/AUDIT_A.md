@@ -33,3 +33,6 @@ Przejrzano main/preload/IPC, kontrakty, bazę i migracje, logger, layout, OAuth,
 - P3: fonty nie dołączone, ręczne testy UX, spójność legacy animacji do etapu 7.
 ## Źródła
 Twitch: https://dev.twitch.tv/docs/authentication/validate-tokens/ ; https://dev.twitch.tv/docs/authentication/refresh-tokens/ ; https://dev.twitch.tv/docs/eventsub/reference/chat ; https://dev.twitch.tv/docs/eventsub/handling-websocket-events/
+
+## Aktualizacja weryfikacji
+Run 45363061536: 29/29 testów PASS, typecheck, build, smoke i NSIS PASS. Raport npm audit wykazał 15 wpisów wyłącznie w zależnościach dev (8 high / 7 moderate); triage i plan naprawy w [DEPENDENCIES_A.md](DEPENDENCIES_A.md). Bramkę zależności zamknąć dopiero po zweryfikowanej aktualizacji.
