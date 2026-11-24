@@ -24,23 +24,23 @@ export class RuntimeService{
  start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(){this.stopped=true;clearInterval(this.timer)}
  private guard(){if(this.busy||this.stopped)throw Error('Runtime operation unavailable')}
- private offline(){const l=this.alerts.liveState(),a=this.alerts.state(),m=this.obs.state().metrics;if(a.queue.current||a.queue.pendingCount||l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}
+ requireOffline(){const l=this.alerts.liveState(),a=this.alerts.state(),m=this.obs.state().metrics;if(a.queue.current||a.queue.pendingCount||l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}
  private outside(path:string){return outsideData(this.directory,path)}
  async backup(){
-  this.guard();this.offline();this.busy=true
+  this.guard();this.requireOffline();this.busy=true
   try{const r=await dialog.showSaveDialog(this.window,{title:'Kopia zapasowa PSSA',defaultPath:'PSSA-'+new Date().toISOString().slice(0,10)+'.pssabackup',filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
    if(r.canceled||!r.filePath)return null
-   const target=this.outside(r.filePath);if(this.stopped)throw Error('App stopping');this.offline()
+   const target=this.outside(r.filePath);if(this.stopped)throw Error('App stopping');this.requireOffline()
    return {media:createBackup(this.db,join(this.directory,'media'),target)}
   }finally{this.busy=false}
  }
  async restore(){
-  this.guard();this.offline();this.busy=true
+  this.guard();this.requireOffline();this.busy=true
   try{const r=await dialog.showOpenDialog(this.window,{title:'Przywracanie PSSA',properties:['openFile'],filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
    if(r.canceled||!r.filePaths[0])return false
    const confirm=await dialog.showMessageBox(this.window,{type:'warning',title:'Przywrócić kopię?',message:'Przy następnym uruchomieniu statystyki i ustawienia zostaną zastąpione.',detail:'PSSA utworzy kopię stanu przed operacją. Lokalne dane logowania pozostaną, a stare oczekujące alerty nie zostaną odtworzone.',buttons:['Anuluj','Przywróć po restarcie'],defaultId:0,cancelId:0})
    if(confirm.response!==1||this.stopped)return false
-   this.offline();stageRestore(r.filePaths[0],this.directory);return true
+   this.requireOffline();stageRestore(r.filePaths[0],this.directory);return true
   }finally{this.busy=false}
  }
  diagnostics():Diagnostics{

@@ -23,19 +23,19 @@ function AssetEditor({asset,busy,save}:{asset:Asset;busy:boolean;save:(x:Library
  <label>Tagi (maks. 12, rozdziel przecinkami)<input value={tags} maxLength={500} onChange={e=>setTags(e.target.value)}/></label>
  <Button variant="primary" disabled={busy} type="submit">Zapisz metadane</Button></form>
 }
-export function LibraryPage({base}:{base:string}){
+export function LibraryPage({base,lowPower=false}:{base:string;lowPower?:boolean}){
  const {state,busy,notice,refresh,run,action}=useLibrary()
  const [query,setQuery]=useState(''),[kind,setKind]=useState('all'),[folder,setFolder]=useState('all'),[missing,setMissing]=useState(false),[selected,setSelected]=useState(''),[limit,setLimit]=useState(48)
  const assets=state?.assets??[],folders=[...new Set(assets.map(a=>a.folder))].sort(),asset=assets.find(a=>a.id===selected)
  const shown=assets.filter(a=>(kind==='all'||a.kind===kind)&&(folder==='all'||a.folder===folder)&&(!missing||a.missing)&&[a.name,a.folder,...a.tags,a.id].join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
  return <>
  <Panel title="Biblioteka multimediów" action={<Button disabled={busy} onClick={()=>void refresh()}>Odśwież</Button>}>
- <p>Jeden zasób może być używany przez wiele scen i profili. Foldery i tagi nie zmieniają fizycznej ścieżki pliku.</p>
+ {lowPower&&<p className="muted">Tryb Streaming: miniatury wyłączone, aby nie dekodować wielu obrazów podczas transmisji.</p>}<p>Jeden zasób może być używany przez wiele scen i profili. Foldery i tagi nie zmieniają fizycznej ścieżki pliku.</p>
  <div className="alert-actions">{(['image','audio','video'] as MediaKind[]).map(k=><Button key={k} disabled={busy} onClick={()=>void run(()=>window.pssa.chooseMedia(k),'Biblioteka odświeżona.')}>+ {{image:'Grafika',audio:'Audio',video:'Wideo'}[k]}</Button>)}</div>
  <div className="library-filters alert-form"><label>Szukaj<input value={query} onChange={e=>{setQuery(e.target.value);setLimit(48)}} placeholder="Nazwa, folder, tag..."/></label><label>Typ<select value={kind} onChange={e=>{setKind(e.target.value);setLimit(48)}}><option value="all">Wszystkie</option><option value="image">Grafiki</option><option value="audio">Audio</option><option value="video">Wideo</option></select></label><label>Folder<select value={folder} onChange={e=>{setFolder(e.target.value);setLimit(48)}}><option value="all">Wszystkie</option>{folders.map(x=><option key={x} value={x}>{x||'Bez folderu'}</option>)}</select></label><label className="alert-checkbox"><input type="checkbox" checked={missing} onChange={e=>setMissing(e.target.checked)}/> Tylko brakujące</label></div>
  <p className="muted">{assets.length} zasobów · {assets.filter(a=>a.missing).length} brakujących · {shown.length} pasujących</p>
  <div className="library-grid">{shown.slice(0,limit).map(a=><button key={a.id} className={'library-tile '+(selected===a.id?'selected':'')} onClick={()=>setSelected(a.id)}>
- <div className="library-thumb">{!a.missing&&a.kind==='image'&&base?<img loading="lazy" src={base+'media/'+a.id} alt=""/>:<span>{a.missing?'BRAK':a.kind==='video'?'VIDEO':a.kind==='audio'?'AUDIO':'IMG'}</span>}</div>
+ <div className="library-thumb">{!a.missing&&a.kind==='image'&&base&&!lowPower?<img loading="lazy" decoding="async" src={base+'media/'+a.id} alt=""/>:<span>{a.missing?'BRAK':a.kind==='video'?'VIDEO':a.kind==='audio'?'AUDIO':'IMG'}</span>}</div>
  <strong title={a.name}>{a.name}</strong><small>{a.folder||'Bez folderu'} · {a.bytes===null?'Brak pliku':(a.bytes/1024/1024).toFixed(2)+' MB'}</small><small>{a.references} powiązań · {a.tags.join(', ')||'Bez tagów'}</small></button>)}</div>
  {!shown.length&&<Empty title="Brak zasobów">Dodaj plik lub zmień filtry.</Empty>}{shown.length>limit&&<Button onClick={()=>setLimit(v=>v+48)}>Pokaż kolejne</Button>}
  </Panel>

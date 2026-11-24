@@ -28,3 +28,19 @@ scripts/performance.mjs: 14400 ticków pustej kolejki, 1000 niezmienionych snaps
 scripts/profile-stream.ps1: rzeczywisty Windows PSSA+OBS+opcjonalny proces gry; tryby off/Studio/Streaming/Background, identyczna scena i gra, 120 s domyślnie. CPU procent maszyny, suma working set/private bytes, procesy. GPU i frametime osobno OBS Stats i narzędzie gry. Nie wykonano pomiarów na PC użytkownika.
 ## Dalsze bramki
 Potwierdzić CI, Node Agent, revision IPC, benchmark i SBOM. Kontynuować ręczny audyt pozostałych plików, licencji i pakietów. Zbadać indeksy historii/kolejki/czatu, agregację dużych baz, wzrost DB i retencję bez usuwania danych bez decyzji użytkownika. Ewentualne batchowanie zapisów wymaga oceny trwałości. Background nadal wyładowuje dokument, nie gwarantuje zamknięcia procesu Chromium/GPU. Rozważyć destroy/recreate BrowserWindow po pomiarach. Backup i analityka pozostają synchroniczne: ocenić worker/snapshot WAL. Realne OBS/Twitch, Windows autostart/tray, wydajność GPU i długi stream pozostają otwarte. Brak podpisu instalatora, automatyczna instalacja unsigned zablokowana. Nie publikować stable/main.
+
+
+## Wyniki beta.3 (run 45377162735)
+Pełny pipeline Windows zakończony sukcesem: audit, inventory, SBOM, benchmark, typecheck, test, build, smoke (w tym Agent Node), packaged smoke, NSIS, clean install, upgrade i marker danych po uninstall.
+Benchmark syntetyczny na tym samym runnerze, beta.2 → beta.3:
+- 14 400 idle ticks: 305.08 → 1.66 ms, SQL 14 400 → 0.
+- 1000 snapshots: 767.67 → 0.34 ms, SQL 3000 → 0.
+- 500 reads of 64 rules: 1234.24 → 113.87 ms, SQL 500 → 500.
+Nie są to wyniki obciążenia całej aplikacji, GPU ani FPS.
+
+## Beta.4 — kolejna seria
+- T15: ciężkie odczyty raportów, eksportów i katalogu w krótkotrwałym workerze Node z read-only SQLite, spójnym snapshotem, limitem pamięci, timeoutem 60 s, anulowaniem przy shutdown i pojedynczym aktywnym zadaniem. Brak stale uruchomionego workera.
+- T16: import historii blokowany podczas transmisji/aktywnej kolejki; stan sprawdzany ponownie po wyborze i odczycie pliku, również OBS.
+- T17: memoizacja stron, brak dekodowania miniatur w Streaming, zachowanie nowszego szkicu edytora przy równoległym zapisie.
+- Test read tasks i rozszerzenie smoke IPC na katalog. CI beta.4 wymaga potwierdzenia; brak zmiany schematu lub zależności.
+- Dalsze bramki: rzeczywisty OBS/Twitch, pomiary trybów na komputerze, soak test 6–8h, profilowanie pamięci/GPU i dalszy przegląd zewnętrznych źródeł pakietów. Nie publikować stable przed akceptacją.

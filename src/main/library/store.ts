@@ -97,8 +97,9 @@ export function rememberAsset(db:DatabaseSync,id:string,name:string){
  if(Object.keys(c.metadata).length>=10000)return
  c.metadata[id]={name:label(name.replace(/[\x00-\x1f]/g,'').slice(0,200)||id,200),folder:'',tags:[]};persist(db,c)
 }
-export async function libraryState(db:DatabaseSync,dir:string):Promise<LibraryState>{
- const c=config(db),refs=references(db,c),ids=new Set([...Object.keys(c.metadata),...refs.keys()])
+export function libraryIndex(db:DatabaseSync){const c=config(db),refs=references(db,c);return {c,refs}}
+export async function scanLibrary({c,refs}:ReturnType<typeof libraryIndex>,dir:string):Promise<LibraryState>{
+ const ids=new Set([...Object.keys(c.metadata),...refs.keys()])
  let root:string|undefined
  try{root=await realpath(dir);for(const e of await readdir(root,{withFileTypes:true}))if(e.isFile()&&validAsset(e.name))ids.add(e.name)}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}
  const assets:Asset[]=[]
@@ -110,5 +111,7 @@ export async function libraryState(db:DatabaseSync,dir:string):Promise<LibrarySt
  }
  return {assets,activeProfile:c.active,profiles:c.profiles.map(({id,name,categoryId})=>({id,name,categoryId})),templates:c.templates}
 }
+
+export async function libraryState(db:DatabaseSync,dir:string):Promise<LibraryState>{return scanLibrary(libraryIndex(db),dir)}
 
 export function assertActiveProfile(db:DatabaseSync,expected:unknown){if(typeof expected!=='string'||expected!==activeProfile(db))throw Error('Active profile changed; reopen editor')}

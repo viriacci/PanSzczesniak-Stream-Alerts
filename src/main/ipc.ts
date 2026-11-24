@@ -54,7 +54,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.alertPoll,1,revision=>alerts.poll(revision)],
    [IPC.analyticsChannels,0,()=>alerts.analyticsChannels()],
    [IPC.analyticsReport,1,filter=>alerts.analyticsReport(filter)],
-   [IPC.analyticsImport,0,()=>alerts.analyticsImport()],
+   [IPC.analyticsImport,0,()=>{runtime.requireOffline();return alerts.analyticsImport(()=>runtime.requireOffline())}],
    [IPC.analyticsExport,2,(filter,format)=>alerts.analyticsExport(filter,format)],
    [IPC.libraryState,0,()=>alerts.libraryState()],
    [IPC.libraryAction,1,value=>alerts.libraryAction(value)],

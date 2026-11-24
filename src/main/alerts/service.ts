@@ -1,10 +1,13 @@
+import {ReadJobs} from '../runtime/read-jobs'
+import type {AnalyticsReport} from '../../shared/analytics'
+import type {LibraryState} from '../../shared/library'
 import {outsideData,writeNew} from '../runtime/output'
 import {assertActiveProfile} from '../library/store'
-import {channels,report} from '../analytics/store'
-import {decodeHistory,importHistory,exportHistory} from '../analytics/transfer'
+import {channels} from '../analytics/store'
+import {decodeHistory,importHistory} from '../analytics/transfer'
 import {readFile,stat,writeFile} from 'node:fs/promises'
 import {extname} from 'node:path'
-import {libraryState,libraryAction,rememberAsset,activeProfile} from '../library/store'
+import {libraryAction,rememberAsset,activeProfile} from '../library/store'
 import {pickVariant} from '../../shared/variants'
 import {basename} from 'node:path'
 import {LiveService} from '../live/service'
@@ -33,6 +36,7 @@ export class AlertsService {
  private rewards:Reward[]=[]
  private media:string
  private directory:string
+ private reads:ReadJobs
  private dialogBusy=false
  private stopped=false
  private generation=0
@@ -40,7 +44,7 @@ export class AlertsService {
  private lastSnapshot?:AlertState
  private validation?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,dir:string,private window:BrowserWindow,private documents:string){
-  this.directory=dir;this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.live=new LiveService(db,this.auth);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
+  this.directory=dir;this.reads=new ReadJobs(join(dir,'pssa.sqlite'),__dirname);this.media=join(dir,'media');this.auth=new Auth(db,{storage:safeStorage,openExternal:url=>shell.openExternal(url),request:fetch});this.live=new LiveService(db,this.auth);this.overlay=new Overlay(this.media);this.queue=new AlertQueue(db,this.overlay);this.overlay.onAck=(id,result)=>this.queue.acknowledge(id,result)
   this.events=new EventSub(this.auth,(phase,detail)=>{this.phase=phase;this.detail=detail},e=>this.dispatch(e),undefined,(id,type,event,at,normalized)=>{try{this.live.event(id,type,event,at,normalized)}catch{this.detail='Błąd zapisu statystyk'}})
  }
  async start(auto=true){
@@ -53,7 +57,7 @@ export class AlertsService {
   this.ticker=setInterval(()=>{try{this.queue.tick()}catch{this.detail='Błąd silnika kolejki'}},250)
   this.validation=setInterval(()=>{const generation=this.generation;if(this.auth.identity)void this.auth.ensure().catch(()=>{if(this.stopped||generation!==this.generation)return;this.events.stop();this.phase='error';this.detail='Sesja Twitch wymaga ponownego połączenia'})},3600000)
  }
- stop(){this.stopped=true;this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.live.stop();try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
+ stop(){this.stopped=true;this.reads.stop();this.generation++;clearInterval(this.validation);clearInterval(this.ticker);this.live.stop();try{this.queue.stop()}finally{this.events.stop();this.auth.stop();this.overlay.stop()}}
  state():AlertState{return {profileId:activeProfile(this.db),twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  poll(since:unknown){
   if(typeof since!=='number'||!Number.isSafeInteger(since)||since< -1)throw Error('Invalid snapshot revision')
@@ -93,22 +97,22 @@ export class AlertsService {
   return {count:data.rules.length,warnings:data.warnings}}finally{this.dialogBusy=false}
  }
  overlayUrl(){return this.overlay.url}
- libraryState(){return libraryState(this.db,this.media)}
+ libraryState(){return this.reads.run<LibraryState>({type:'library',media:this.media})}
  libraryAction(value:unknown){libraryAction(this.db,value)}
  analyticsChannels(){return [...new Set([...channels(this.db),...(this.auth.identity?[this.auth.identity.userId]:[])])]}
- analyticsReport(value:unknown){return report(this.db,value)}
- async analyticsImport(){
+ analyticsReport(value:unknown){return this.reads.run<AnalyticsReport>({type:'analytics',filter:value})}
+ async analyticsImport(guard:()=>void=()=>{}){
   if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true
   try{const result=await dialog.showOpenDialog(this.window,{title:'Import historii transmisji PSSA',properties:['openFile'],filters:[{name:'Historia CSV / JSON',extensions:['csv','json']}]});const path=result.filePaths[0];if(result.canceled||!path)return null
    const ext=extname(path).toLowerCase();if(ext!=='.csv'&&ext!=='.json')throw Error('Invalid format')
    const info=await stat(path);if(!info.isFile()||info.size>10*1024*1024)throw Error('Import too large')
-   const content=await readFile(path,'utf8');if(this.stopped)throw Error('App stopping')
-   const format=ext==='.csv'?'csv':'json';return importHistory(this.db,decodeHistory(content,format),format)
+   const content=await readFile(path,'utf8');if(this.stopped)throw Error('App stopping');if(this.live.snapshot().phase==='live'||this.live.snapshot().phase==='unknown'||this.queue.state().current||this.queue.state().pendingCount)throw Error('Import unavailable during streaming')
+   guard();const format=ext==='.csv'?'csv':'json';return importHistory(this.db,decodeHistory(content,format),format)
   }finally{this.dialogBusy=false}
  }
  async analyticsExport(value:unknown,format:unknown){
   if(this.dialogBusy||this.stopped||format!=='csv'&&format!=='json')throw Error('Invalid export');this.dialogBusy=true
-  try{const data=exportHistory(this.db,value,format);const result=await dialog.showSaveDialog(this.window,{title:'Eksport statystyk PSSA',defaultPath:'pssa-history.'+format,filters:[{name:format.toUpperCase(),extensions:[format]}]});if(result.canceled||!result.filePath)return false;if(this.stopped)throw Error('App stopping');writeNew(outsideData(this.directory,result.filePath),data);return true}finally{this.dialogBusy=false}
+  try{const data=await this.reads.run<string>({type:'export',filter:value,format});if(this.stopped)throw Error('App stopping');const result=await dialog.showSaveDialog(this.window,{title:'Eksport statystyk PSSA',defaultPath:'pssa-history.'+format,filters:[{name:format.toUpperCase(),extensions:[format]}]});if(result.canceled||!result.filePath)return false;if(this.stopped)throw Error('App stopping');writeNew(outsideData(this.directory,result.filePath),data);return true}finally{this.dialogBusy=false}
  }
  liveState(){return this.live.snapshot()}
  liveAction(value:unknown){return this.live.action(value)}

@@ -2,7 +2,7 @@ import {resolve} from 'node:path'
 import { defineConfig } from 'electron-vite'
 
 export default defineConfig({
-  main: {build:{rollupOptions:{input:{index:resolve('src/main/index.ts'),agent:resolve('src/main/agent/entry.ts')}}}},
+  main: {build:{rollupOptions:{input:{index:resolve('src/main/index.ts'),agent:resolve('src/main/agent/entry.ts'),'read-worker':resolve('src/main/runtime/read-worker.ts')}}}},
   preload: {},
   renderer: {
     server: { host: '127.0.0.1' },
