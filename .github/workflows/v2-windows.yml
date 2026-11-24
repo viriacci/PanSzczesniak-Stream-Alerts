@@ -1,0 +1,40 @@
+name: PSSA v2 Windows verification
+on:
+  push:
+    branches: [develop/v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pssa-v2-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          if (Test-Path package-lock.json) { npm ci } else { npm install }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Save resolved dependency lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: pssa-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run smoke
+      - run: npx electron-builder --win nsis --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PSSA-2-Dev-Windows
+          path: dist/*.exe
+          if-no-files-found: error
