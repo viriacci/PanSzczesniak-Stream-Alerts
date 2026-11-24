@@ -102,3 +102,15 @@ test('release checker rejects excessive responses',async()=>{
  const fake=(async()=>new Response('x'.repeat(2*1024*1024+1))) as typeof fetch
  assert.equal((await checkRelease('2.0.0-beta.1','beta',fake)).state,'error')
 })
+
+test('v4 archives remain restorable after v5 index migration',()=>{
+ const root=tmp(),db=openDatabase(':memory:')
+ try{
+  const file=join(root,'v4.pssabackup'),media=join(root,'media')
+  setCompact(db,true);createBackup(db,media,file)
+  const old=new DatabaseSync(file)
+  try{old.exec('DROP INDEX alert_queue_history; DROP INDEX events_chat_by_session; DROP INDEX events_nonchat_by_session; PRAGMA user_version=4')}finally{old.close()}
+  setCompact(db,false);assert.equal(validateBackup(file),0);restoreBackup(db,media,file);assert.equal(getCompact(db),true)
+  assert.equal(db.prepare('PRAGMA user_version').get()?.user_version,5)
+ }finally{db.close();rmSync(root,{recursive:true,force:true})}
+})

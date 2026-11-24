@@ -34,6 +34,7 @@ let window: BrowserWindow | undefined
 let db: DatabaseSync | undefined
 let disposeIpc: (() => void) | undefined
 let cleaned = false
+let backgrounded=false
 let runtime:RuntimeService|undefined
 let tray:Tray|undefined
 let reveal:()=>void=()=>{}
@@ -74,57 +75,66 @@ async function start(): Promise<void> {
   const document = devUrl ? new URL(devUrl).href : pathToFileURL(file).href
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   session.defaultSession.setPermissionCheckHandler(() => false)
-  const state = readWindowState(db, screen.getAllDisplays().map(display => display.workArea))
-  window = new BrowserWindow({
-    title: BRAND+' 2 Beta', ...state.bounds, minWidth: 700, minHeight: 500,
-    titleBarStyle: 'hidden', titleBarOverlay: { color: '#111114', symbolColor: '#e8e7eb', height: 36 },
-    show: false, backgroundColor: '#101012',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true, sandbox: true, nodeIntegration: false,
-      webSecurity: true, webviewTag: false, devTools: !app.isPackaged
-    }
-  })
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  window.webContents.on('will-navigate', event => event.preventDefault())
-  window.webContents.on('will-attach-webview', event => event.preventDefault())
-  window.webContents.on('render-process-gone', () => {
-    log('renderer-gone')
-    if (smoke) fail()
-    else dialog.showErrorBox('PSSA 2 Dev', 'Interfejs uległ awarii. Uruchom aplikację ponownie.')
-  })
-  const activeWindow = window
-  const activeDb = db
-  activeWindow.on('close', () => {
-    if (cleaned || smoke) return
-    try { writeWindowState(activeDb, { bounds: activeWindow.getNormalBounds(), maximized: activeWindow.isMaximized() }) }
-    catch { console.warn('PSSA: unable to persist window bounds') }
-  })
-  if (state.maximized && !smoke) activeWindow.maximize()
-  alerts=new AlertsService(db,directory,window,app.getPath('documents'))
+  const activeDb=db
+  alerts=new AlertsService(activeDb,directory,()=>window,app.getPath('documents'))
   await alerts.start(!smoke)
   const activeAlerts=alerts
-  obs=new ObsService(db,state=>{try{activeAlerts.observeObs(state)}catch{console.warn('PSSA: telemetry write failed')}})
-  if(!smoke)obs.start()
+  const activeObs=new ObsService(activeDb,state=>{try{activeAlerts.observeObs(state)}catch{console.warn('PSSA: telemetry write failed')}})
+  obs=activeObs
+  if(!smoke)activeObs.start()
   if(!smoke){agent=new AgentBridge(directory,async()=>activeAlerts.reloadOverlay());agent.start()}
-  let blank=false,modeGeneration=0
-  const loadRenderer=()=>devUrl?activeWindow.loadURL(document):activeWindow.loadFile(file)
-  const showWindow=async()=>{
-   const g=++modeGeneration
-   if(activeWindow.isDestroyed()||cleaned)return
-   if(blank){await loadRenderer();if(g!==modeGeneration||cleaned)return;blank=false}
-   if(activeWindow.isMinimized())activeWindow.restore()
-   activeWindow.show();activeWindow.focus()
+  let modeGeneration=0,loading:Promise<void>|undefined
+  function rememberWindow(w:BrowserWindow){
+   if(cleaned||smoke||w.isDestroyed())return
+   try{writeWindowState(activeDb,{bounds:w.getNormalBounds(),maximized:w.isMaximized()})}catch{console.warn('PSSA: unable to persist window bounds')}
   }
-  reveal=()=>{if(preferences(activeDb).mode==='background')savePreferences(activeDb,{...preferences(activeDb),mode:'streaming'});void showWindow().catch(()=>{if(!cleaned)dialog.showErrorBox('PSSA','Nie udało się przywrócić interfejsu. Uruchom PSSA ponownie.')})}
+  function createWindow(){
+   const state=readWindowState(activeDb,screen.getAllDisplays().map(d=>d.workArea))
+   const w=new BrowserWindow({
+    title:BRAND+' 2',...state.bounds,minWidth:700,minHeight:500,
+    titleBarStyle:'hidden',titleBarOverlay:{color:'#111114',symbolColor:'#e8e7eb',height:36},
+    show:false,backgroundColor:'#101012',
+    webPreferences:{preload:join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,webviewTag:false,devTools:!app.isPackaged}
+   })
+   window=w
+   w.webContents.setWindowOpenHandler(()=>({action:'deny'}))
+   w.webContents.on('will-navigate',event=>event.preventDefault())
+   w.webContents.on('will-attach-webview',event=>event.preventDefault())
+   w.webContents.on('render-process-gone',()=>{log('renderer-gone');if(smoke)fail();else if(!cleaned&&window===w)dialog.showErrorBox(BRAND,'Interfejs uległ awarii. Uruchom aplikację ponownie.')})
+   w.on('close',()=>rememberWindow(w))
+   w.once('closed',()=>{if(window===w){window=undefined;disposeIpc?.();disposeIpc=undefined}})
+   if(state.maximized&&!smoke)w.maximize()
+   disposeIpc=registerIpc(w,activeDb,document,app.getVersion(),activeAlerts,activeObs,agent,runtime!)
+   return w
+  }
+  const showWindow=async(show=true)=>{
+   if(cleaned)return
+   backgrounded=false
+   let w=window
+   if(!w||w.isDestroyed()){
+    w=createWindow()
+    const pending=devUrl?w.loadURL(document):w.loadFile(file)
+    loading=pending
+    try{await pending}catch(e){if(window===w&&!w.isDestroyed())w.destroy();throw e}finally{if(loading===pending)loading=undefined}
+   }else if(loading)await loading
+   if(cleaned||backgrounded||window!==w||w.isDestroyed())return
+   if(show){if(w.isMinimized())w.restore();w.show();w.focus()}
+  }
+  const hibernate=()=>{
+   backgrounded=true
+   const w=window
+   if(!w||w.isDestroyed())return
+   rememberWindow(w)
+   disposeIpc?.();disposeIpc=undefined;window=undefined
+   w.destroy()
+  }
+  reveal=()=>{modeGeneration++;if(preferences(activeDb).mode==='background')savePreferences(activeDb,{...preferences(activeDb),mode:'streaming'});void showWindow().catch(()=>{if(!cleaned)dialog.showErrorBox(BRAND,'Nie udało się przywrócić interfejsu. Uruchom PSSA ponownie.')})}
   const applyMode=(p:RuntimePreferences)=>{
    if(smoke||cleaned)return
    const g=++modeGeneration
-   if(p.mode!=='background'||!tray){if(p.mode==='background'&&!tray)savePreferences(activeDb,{...p,mode:'streaming'});if(blank)reveal();return}
-   // Let the IPC result reach the renderer, then unload its document and timers.
-   setTimeout(()=>{if(g!==modeGeneration||cleaned||activeWindow.isDestroyed())return
-    blank=true;activeWindow.hide();void activeWindow.loadURL('about:blank').catch(()=>{if(g===modeGeneration&&!cleaned)reveal()})
-   },150)
+   if(p.mode!=='background'||!tray){if(p.mode==='background'&&!tray)savePreferences(activeDb,{...p,mode:'streaming'});if(backgrounded)reveal();return}
+   // Deliver the IPC response before destroying the renderer and its document.
+   setTimeout(()=>{if(g===modeGeneration&&!cleaned)hibernate()},150)
   }
   if(!smoke){
    try{
@@ -134,20 +144,21 @@ async function start(): Promise<void> {
     tray.on('double-click',()=>reveal())
    }catch{tray=undefined}
   }
-  runtime=new RuntimeService(db,directory,window,alerts,obs,agent,restoreStatus,applyMode)
+  runtime=new RuntimeService(activeDb,directory,()=>window,activeAlerts,activeObs,agent,restoreStatus,applyMode)
   if(!smoke)runtime.start()
-  disposeIpc = registerIpc(window, db, document, app.getVersion(),alerts,obs,agent,runtime)
-  if (devUrl) await window.loadURL(document)
-  else await window.loadFile(file)
+  if(!smoke&&runtime.state().mode==='background'&&tray){backgrounded=true;log('ready');return}
+  await showWindow(!smoke)
+  const activeWindow=window
+  if(!activeWindow)throw Error('Renderer unavailable')
   log('ready')
   if (smoke) {
     const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true)
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{child.kill();reject(Error('Node Agent smoke timeout'))},12000);child.once('error',e=>{clearTimeout(timer);reject(e)});child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(Error('Node Agent smoke failed'))})})
     // Exercise the actual preload and IPC bridge in the loaded renderer.
-    const revisionCheck=await window.webContents.executeJavaScript('window.pssa.alertPoll(-1).then(async first=>!!first.state&&(await window.pssa.alertPoll(first.revision)).state===null)')
+    const revisionCheck=await activeWindow.webContents.executeJavaScript('window.pssa.alertPoll(-1).then(async first=>!!first.state&&(await window.pssa.alertPoll(first.revision)).state===null)')
     if(revisionCheck!==true)throw Error('Alert snapshot revision smoke failed')
-    const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 4 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 4)'
+    const passed = await activeWindow.webContents.executeJavaScript(
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 5 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 5)'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     // Load the real served overlay in a separate isolated Chromium window and wait for ACK.
@@ -190,10 +201,13 @@ async function start(): Promise<void> {
       await exercise(scene,'done')
       await exercise({...scene,layers:scene.layers.map(l=>l.kind==='image'?{...l,asset:'f'.repeat(64)+'.png'}:l)},'failed')
     }finally{preview.destroy()}
+    const oldId=activeWindow.id
+    hibernate();if(window||!activeWindow.isDestroyed())throw Error('Background did not release window')
+    await showWindow(false)
+    const reopened:BrowserWindow|undefined=BrowserWindow.getAllWindows().find(w=>w.id!==oldId)
+    if(!reopened||!(await reopened.webContents.executeJavaScript('window.pssa.getStatus().then(s=>s.database===\"ready\")')))throw Error('Background resume failed')
     app.quit()
-  } else {
-    window.show();applyMode(runtime.state())
-  }
+  } else applyMode(runtime.state())
 }
 
 if(agentMode){
@@ -204,11 +218,9 @@ if(agentMode){
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (window && !window.isDestroyed()) {
-      reveal()
-    }
+    if(!cleaned)reveal()
   })
-  app.on('window-all-closed', () => app.quit())
+  app.on('window-all-closed', () => {if(!backgrounded)app.quit()})
   app.on('before-quit', () => {
     if (!cleaned && !smoke && db && window && !window.isDestroyed()) {
       try { writeWindowState(db, { bounds: window.getNormalBounds(), maximized: window.isMaximized() }) }

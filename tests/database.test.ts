@@ -41,7 +41,7 @@ test('foreign keys, sample validation and event deduplication', () => {
 test('failed migration rolls back schema and version', () => {
   const db = openDatabase(':memory:')
   try {
-    assert.throws(() => migrate(db, ['unused', 'unused', 'unused', 'unused', 'CREATE TABLE temporary_test(x); INVALID SQL;']))
+    assert.throws(() => migrate(db, [...Array<string>(SCHEMA_VERSION).fill('unused'), 'CREATE TABLE temporary_test(x); INVALID SQL;']))
     assert.equal(schemaVersion(db), SCHEMA_VERSION)
     assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE name='temporary_test'").get(), undefined)
   } finally { db.close() }
@@ -58,13 +58,25 @@ test('newer database is rejected without downgrade', () => {
 
 
 test('schema 1 upgrades to latest schema without losing settings',()=>{
- const db=openDatabase(':memory:')
+ const db=openDatabase(':memory:',1)
  try{
   setCompact(db,true)
-  db.exec('DROP TABLE imported_summaries; DROP TABLE obs_samples; DROP INDEX events_channel_time; ALTER TABLE stream_events DROP COLUMN chatter_key; ALTER TABLE stream_events DROP COLUMN channel_id; ALTER TABLE viewer_samples DROP COLUMN category; ALTER TABLE viewer_samples DROP COLUMN category_id; ALTER TABLE stream_sessions DROP COLUMN end_quality; ALTER TABLE stream_sessions DROP COLUMN last_seen_at; ALTER TABLE stream_sessions DROP COLUMN category; ALTER TABLE stream_sessions DROP COLUMN category_id; ALTER TABLE stream_sessions DROP COLUMN title; DROP TABLE alert_queue; PRAGMA user_version=1')
   migrate(db)
   assert.equal(schemaVersion(db),SCHEMA_VERSION)
   assert.equal(getCompact(db),true)
   assert.equal(db.prepare('SELECT count(*) AS n FROM alert_queue').get()?.n,0)
+ }finally{db.close()}
+})
+
+test('v4 database gains covering history and chat indexes without losing rows',()=>{
+ const db=openDatabase(':memory:',4)
+ try{
+  db.exec("INSERT INTO stream_sessions(channel_id,source,started_at) VALUES ('42','twitch',1000); INSERT INTO stream_events(session_id,source,external_id,kind,occurred_at,payload_json,chatter_key) VALUES (1,'twitch','chat1','chat',1000,'{}','a')")
+  migrate(db);assert.equal(schemaVersion(db),5)
+  assert.equal(db.prepare('SELECT count(*) n FROM stream_events').get()?.n,1)
+  const plan=db.prepare("EXPLAIN QUERY PLAN SELECT count(*),count(DISTINCT chatter_key) FROM stream_events WHERE session_id=? AND kind='chat'").all(1)
+  assert.match(JSON.stringify(plan),/events_chat_by_session/)
+  const history=db.prepare("EXPLAIN QUERY PLAN SELECT id FROM alert_queue WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100").all()
+  assert.match(JSON.stringify(history),/alert_queue_history/)
  }finally{db.close()}
 })

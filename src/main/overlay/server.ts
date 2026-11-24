@@ -28,6 +28,8 @@ export class Overlay {
  private media:string
  private port:number
  private playback?:{attempt:string;stream:ServerResponse}
+ onClientsChanged:()=>void=()=>{}
+ private removeStream(s:ServerResponse){if(this.streams.delete(s))this.onClientsChanged()}
  onAck:(attempt:string,result:'done'|'media-error')=>boolean=()=>false
  constructor(media:string,port=18766){this.media=media;this.port=port}
  get url(){return this.key?'http://127.0.0.1:'+this.boundPort+'/'+this.key+'/':''}
@@ -39,13 +41,13 @@ export class Overlay {
   this.server=server
   try{await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(this.port,'127.0.0.1',()=>{server.removeListener('error',reject);const addr=server.address();if(addr&&typeof addr!=='string')this.boundPort=addr.port;resolve()})})}catch(e){this.server=undefined;this.key='';throw e}
   server.on('error',()=>this.stop())
-  this.heartbeat=setInterval(()=>{for(const s of this.streams){if(s.destroyed||s.writableLength>65536){s.destroy();this.streams.delete(s)}else s.write(': keepalive\n\n')}},15000)
+  this.heartbeat=setInterval(()=>{for(const s of this.streams){if(s.destroyed||s.writableLength>65536){s.destroy();this.removeStream(s)}else s.write(': keepalive\n\n')}},15000)
  }
- stop(){this.playback=undefined;clearInterval(this.heartbeat);for(const s of this.streams)s.end();this.streams.clear();this.server?.close();this.server?.closeAllConnections();this.server=undefined;this.key=''}
+ stop(){this.playback=undefined;clearInterval(this.heartbeat);for(const s of this.streams)s.end();this.streams.clear();this.onClientsChanged();this.server?.close();this.server?.closeAllConnections();this.server=undefined;this.key=''}
  reload(){let count=0;for(const stream of this.streams)if(this.write(stream,{type:'reload'}))count++;return count}
- online(){return [...this.streams].some(s=>!s.destroyed&&s.writableLength<=65536)}
+ online(){for(const s of this.streams)if(!s.destroyed&&s.writableLength<=65536)return true;return false}
  active(attempt:string){return this.playback?.attempt===attempt&&!this.playback.stream.destroyed&&this.streams.has(this.playback.stream)}
- private write(stream:ServerResponse,value:unknown){if(stream.destroyed||stream.writableLength>65536){stream.destroy();this.streams.delete(stream);return false}try{stream.write('data: '+JSON.stringify(value)+'\n\n');return true}catch{stream.destroy();this.streams.delete(stream);return false}}
+ private write(stream:ServerResponse,value:unknown){if(stream.destroyed||stream.writableLength>65536){stream.destroy();this.removeStream(stream);return false}try{stream.write('data: '+JSON.stringify(value)+'\n\n');return true}catch{stream.destroy();this.removeStream(stream);return false}}
  send(value:Playback){
   if(this.playback)return false
   for(const stream of this.streams){if(this.write(stream,{type:'play',attempt:value.attempt,text:value.text,volume:value.volume,scene:sceneForRule(value.rule)})){this.playback={attempt:value.attempt,stream};return true}}
@@ -72,7 +74,7 @@ export class Overlay {
   if(method!=='GET'){res.writeHead(405);res.end();return}
   if(path===''){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(html);return}
   if(path==='client.js'){res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8'});res.end(js);return}
-  if(path==='events'){if(req.headers.origin&&req.headers.origin!=='http://127.0.0.1:'+this.boundPort){res.writeHead(403);res.end();return}if(this.streams.size>=10){res.writeHead(503);res.end();return}res.writeHead(200,{'Content-Type':'text/event-stream','Connection':'keep-alive'});res.write(': connected\n\n');this.streams.add(res);res.on('close',()=>this.streams.delete(res));res.on('error',()=>{this.streams.delete(res);res.destroy()});return}
+  if(path==='events'){if(req.headers.origin&&req.headers.origin!=='http://127.0.0.1:'+this.boundPort){res.writeHead(403);res.end();return}if(this.streams.size>=10){res.writeHead(503);res.end();return}res.writeHead(200,{'Content-Type':'text/event-stream','Connection':'keep-alive'});res.write(': connected\n\n');this.streams.add(res);this.onClientsChanged();res.on('drain',()=>this.onClientsChanged());res.on('close',()=>this.removeStream(res));res.on('error',()=>{this.removeStream(res);res.destroy()});return}
   if(path.startsWith('media/')){
    const name=path.slice(6),type=mediaTypes[extname(name).toLowerCase()]
    if(name&&validMedia(name)&&type){const root=await realpath(this.media),file=await realpath(join(root,name)),rel=relative(root,file);if(rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid path');const st=await stat(file);if(!st.isFile()||st.size>50*1024*1024)throw Error('Invalid file');res.setHeader('Cache-Control','private, max-age=86400, immutable');const range=mediaRange(req.headers.range,st.size);if(range===false){res.writeHead(416,{'Content-Range':'bytes */'+st.size});res.end();return}const headers:Record<string,string|number>={'Content-Type':type,'Content-Length':range?range.end-range.start+1:st.size,'Accept-Ranges':'bytes'};if(range)headers['Content-Range']='bytes '+range.start+'-'+range.end+'/'+st.size;res.writeHead(range?206:200,headers);const stream=createReadStream(file,range||undefined);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);return}

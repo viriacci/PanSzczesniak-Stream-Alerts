@@ -43,3 +43,13 @@ test('socket creation failure schedules retry and migration failure retains old 
   await settle();assert.equal(old.closed,false);assert.equal(states.at(-1),'connected')
  }finally{client.stop()}
 })
+
+test('failed replacement socket does not terminate a still-valid EventSub connection',async()=>{
+ const sockets:Socket[]=[],events:AlertEvent[]=[],states:string[]=[]
+ const client=new EventSub({identity:{userId:'42',login:'test'},helix:async()=>({})},p=>states.push(p),e=>events.push(e),()=>{const socket=new Socket();sockets.push(socket);return socket as unknown as WebSocket})
+ try{client.start();const old=sockets[0]!;old.message('session_welcome',{session:{id:'old',keepalive_timeout_seconds:10}});await settle()
+  old.message('session_reconnect',{session:{reconnect_url:'wss://eventsub.wss.twitch.tv/ws?reconnect=1'}});sockets[1]!.close()
+  assert.equal(old.closed,false);assert.equal(states.at(-1),'connected')
+  old.message('notification',{event:{user_name:'viewer'}},{message_id:'one',subscription_type:'channel.follow'});assert.equal(events.length,1)
+ }finally{client.stop()}
+})

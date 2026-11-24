@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 const migrations: readonly string[] = [
   `CREATE TABLE settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
@@ -72,7 +72,10 @@ const migrations: readonly string[] = [
     average REAL CHECK(average IS NULL OR average>=0),
     peak INTEGER CHECK(peak IS NULL OR peak>=0),
     provenance TEXT NOT NULL
-  ) STRICT;`
+  ) STRICT;`,
+  `CREATE INDEX alert_queue_history ON alert_queue(finished_at DESC,id DESC) WHERE status IN ('done','skipped','failed','suppressed');
+  CREATE INDEX events_chat_by_session ON stream_events(session_id,chatter_key) WHERE kind='chat';
+  CREATE INDEX events_nonchat_by_session ON stream_events(session_id,kind) WHERE kind<>'chat';`
 ]
 
 export function schemaVersion(db: DatabaseSync): number {
@@ -99,11 +102,12 @@ export function migrate(db: DatabaseSync, steps: readonly string[] = migrations)
   }
 }
 
-export function openDatabase(path: string): DatabaseSync {
+export function openDatabase(path: string, version=SCHEMA_VERSION): DatabaseSync {
   const db = new DatabaseSync(path)
   try {
     db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;')
-    migrate(db)
+    if(!Number.isInteger(version)||version<1||version>SCHEMA_VERSION)throw Error('Unsupported schema target')
+    migrate(db,migrations.slice(0,version))
     return db
   } catch (error) {
     db.close()

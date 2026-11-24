@@ -18,17 +18,18 @@ export class RuntimeService{
  private cached:UpdateInfo={state:'none',version:'',url:'',detail:'Nie sprawdzano aktualizacji.'}
  private checkedAt=0
  private timer?:ReturnType<typeof setInterval>
- constructor(private db:DatabaseSync,private directory:string,private window:BrowserWindow,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void){}
+ constructor(private db:DatabaseSync,private directory:string,private window:()=>BrowserWindow|undefined,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void){}
  state(){return preferences(this.db)}
  save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);return this.state()}
  start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(){this.stopped=true;clearInterval(this.timer)}
+ private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
  private guard(){if(this.busy||this.stopped)throw Error('Runtime operation unavailable')}
  requireOffline(){const l=this.alerts.liveState(),a=this.alerts.state(),m=this.obs.state().metrics;if(a.queue.current||a.queue.pendingCount||l.phase==='live'||l.phase==='unknown'||m?.streaming||m?.recording)throw Error('Stop streaming before backup or restore')}
  private outside(path:string){return outsideData(this.directory,path)}
  async backup(){
   this.guard();this.requireOffline();this.busy=true
-  try{const r=await dialog.showSaveDialog(this.window,{title:'Kopia zapasowa PSSA',defaultPath:'PSSA-'+new Date().toISOString().slice(0,10)+'.pssabackup',filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
+  try{const r=await dialog.showSaveDialog(this.requireWindow(),{title:'Kopia zapasowa PSSA',defaultPath:'PSSA-'+new Date().toISOString().slice(0,10)+'.pssabackup',filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
    if(r.canceled||!r.filePath)return null
    const target=this.outside(r.filePath);if(this.stopped)throw Error('App stopping');this.requireOffline()
    return {media:createBackup(this.db,join(this.directory,'media'),target)}
@@ -36,9 +37,9 @@ export class RuntimeService{
  }
  async restore(){
   this.guard();this.requireOffline();this.busy=true
-  try{const r=await dialog.showOpenDialog(this.window,{title:'Przywracanie PSSA',properties:['openFile'],filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
+  try{const r=await dialog.showOpenDialog(this.requireWindow(),{title:'Przywracanie PSSA',properties:['openFile'],filters:[{name:'PSSA Backup',extensions:['pssabackup']}]})
    if(r.canceled||!r.filePaths[0])return false
-   const confirm=await dialog.showMessageBox(this.window,{type:'warning',title:'Przywrócić kopię?',message:'Przy następnym uruchomieniu statystyki i ustawienia zostaną zastąpione.',detail:'PSSA utworzy kopię stanu przed operacją. Lokalne dane logowania pozostaną, a stare oczekujące alerty nie zostaną odtworzone.',buttons:['Anuluj','Przywróć po restarcie'],defaultId:0,cancelId:0})
+   const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'warning',title:'Przywrócić kopię?',message:'Przy następnym uruchomieniu statystyki i ustawienia zostaną zastąpione.',detail:'PSSA utworzy kopię stanu przed operacją. Lokalne dane logowania pozostaną, a stare oczekujące alerty nie zostaną odtworzone.',buttons:['Anuluj','Przywróć po restarcie'],defaultId:0,cancelId:0})
    if(confirm.response!==1||this.stopped)return false
    this.requireOffline();stageRestore(r.filePaths[0],this.directory);return true
   }finally{this.busy=false}
@@ -50,7 +51,7 @@ export class RuntimeService{
  }
  async exportDiagnostics(){
   this.guard();this.busy=true
-  try{const r=await dialog.showSaveDialog(this.window,{defaultPath:'pssa-diagnostics.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath)return false;const target=this.outside(r.filePath);if(this.stopped)return false;writeNew(target,JSON.stringify(this.diagnostics(),null,2));return true}finally{this.busy=false}
+  try{const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-diagnostics.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath)return false;const target=this.outside(r.filePath);if(this.stopped)return false;writeNew(target,JSON.stringify(this.diagnostics(),null,2));return true}finally{this.busy=false}
  }
  async check(){if(this.stopped)return this.cached;if(this.update)return this.update
   const channel=this.state().updates

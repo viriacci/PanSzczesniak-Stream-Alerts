@@ -41,8 +41,8 @@ function openArchive(path:string){
  if(regular(path).size>maxArchive||['-wal','-shm','-journal'].some(s=>existsSync(path+s)))throw Error('Backup too large or has sidecar files')
  const db=new DatabaseSync(path,{readOnly:true})
  try{db.exec('PRAGMA trusted_schema=OFF; PRAGMA query_only=ON')
-  if(schemaVersion(db)!==SCHEMA_VERSION)throw Error('Unsupported backup schema')
-  const expected=openDatabase(':memory:')
+  const version=schemaVersion(db);if(version!==4&&version!==SCHEMA_VERSION)throw Error('Unsupported backup schema')
+  const expected=openDatabase(':memory:',version)
   try{
    expected.exec('CREATE TABLE backup_manifest(key TEXT PRIMARY KEY,value TEXT NOT NULL) STRICT; CREATE TABLE backup_media(name TEXT PRIMARY KEY,bytes BLOB NOT NULL) STRICT;')
    // Reject foreign SQL objects, virtual tables, generated columns and modified constraints.

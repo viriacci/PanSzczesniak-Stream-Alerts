@@ -23,7 +23,7 @@ export class EventSub {
  private watchdog(s:WebSocket,seconds:number){clearTimeout(this.timers.get(s));this.timers.set(s,setTimeout(()=>{this.close(s);this.lost(s)},seconds*1000+2000))}
  private lost(s:WebSocket){
   if(this.stopped)return
-  if(s===this.pending){this.pending=undefined;if(this.current&&this.current!==s){this.close(this.current);this.current=undefined}}
+  if(s===this.pending){this.pending=undefined;if(this.current&&this.sockets.has(this.current)){this.state('connected','Migracja przerwana; zachowano połączenie');return}this.current=undefined}
   else if(s===this.current){this.current=undefined;if(this.pending)return}
   else return
   if(this.retry)return

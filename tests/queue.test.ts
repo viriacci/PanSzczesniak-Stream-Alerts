@@ -136,3 +136,17 @@ test('idle queue performs no SQL and reuses snapshots; mutation and reconnect in
   f.connect(false);assert.equal(f.q.state().online,false)
  }finally{f.q.stop();f.db.close()}
 })
+
+test('queue only schedules work for pending online alerts, gap, active deadline and disconnect',()=>{
+ const f=fixture()
+ try{
+  assert.equal(f.q.nextDelay(),null)
+  f.q.enqueue(f.event('a'),f.rule);assert.equal(f.q.nextDelay(),null)
+  f.connect(true);assert.equal(f.q.nextDelay(),0);f.q.tick()
+  assert.equal(f.q.nextDelay(),15000)
+  f.q.enqueue(f.event('b'),f.rule);f.ack();assert.equal(f.q.nextDelay(),500)
+  f.advance(500);assert.ok(f.q.state().current)
+  f.connect(false);assert.equal(f.q.nextDelay(),0);f.q.tick();assert.equal(f.q.nextDelay(),null)
+  f.connect(true);f.advance(500);f.ack();f.advance(500);assert.equal(f.q.nextDelay(),null)
+ }finally{f.q.stop();f.db.close()}
+})

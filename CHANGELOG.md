@@ -1,4 +1,11 @@
 # Changelog
+## 2.0.0-rc.1
+- Kolejka zdarzeniowa, bez aktywnego timera w idle.
+- Schemat 5: indeksy historii/czatu, obsługa archiwów v4.
+- Background zwalnia okno renderera; bezpieczny powrót z tray.
+- Odporność migracji EventSub i regresje, 8h syntetyczny soak.
+- Instrukcja odbioru, SHA256 instalatora, test aktualizacji z beta.4.
+
 ## 2.0.0-beta.3
 - Reaudyt techniczny, cache reguł/kolejki, revision IPC, Node Agent, oszczędny harmonogram renderowania, callback telemetrii OBS.
 - Inwentarz źródeł i pakietów, SBOM, pinning CI i benchmark Windows.

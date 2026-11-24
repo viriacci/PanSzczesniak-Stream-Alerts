@@ -38,11 +38,12 @@ export function summarize(db:DatabaseSync,id:number){
  const rows=db.prepare('SELECT sampled_at,viewers,category FROM viewer_samples WHERE session_id=? ORDER BY sampled_at DESC LIMIT 480').all(id).reverse()
  const points:ViewerPoint[]=rows.map(x=>({at:Number(x.sampled_at),viewers:Number(x.viewers),category:String(x.category)}))
  const counts:LiveCounts={follows:0,subs:0,prime:0,resubs:0,gifts:0,bits:0,raids:0,raidViewers:0,rewards:0,points:0,messages:0,chatters:0}
- const groups=db.prepare("SELECT kind,count(*) n,sum(coalesce(json_extract(payload_json,'$.count'),0)) amount,sum(coalesce(json_extract(payload_json,'$.points'),0)) points FROM stream_events WHERE session_id=? GROUP BY kind").all(id)
+ const groups=db.prepare("SELECT kind,count(*) n,sum(coalesce(json_extract(payload_json,'$.count'),0)) amount,sum(coalesce(json_extract(payload_json,'$.points'),0)) points FROM stream_events WHERE session_id=? AND kind<>'chat' GROUP BY kind").all(id)
  for(const row of groups){const n=Number(row.n),amount=Number(row.amount)
   switch(row.kind){case 'follow':counts.follows=n;break;case 'sub':counts.subs=n;break;case 'prime_sub':counts.prime=n;break;case 'resub':counts.resubs=n;break;case 'gift':case 'mass_gift':counts.gifts+=amount;break;case 'bits':counts.bits=amount;break;case 'raid':counts.raids=n;counts.raidViewers=amount;break;case 'redemption':counts.rewards=n;counts.points=Number(row.points);break;case 'chat':counts.messages=n;break}
  }
- counts.chatters=Number(db.prepare("SELECT count(DISTINCT chatter_key) n FROM stream_events WHERE session_id=? AND kind='chat'").get(id)?.n??0)
+ const chat=db.prepare("SELECT count(*) messages,count(DISTINCT chatter_key) chatters FROM stream_events WHERE session_id=? AND kind='chat'").get(id)
+ counts.messages=Number(chat?.messages??0);counts.chatters=Number(chat?.chatters??0)
  return {average:stat.average===null?null:Number(stat.average),peak:stat.peak===null?null:Number(stat.peak),samples:Number(stat.n),points,counts}
 }
 export function recordObs(db:DatabaseSync,id:number,at:number,metrics:unknown,bitrate:number|null){db.prepare('INSERT OR IGNORE INTO obs_samples VALUES (?,?,?,?)').run(id,at,JSON.stringify(metrics),bitrate)}

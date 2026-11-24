@@ -1,6 +1,6 @@
-# Handoff — 2.0.0-beta.4
-Gałąź develop/v2, main/legacy bez zmian. Beta.3 run 45377162735 zakończony sukcesem (audit, inventory, SBOM, benchmark, build/test/smoke Agent Node, NSIS, instalacja, upgrade, uninstall marker).
-Reaudyt T01–T14: cache, idle SQL, revision IPC, Agent Node, scheduler scen, media cache, OBS callback, piny CI. Benchmark w docs/audits/TECHNICAL_REAUDIT.md.
-Beta.4 T15–T17: read-only worker analityki/eksportu/katalogu, blokada importu podczas streama i ponowna kontrola po dialogu, memoizacja stron, brak miniatur w Streaming, ochrona nowszych szkiców. Test read tasks, smoke katalogu. CI oczekuje — sprawdzić przed dalszymi zmianami.
-Pełny inwentarz nie jest ręcznym audytem kodu wszystkich pakietów upstream. Dalsze bramki w raporcie. scripts/profile-stream.ps1: pomiar off/studio/streaming/background, rzeczywisty OBS i gra; soak 6–8h. Bez deklaracji FPS/RAM przed pomiarem.
-Tryb testowy i skórki odłożone; nie publikować stable/main bez akceptacji.
+# Handoff — 2.0.0-rc.1
+Gałąź develop/v2. Main i legacy/python pozostają bez zmian.
+Beta.4 run 45378166188 success, 78/78, audit 0, build, Agent Node, worker, NSIS, install/upgrade/uninstall marker PASS.
+RC: event-driven kolejka bez stałego tick, indeksy schematu 5 (wczytywanie backupu v4 zachowane), oddzielna agregacja czatu, EventSub zachowuje stary socket przy nieudanej migracji, Background niszczy i odtwarza BrowserWindow z ponownym IPC, test 8h wirtualny, checksum instalatora, aktualizacja z beta.4. Nowy CI oczekuje; przed zamknięciem sprawdzić i naprawić regresje.
+Raport docs/audits/TECHNICAL_REAUDIT.md; instrukcja i bramki docs/RELEASE_ACCEPTANCE.md. Brak rzeczywistych pomiarów PC i OBS/Twitch live. Stable/main nie publikować przed odbiorem.
+Po zakończeniu przypomnieć użytkownikowi: tryb testowy i skórki, docs/POST_ROADMAP.md.

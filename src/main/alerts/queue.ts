@@ -23,7 +23,16 @@ export class AlertQueue {
  private revision=0
  private cached?:{revision:number;online:boolean;state:QueueState}
  get version(){return this.revision}
- private changed(){this.revision++;this.cached=undefined}
+ onChange:()=>void=()=>{}
+ private changed(){this.revision++;this.cached=undefined;this.onChange()}
+ // Null means no timer: wake on a new event, command, or transport change.
+ nextDelay():number|null{
+  if(this.stopped)return null
+  const now=this.now()
+  if(this.current)return this.transport.active(this.current.attempt)?Math.max(0,this.current.deadline-now):0
+  if(!this.hasPending||this.settings.paused||!this.transport.online())return null
+  return Math.max(0,this.nextAt-now)
+ }
  constructor(db:DatabaseSync,transport:Transport,now=Date.now){
   this.db=db;this.transport=transport;this.now=now
   const raw=db.prepare("SELECT value FROM settings WHERE key='queue.v1'").get()?.value

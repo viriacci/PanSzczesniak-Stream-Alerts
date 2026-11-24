@@ -44,3 +44,6 @@ Nie są to wyniki obciążenia całej aplikacji, GPU ani FPS.
 - T17: memoizacja stron, brak dekodowania miniatur w Streaming, zachowanie nowszego szkicu edytora przy równoległym zapisie.
 - Test read tasks i rozszerzenie smoke IPC na katalog. CI beta.4 wymaga potwierdzenia; brak zmiany schematu lub zależności.
 - Dalsze bramki: rzeczywisty OBS/Twitch, pomiary trybów na komputerze, soak test 6–8h, profilowanie pamięci/GPU i dalszy przegląd zewnętrznych źródeł pakietów. Nie publikować stable przed akceptacją.
+
+## Domknięcie RC.1
+Beta.4 run 45378166188 — 78/78, audit 0, full Windows CI PASS. RC T18–T23: kolejka budzona przez zdarzenia/ACK/zmianę transportu i pojedynczy deadline, schema 5 (indeksy historii i zdarzeń), odczyt backupów v4 i v5, zachowanie starego EventSub podczas awarii zastępczego socketu, Background destroy/recreate BrowserWindow i rebinding IPC, limit importu po odczycie, 8h wirtualnego soak. Weryfikacja RC oczekuje. Brak pomiaru rzeczywistego GPU, RAM i frametimes; nie zastępować go testem syntetycznym. Pełny upstream source audit i fizyczne stanowisko nadal poza dowodem CI.
