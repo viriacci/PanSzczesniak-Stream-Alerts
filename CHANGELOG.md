@@ -1,4 +1,8 @@
 # Changelog
+## 2.0.0-dev.7-audit.1
+- Audyt B: potwierdzenia Agenta, izolacja sesji OBS, readiness scen, poprawki Live Center i bezpieczny zapis scen.
+- HTTP Range, lekkie snapshoty kolejki, optymalizacja geometrii, szkice w pamięci, walidacja i regresje.
+
 ## 2.0.0-dev.7
 - Visual Studio: warstwy, pozycje, skalowanie, prowadnice, snap, właściwości, undo/redo, timeline, animacje.
 - Wspólny renderer sceny dla preview i overlay, wideo MP4/WebM, kształty i proste cząsteczki.

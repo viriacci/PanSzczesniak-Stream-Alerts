@@ -7,18 +7,22 @@ import {Button,Panel,Empty} from '../components/ui'
 
 const names:Record<LayerKind,string>={text:'Tekst',image:'Grafika',video:'Wideo',audio:'Dźwięk',shape:'Kształt',particles:'Cząsteczki'}
 const uid=()=>crypto.randomUUID()
+// Unsaved drafts survive navigation in this renderer session; never silently overwrite saved rules.
+const drafts=new Map<string,Scene>()
+function keepDraft(key:string,scene:Scene){drafts.delete(key);drafts.set(key,scene);if(drafts.size>50)drafts.delete(drafts.keys().next().value!)}
 function NumberField({label,value,min,max,step=1,onChange}:{label:string;value:number;min:number;max:number;step?:number;onChange:(n:number)=>void}){
  return <label>{label}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>{const n=e.target.valueAsNumber;if(Number.isFinite(n))onChange(Math.max(min,Math.min(max,n)))}}/></label>
 }
 function StudioEditor({rule,base}:{rule:AlertRule;base:string}){
- const [scene,setScene]=useState<Scene>(()=>sceneForRule(rule)),[selected,setSelected]=useState(''),[snapOn,setSnap]=useState(true),[guides,setGuides]=useState(true),[playing,setPlaying]=useState(false),[editMode,setEditMode]=useState(true),[time,setTime]=useState(0),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[dirty,setDirty]=useState(false)
+ const [scene,setScene]=useState<Scene>(()=>drafts.get(rule.key)??sceneForRule(rule)),[selected,setSelected]=useState(''),[snapOn,setSnap]=useState(true),[guides,setGuides]=useState(true),[playing,setPlaying]=useState(false),[editMode,setEditMode]=useState(true),[time,setTime]=useState(0),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[dirty,setDirty]=useState(()=>drafts.has(rule.key))
  const past=useRef<Scene[]>([]),future=useRef<Scene[]>([]),current=useRef(scene),root=useRef<HTMLDivElement>(null),canvas=useRef<HTMLDivElement>(null),player=useRef<ReturnType<typeof createScenePlayer>|null>(null),clock=useRef(0)
  const drag=useRef<{pointer:number;before:Scene;layer:Layer;px:number;py:number;w:number;h:number;resize:boolean}|null>(null)
  const layer=scene.layers.find(l=>l.id===selected)
  const event:AlertEvent={id:'preview',kind:rule.key.startsWith('reward:')?'redemption':rule.key as AlertEvent['kind'],user:'Test PSSA',reward:rule.title,count:25,months:3}
  const text=renderText(rule.template,event)
- const assign=(next:Scene)=>{current.current=next;setScene(next);setDirty(true)}
+ const assign=(next:Scene)=>{current.current=next;keepDraft(rule.key,next);setScene(next);setDirty(true)}
  const remember=(before:Scene)=>{past.current=[...past.current.slice(-49),before];future.current=[]}
+ const signature=JSON.stringify({...scene,layers:scene.layers.map(({x,y,width,height,rotation,opacity,...rest})=>rest)})
  function change(next:Scene){setPlaying(false);remember(current.current);assign(next)}
  function patch(p:Partial<Layer>){if(!layer)return;change({...scene,layers:scene.layers.map(l=>l.id===layer.id?{...l,...p}:l)})}
  function undo(){const previous=past.current.pop();if(!previous)return;setPlaying(false);future.current.push(current.current);assign(previous)}
@@ -29,24 +33,25 @@ function StudioEditor({rule,base}:{rule:AlertRule;base:string}){
  function remove(){if(!layer||layer.locked)return;change({...scene,layers:scene.layers.filter(x=>x.id!==layer.id)});setSelected('')}
  useEffect(()=>{const el=root.current;if(!el)return
   try{const p=createScenePlayer(el,scene,text,base?base+'media/':'',rule.volume,()=>{setNotice('Nie udało się załadować multimediów.');setPlaying(false)});player.current=p;p.paint(Math.min(time,scene.duration-1),false,editMode);return()=>{player.current=null;p.dispose()}}catch{setNotice('Błąd podglądu.')}
- },[scene,text,base,rule.volume])
+ },[signature,text,base,rule.volume])
+ useEffect(()=>{player.current?.updateGeometry(scene);if(!playing)player.current?.paint(Math.min(time,scene.duration-1),false,editMode)},[scene,playing,editMode,time])
  useEffect(()=>{if(!playing){player.current?.paint(Math.min(time,scene.duration-1),false,editMode);return}
   let frame=0;const begin=performance.now()-clock.current
   const tick=(now:number)=>{const t=Math.min(scene.duration,now-begin);clock.current=t;setTime(t);player.current?.paint(t,t<scene.duration,false);if(t<scene.duration)frame=requestAnimationFrame(tick);else setPlaying(false)}
   frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)
  },[playing,scene,editMode])
  useEffect(()=>{if(!playing){clock.current=time;player.current?.paint(Math.min(time,scene.duration-1),false,editMode)}},[time,playing,editMode,scene])
- useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(e.target instanceof HTMLElement&&(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable))return;if(e.ctrlKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if(e.ctrlKey&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)},[])
+ useEffect(()=>{const handle=(e:KeyboardEvent)=>{if(busy||drag.current)return;if(e.target instanceof HTMLElement&&(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable))return;if(e.ctrlKey&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo()}if(e.ctrlKey&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)},[busy])
  function begin(e:ReactPointerEvent<HTMLButtonElement>,l:Layer,resize=false){e.stopPropagation();setSelected(l.id);if(l.locked||playing||!canvas.current)return;const bounds=canvas.current.getBoundingClientRect();if(!bounds.width||!bounds.height)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={pointer:e.pointerId,before:current.current,layer:l,px:e.clientX,py:e.clientY,w:bounds.width,h:bounds.height,resize};setEditMode(true)}
  function move(e:ReactPointerEvent<HTMLButtonElement>){const d=drag.current;if(!d||d.pointer!==e.pointerId)return;const dx=(e.clientX-d.px)*100/d.w,dy=(e.clientY-d.py)*100/d.h;const p=d.resize?{width:Math.max(1,snap(d.layer.width+dx*2,snapOn)),height:Math.max(1,snap(d.layer.height+dy*2,snapOn))}:{x:snap(d.layer.x+dx,snapOn),y:snap(d.layer.y+dy,snapOn)};assign({...d.before,layers:d.before.layers.map(x=>x.id===d.layer.id?{...x,...p}:x)})}
  function end(e:ReactPointerEvent<HTMLButtonElement>,cancel=false){const d=drag.current;if(!d||d.pointer!==e.pointerId)return;drag.current=null;if(cancel)assign(d.before);else if(current.current!==d.before)remember(d.before);if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);setScene({...current.current})}
  async function media(){if(!layer||!['image','video','audio'].includes(layer.kind))return;const id=layer.id,kind=layer.kind as 'image'|'video'|'audio';setBusy(true);try{const asset=await window.pssa.chooseMedia(kind);if(asset){const s=current.current;change({...s,layers:s.layers.map(l=>l.id===id?{...l,asset}:l)})}}catch{setNotice('Nie udało się dodać pliku.')}finally{setBusy(false)}}
- async function save(test=false){setBusy(true);setPlaying(false);try{const valid=parseScene(current.current);await window.pssa.saveAlert({...rule,scene:valid,duration:valid.duration/1000});setDirty(false);if(test){const count=await window.pssa.testAlert(rule.key);setNotice(count?'Test dodany do kolejki OBS.':'Kolejka pełna.')}else setNotice('Zapisano scenę.')}catch{setNotice('Nie udało się zapisać sceny. Sprawdź zakres czasu i właściwości warstw.')}finally{setBusy(false)}}
+ async function save(test=false){setBusy(true);setPlaying(false);try{const valid=parseScene(current.current);await window.pssa.saveScene(rule.key,valid,rule.title);drafts.delete(rule.key);setDirty(false);if(test){const count=await window.pssa.testAlert(rule.key);setNotice(count?'Test dodany do kolejki OBS.':'Kolejka pełna.')}else setNotice('Zapisano scenę.')}catch{setNotice('Nie udało się zapisać sceny. Sprawdź zakres czasu i właściwości warstw.')}finally{setBusy(false)}}
  function seek(n:number){setPlaying(false);setEditMode(false);clock.current=n;setTime(n)}
  function togglePlay(){if(playing){setPlaying(false);return}if(clock.current>=scene.duration)clock.current=0;setEditMode(false);setPlaying(true)}
  const locked=layer?.locked||busy
  return <div className="studio">
- <div className="studio-toolbar"><div className="alert-actions"><Button disabled={!past.current.length||busy} onClick={undo}>Cofnij</Button><Button disabled={!future.current.length||busy} onClick={redo}>Ponów</Button><Button disabled={busy} onClick={()=>{setPlaying(false);setEditMode(true)}}>Edycja</Button><Button disabled={busy} onClick={togglePlay}>{playing?'Pauza':'Odtwórz'}</Button><Button disabled={busy} onClick={()=>seek(0)}>Stop</Button></div><div className="alert-actions"><Button variant="primary" disabled={busy} onClick={()=>void save()}>Zapisz{dirty?' *':''}</Button><Button disabled={busy} onClick={()=>void save(true)}>Zapisz i testuj OBS</Button></div></div>
+ <div className="studio-toolbar"><div className="alert-actions"><Button disabled={!past.current.length||busy} onClick={undo}>Cofnij</Button><Button disabled={!future.current.length||busy} onClick={redo}>Ponów</Button><Button disabled={busy} onClick={()=>{setPlaying(false);setEditMode(true)}}>Edycja</Button><Button disabled={busy} onClick={togglePlay}>{playing?'Pauza':'Odtwórz'}</Button><Button disabled={busy} onClick={()=>seek(0)}>Stop</Button></div><div className="alert-actions"><Button variant="primary" disabled={busy} onClick={()=>void save()}>Zapisz{dirty?' *':''}</Button><Button disabled={busy||!dirty} onClick={()=>{setPlaying(false);const saved=sceneForRule(rule);current.current=saved;setScene(saved);drafts.delete(rule.key);past.current=[];future.current=[];setDirty(false);setNotice('Przywrócono zapisaną scenę.')}}>Odrzuć szkic</Button><Button disabled={busy} onClick={()=>void save(true)}>Zapisz i testuj OBS</Button></div></div>
  <div className="studio-workspace">
  <Panel title="Warstwy" className="studio-layers"><div className="studio-add">{layerKinds.map(k=><Button key={k} disabled={busy||scene.layers.length>=32} onClick={()=>add(k)}>+ {names[k]}</Button>)}</div>
  <div className="studio-layer-list">{[...scene.layers].reverse().map(l=><div key={l.id} className={'studio-layer '+(selected===l.id?'selected':'')}><button onClick={()=>setSelected(l.id)} title={l.name}>{l.name}</button><button title={l.visible?'Ukryj':'Pokaż'} aria-label={'Widoczność '+l.name} disabled={busy} onClick={()=>change({...scene,layers:scene.layers.map(x=>x.id===l.id?{...x,visible:!x.visible}:x)})}>{l.visible?'◉':'○'}</button><button title={l.locked?'Odblokuj':'Zablokuj'} aria-label={'Blokada '+l.name} disabled={busy} onClick={()=>change({...scene,layers:scene.layers.map(x=>x.id===l.id?{...x,locked:!x.locked}:x)})}>{l.locked?'🔒':'◇'}</button></div>)}</div>
@@ -70,5 +75,5 @@ export function StudioPage({state}:{state?:AlertState}){
  const [key,setKey]=useState('raid')
  const rules=state?.rules??[],list=[...rules,...(state?.rewards??[]).filter(r=>!rules.some(x=>x.key==='reward:'+r.id)).map(r=>defaultRule('reward:'+r.id,r.title))]
  const rule=list.find(r=>r.key===key)??list[0]
- return <><Panel title="Projekt alertu"><label className="alert-form">Alert / nagroda<select className="queue-select" value={rule?.key??''} onChange={e=>setKey(e.target.value)}>{list.map(r=><option key={r.key} value={r.key}>{r.title}</option>)}</select></label><p className="muted">Zmiana projektu porzuca niezapisane zmiany. Zapisz przed przejściem do innego alertu.</p></Panel>{rule?<StudioEditor key={rule.key} rule={rule} base={state?.twitch.overlayUrl??''}/>:<Empty title="Brak alertów">Poczekaj na inicjalizację danych.</Empty>}</>
+ return <><Panel title="Projekt alertu"><label className="alert-form">Alert / nagroda<select className="queue-select" value={rule?.key??''} onChange={e=>setKey(e.target.value)}>{list.map(r=><option key={r.key} value={r.key}>{r.title}</option>)}</select></label><p className="muted">Niezapisane szkice pozostają w pamięci bieżącego uruchomienia (do 50). Zapisz przed zamknięciem PSSA.</p></Panel>{rule?<StudioEditor key={rule.key} rule={rule} base={state?.twitch.overlayUrl??''}/>:<Empty title="Brak alertów">Poczekaj na inicjalizację danych.</Empty>}</>
 }

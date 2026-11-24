@@ -8,7 +8,7 @@ import { Auth } from '../twitch/auth'
 import { EventSub } from '../twitch/eventsub'
 import { AlertQueue } from './queue'
 import { Overlay } from '../overlay/server'
-import { rules,saveRule,saveRules } from './store'
+import { rules,saveRule,saveRules,saveScene } from './store'
 import { copyMedia,imageExt,audioExt,videoExt } from './media'
 import { importLegacy } from './import'
 import { defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
@@ -57,6 +57,7 @@ export class AlertsService {
   this.rewards=(Array.isArray(data.data)?data.data:[]).filter((x:any)=>typeof x.id==='string'&&typeof x.title==='string').map((x:any)=>({id:x.id,title:x.title,cost:Number(x.cost)||0}))
   return this.rewards
  }
+ saveScene(key:unknown,value:unknown,title:unknown){return saveScene(this.db,key,value,title)}
  save(value:unknown){return saveRule(this.db,value)}
  async choose(kind:'image'|'audio'|'video'){
   if(this.dialogBusy||this.stopped)throw Error('Dialog unavailable');this.dialogBusy=true

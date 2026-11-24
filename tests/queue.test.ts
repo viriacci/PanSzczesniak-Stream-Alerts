@@ -114,3 +114,11 @@ test('1000 queued events drain sequentially with unique playback attempts',()=>{
   assert.equal(f.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='done'").get()?.n,1000)
  }finally{f.q.stop();f.db.close()}
 })
+
+test('queue summary excludes heavyweight scene snapshots without losing replay',()=>{
+ const f=fixture()
+ try{f.q.enqueue(f.event('summary'),f.rule);const item=f.q.state().pending[0]!
+ assert.equal(Object.hasOwn(item,'rule'),false)
+ f.q.command({type:'skip',id:item.id});f.q.command({type:'replay',id:item.id});assert.equal(f.q.state().pendingCount,1)
+ }finally{f.q.stop();f.db.close()}
+})

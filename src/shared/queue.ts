@@ -3,7 +3,8 @@ export type QueueStatus='pending'|'playing'|'done'|'skipped'|'failed'|'suppresse
 export type QueueSource='twitch'|'test'|'replay'
 export interface QueueItem {id:number;source:QueueSource;key:string;title:string;text:string;rule:AlertRule;status:QueueStatus;priority:number;position:number;attempts:number;createdAt:number;finishedAt:number|null;reason:string}
 export interface QueueSettings {paused:boolean;muted:boolean;volume:number;gapMs:number}
-export interface QueueState {settings:QueueSettings;current:QueueItem|null;pending:QueueItem[];pendingCount:number;history:QueueItem[];online:boolean}
+export type QueueSummary=Omit<QueueItem,'rule'>
+export interface QueueState {settings:QueueSettings;current:QueueSummary|null;pending:QueueSummary[];pendingCount:number;history:QueueSummary[];online:boolean}
 export interface Playback {attempt:string;rule:AlertRule;text:string;volume:number}
 export type QueueCommand={type:'settings';settings:QueueSettings}|{type:'skip'|'replay';id:number}|{type:'move';id:number;direction:-1|1}|{type:'priority';id:number;priority:number}
 export const defaultQueueSettings:QueueSettings={paused:false,muted:false,volume:100,gapMs:500}

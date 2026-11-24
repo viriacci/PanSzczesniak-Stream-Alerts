@@ -5,7 +5,7 @@ import {sceneForRule} from '../src/shared/scene-legacy.ts'
 import {defaultRule,parseRule} from '../src/shared/alerts.ts'
 import {createScenePlayer} from '../src/shared/scene-player.ts'
 import {openDatabase} from '../src/main/database/index.ts'
-import {saveRule,rules} from '../src/main/alerts/store.ts'
+import {saveRule,rules,saveScene} from '../src/main/alerts/store.ts'
 const fixture=():Scene=>({version:1,width:1920,height:1080,duration:5000,layers:[makeLayer('text','text-1',5000)]})
 test('scene schema roundtrips and rejects duplicate ids, invalid timeline and unsafe assets',()=>{
  const s=fixture();assert.deepEqual(parseScene(s),s)
@@ -37,4 +37,12 @@ test('shortening timeline keeps each layer valid and snapping bounded',()=>{
 test('shared player source serializes as standalone browser JS',()=>{
  const source=createScenePlayer.toString()
  assert.equal(typeof new Function('return ('+source+')')(),'function')
+})
+
+test('saving scene preserves the latest alert settings',()=>{
+ const db=openDatabase(':memory:')
+ try{saveRule(db,{...defaultRule('raid'),enabled:true,priority:9,volume:32,template:'New {user}'})
+ const saved=saveScene(db,'raid',fixture(),'Old title')
+ assert.equal(saved.enabled,true);assert.equal(saved.priority,9);assert.equal(saved.volume,32);assert.equal(saved.template,'New {user}');assert.deepEqual(saved.scene,fixture())
+ }finally{db.close()}
 })

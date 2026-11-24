@@ -11,7 +11,7 @@ test('agent starts, gracefully restarts and rate limits crashed children',()=>{
  let time=100000;const children:ChildProcess[]=[]
  const a=new AgentController(()=>{const c=child();children.push(c);return c},()=>time)
  a.command('start');assert.equal(children.length,1)
- a.heartbeat('a');a.command('restart');assert.equal(a.heartbeat('a'),'restart')
+ a.heartbeat('a');a.command('restart');assert.equal(a.heartbeat('a')?.action,'restart')
  a.closing('a');children[0]!.emit('exit',0);a.tick();assert.equal(children.length,1)
  time+=3000;a.tick();assert.equal(children.length,2)
  for(let i=0;i<3;i++){children.at(-1)!.emit('exit',1);time+=3000;a.tick()}
@@ -30,8 +30,21 @@ test('agent dock HTTP authentication and command delivery',async()=>{
   assert.equal((await api('/api/heartbeat',{instance})).status,200)
   assert.equal((await api('/api/command',{command:'refresh'},agent.url)).status,200)
   const result=await (await api('/api/heartbeat',{instance})).json()
-  assert.equal(result.action,'refresh')
+  assert.equal(result.command.action,'refresh');assert.equal((await (await api('/api/heartbeat',{instance})).json()).command.id,result.command.id);assert.equal((await api('/api/ack',{instance,id:result.command.id})).status,200);assert.equal((await (await api('/api/heartbeat',{instance})).json()).command,null)
   assert.equal((await api('/api/command',{command:'stop'},agent.url)).status,200)
-  assert.equal((await (await api('/api/heartbeat',{instance})).json()).action,'stop')
+  assert.equal((await (await api('/api/heartbeat',{instance})).json()).command.action,'stop')
  }finally{agent.close();await rm(dir,{recursive:true,force:true})}
+})
+
+test('agent retains commands until acknowledgment and ignores stale closing heartbeats',()=>{
+ let time=100000;const a=new AgentController(()=>child(),()=>time)
+ a.heartbeat('old');a.command('refresh')
+ const cmd=a.heartbeat('old')!
+ assert.deepEqual(a.heartbeat('old'),cmd)
+ assert.equal(a.ack('old','wrong'),false)
+ assert.equal(a.ack('old',cmd.id),true)
+ assert.equal(a.heartbeat('old'),null)
+ a.command('restart');assert.equal(a.heartbeat('old')?.action,'restart')
+ a.closing('old');assert.equal(a.heartbeat('old'),null);assert.equal(a.running(),false)
+ time+=3000;a.heartbeat('new');a.closing('old');assert.equal(a.running(),true)
 })

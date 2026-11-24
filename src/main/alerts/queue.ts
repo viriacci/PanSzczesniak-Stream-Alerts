@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { parseRule, renderText, type AlertEvent, type AlertRule } from '../../shared/alerts.ts'
-import { defaultQueueSettings,parseQueueSettings,parseQueueCommand,type QueueItem,type QueueSource,type QueueState,type QueueStatus,type Playback,type QueueSettings } from '../../shared/queue.ts'
+import { defaultQueueSettings,parseQueueSettings,parseQueueCommand,type QueueItem,type QueueSummary,type QueueSource,type QueueState,type QueueStatus,type Playback,type QueueSettings } from '../../shared/queue.ts'
 
 export interface Transport {
  online():boolean
@@ -33,10 +33,13 @@ export class AlertQueue {
  }
  private get(id:number){const row=this.db.prepare('SELECT * FROM alert_queue WHERE id=?').get(id);return row?this.decode(row):undefined}
  private pendingCount(){return Number(this.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='pending'").get()?.n??0)}
+ private summary(row:any):QueueSummary{return {id:Number(row.id),source:row.source,key:row.rule_key,title:typeof row.title==='string'?row.title:row.rule_key,text:row.text,status:row.status,priority:row.priority,position:row.position,attempts:row.attempts,createdAt:row.created_at,finishedAt:row.finished_at,reason:row.reason}}
  state():QueueState{
-  const pending=this.db.prepare("SELECT * FROM alert_queue WHERE status='pending' ORDER BY priority DESC,position,id LIMIT 100").all().map(r=>this.decode(r))
-  const history=this.db.prepare("SELECT * FROM alert_queue WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100").all().map(r=>this.decode(r))
-  return {settings:{...this.settings},current:this.current?this.get(this.current.id)??null:null,pending,pendingCount:this.pendingCount(),history,online:this.transport.online()}
+  const fields="id,source,rule_key,json_extract(rule_json,'$.title') AS title,text,status,priority,position,attempts,created_at,finished_at,reason"
+  const current=this.current?this.db.prepare('SELECT '+fields+' FROM alert_queue WHERE id=?').get(this.current.id):undefined
+  const pending=this.db.prepare('SELECT '+fields+" FROM alert_queue WHERE status='pending' ORDER BY priority DESC,position,id LIMIT 100").all().map(r=>this.summary(r))
+  const history=this.db.prepare('SELECT '+fields+" FROM alert_queue WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100").all().map(r=>this.summary(r))
+  return {settings:{...this.settings},current:current?this.summary(current):null,pending,pendingCount:this.pendingCount(),history,online:this.transport.online()}
  }
  enqueue(event:AlertEvent,rule:AlertRule,source:QueueSource='twitch'){
   return this.insert(source+':'+event.id,source,parseRule(rule),renderText(rule.template,event),event.count??event.months??0)

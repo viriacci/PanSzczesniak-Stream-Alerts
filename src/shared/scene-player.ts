@@ -67,5 +67,5 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   }
  }
  const ready=Promise.all(readiness).then(()=>undefined);void ready.catch(()=>{})
- return {ready,paint,setVolume(value:number){master=Math.max(0,Math.min(100,value))/100;for(const n of nodes)if(n.media)n.media.volume=master*n.layer.volume/100},dispose(){disposed=true;observer.disconnect();for(const n of nodes)if(n.media){n.playing=false;n.media.onerror=null;n.media.pause();n.media.removeAttribute('src');n.media.load()}root.replaceChildren()}}
+ return {ready,paint,updateGeometry(next:Scene){for(const n of nodes){const l=next.layers.find(x=>x.id===n.layer.id);if(!l)continue;n.layer=l;Object.assign(n.el.style,{left:l.x+'%',top:l.y+'%',width:l.width+'%',height:l.height+'%'})}},setVolume(value:number){master=Math.max(0,Math.min(100,value))/100;for(const n of nodes)if(n.media)n.media.volume=master*n.layer.volume/100},dispose(){disposed=true;observer.disconnect();for(const n of nodes)if(n.media){n.playing=false;n.media.onerror=null;n.media.pause();n.media.removeAttribute('src');n.media.load()}root.replaceChildren()}}
 }

@@ -1,9 +1,9 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp,rm} from 'node:fs/promises'
+import {mkdtemp,rm,writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {Overlay} from '../src/main/overlay/server.ts'
+import {Overlay,mediaRange} from '../src/main/overlay/server.ts'
 import {defaultRule} from '../src/shared/alerts.ts'
 
 test('loopback overlay rejects missing key and delivers SSE events', {timeout:10000}, async()=>{
@@ -19,5 +19,18 @@ test('loopback overlay rejects missing key and delivers SSE events', {timeout:10
   const stream=await fetch(url+'events',{signal:AbortSignal.timeout(5000)})
   const reader=stream.body!.getReader()
   try{await reader.read();assert.equal(overlay.send({attempt:'attempt-1',rule:defaultRule('raid'),text:'Test <b>',volume:50}),true);const msg=await reader.read();assert.match(new TextDecoder().decode(msg.value),/Test <b>/);assert.equal(overlay.active('attempt-1'),true);const ack=(id:string,origin=new URL(url).origin)=>fetch(url+'ack',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({attempt:id})});let result='';overlay.onAck=(id,outcome)=>{result=outcome;return id==='attempt-1'};assert.equal((await ack('attempt-1','https://example.com')).status,403);assert.equal((await ack('wrong')).status,409);assert.equal((await ack('attempt-1')).status,204);assert.equal(overlay.active('attempt-1'),false);assert.equal(result,'done');assert.equal(overlay.send({attempt:'attempt-2',rule:defaultRule('raid'),text:'Broken',volume:50}),true);await reader.read();overlay.onAck=(id,outcome)=>{result=outcome;return id==='attempt-2'};const failed=await fetch(url+'ack',{method:'POST',headers:{origin:new URL(url).origin,'Content-Type':'application/json'},body:JSON.stringify({attempt:'attempt-2',result:'media-error'})});assert.equal(failed.status,204);assert.equal(result,'media-error')}finally{await reader.cancel()}
+ }finally{overlay.stop();await rm(root,{recursive:true,force:true})}
+})
+
+test('media ranges support seeks and reject invalid requests',async()=>{
+ assert.deepEqual(mediaRange('bytes=2-4',10),{start:2,end:4})
+ assert.deepEqual(mediaRange('bytes=-3',10),{start:7,end:9})
+ assert.equal(mediaRange('bytes=10-',10),false)
+ assert.equal(mediaRange('bytes=0-1,3-4',10),false)
+ const root=await mkdtemp(join(tmpdir(),'pssa-ranges-')),overlay=new Overlay(root,0),name='a'.repeat(64)+'.webm'
+ try{await writeFile(join(root,name),'0123456789');await overlay.start()
+ const res=await fetch(overlay.url+'media/'+name,{headers:{Range:'bytes=2-4'}});assert.equal(res.status,206);assert.equal(res.headers.get('content-range'),'bytes 2-4/10');assert.equal(await res.text(),'234')
+ const bad=await fetch(overlay.url+'media/'+name,{headers:{Range:'bytes=10-'}});assert.equal(bad.status,416)
+ const foreign=await fetch(overlay.url+'events',{headers:{Origin:'https://example.org'}});assert.equal(foreign.status,403)
  }finally{overlay.stop();await rm(root,{recursive:true,force:true})}
 })

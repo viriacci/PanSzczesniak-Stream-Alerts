@@ -14,6 +14,7 @@ const api: PssaApi = {
   twitchLogout:()=>ipcRenderer.invoke(IPC.twitchLogout),
   twitchConnect:()=>ipcRenderer.invoke(IPC.twitchConnect),
   syncRewards:()=>ipcRenderer.invoke(IPC.syncRewards),
+  saveScene:(key,scene,title)=>ipcRenderer.invoke(IPC.saveScene,key,scene,title),
   saveAlert:rule=>ipcRenderer.invoke(IPC.saveAlert,rule),
   chooseMedia:kind=>ipcRenderer.invoke(IPC.chooseMedia,kind),
   importLegacy:()=>ipcRenderer.invoke(IPC.importLegacy),

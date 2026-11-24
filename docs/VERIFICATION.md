@@ -24,3 +24,5 @@ Audyt A zamknięty automatycznie, run 45364375474: 29/29, full/production npm au
 Etap 5: run 45365741505 success. Etap 6: 7 nowych testów Live Center (sesje, dedup i agregacja, luki API, bitrate, prywatność czatu, akcje i scope, spóźniona odpowiedź), regresje schema 3 i EventSub; smoke rozszerzony o liveState. CI oczekuje. Realny Twitch/OBS nieprzetestowany.
 
 Etap 6 run 45368803283: npm audit clean, typecheck FAIL TS2532 auth.ts:29; poprawka w etapie 7. Etap 7: 5 nowych testów sceny i rozszerzony smoke nakładki Chromium z ACK. Pełny CI oczekuje; nie uznawać nieuruchomionych testów za PASS.
+
+Etap 7: run 45370241006 success, 45/45, npm audit 0, typecheck, build, smoke render/ACK, NSIS, packaged smoke PASS. Audyt B: 6 nowych testów i rozszerzenie testu Agenta, CI oczekuje. Manualne scenariusze nieprzeprowadzone.

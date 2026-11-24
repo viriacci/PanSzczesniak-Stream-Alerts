@@ -37,7 +37,7 @@ export class AgentController{
  ack(instance:string,id:string){if(instance!==this.instance||this.pending?.id!==id||this.pending.action!=='refresh')return false;this.pending=undefined;return true}
  closing(instance:string){if(instance===this.instance&&instance!==this.closingInstance){this.closingInstance=instance;this.pending=undefined;this.last=0;this.restartAfter=this.now()+3000;if(!this.restart)this.desired=false}}
  private start(){
-  if(this.running()||this.child||this.state().starting)return
+  if(this.running()||this.child||this.state().starting||this.now()<this.restartAfter)return
   const now=this.now();this.failures=this.failures.filter(t=>now-t<60000)
   if(this.failures.length>=3){this.detail='Limit restartów po awarii';this.desired=false;return}
   this.launchAt=now;this.desired=true;this.detail='Uruchamianie PSSA'
@@ -51,7 +51,7 @@ export class AgentController{
  }
  command(cmd:DockCommand){
   if(cmd==='auto-on'||cmd==='auto-off'){this.autoLaunch=cmd==='auto-on';return}
-  if(cmd==='start'){this.failures=[];this.start();return}
+  if(cmd==='start'){if(!this.running()&&!this.child&&!this.state().starting)this.failures=[];this.start();return}
   if(cmd==='stop'){this.desired=false;this.restart=false;if(this.running())this.pending={id:randomUUID(),action:'stop'};this.detail='Zamykanie PSSA';return}
   if(cmd==='restart'){this.failures=[];if(this.running()){this.pending={id:randomUUID(),action:'restart'};this.restart=true;this.restartAfter=this.now()+3000;this.desired=false;this.detail='Restart PSSA'}else this.start();return}
   if(cmd==='refresh'&&this.running()){if(this.pending?.action!=='stop'&&this.pending?.action!=='restart')this.pending={id:randomUUID(),action:'refresh'};return}

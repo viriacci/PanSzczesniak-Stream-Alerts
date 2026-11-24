@@ -22,7 +22,7 @@ export class AgentBridge{
    const h=await this.api('/api/heartbeat',{instance:this.instance})
    if(this.stopped)return
    const cmd=h.command
-   if(cmd?.action==='stop'||cmd?.action==='restart'){await this.api('/api/closing',{instance:this.instance});if(!this.stopped)app.quit();return}
+   if(cmd?.action==='stop'||cmd?.action==='restart'){await this.api('/api/closing',{instance:this.instance}).catch(()=>{});if(!this.stopped)app.quit();return}
    if(cmd?.action==='refresh'&&typeof cmd.id==='string'){
     if(this.lastRefresh!==cmd.id){await this.refresh();this.lastRefresh=cmd.id}
     await this.api('/api/ack',{instance:this.instance,id:cmd.id})

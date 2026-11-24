@@ -113,3 +113,20 @@ test('late response after account reset cannot write the old stream',async()=>{
   assert.equal(db.prepare('SELECT count(*) n FROM stream_sessions').get()?.n,0)
  }finally{service.stop();db.close()}
 })
+
+test('rapid manual polls cannot overweight viewer averages; stale observation cannot close a newer session',()=>{
+ const db=openDatabase(':memory:')
+ try{const id=observe(db,'42',observation,start+30000)!
+  for(let i=1;i<=20;i++)observe(db,'42',{...observation,viewers:1000},start+30000+i*100)
+  observe(db,'42',{...observation,viewers:20},start+60000)
+  assert.equal(summarize(db,id).samples,2);assert.equal(summarize(db,id).average,15)
+  assert.throws(()=>observe(db,'42',null,start+40000),/Stale/)
+  assert.equal(db.prepare('SELECT ended_at FROM stream_sessions WHERE id=?').get(id)?.ended_at,null)
+ }finally{db.close()}
+})
+test('malformed Twitch response cannot end a confirmed session',async()=>{
+ const db=openDatabase(':memory:');let payload:unknown={data:[raw(12)]}
+ const service=new LiveService(db,{identity:{userId:'42',login:'tester'},canManage:false,helix:async()=>payload},()=>start+30000)
+ try{await service.poll();payload={data:[null]};await service.poll();assert.equal(service.snapshot().phase,'unknown');assert.equal(db.prepare('SELECT ended_at FROM stream_sessions').get()?.ended_at,null);await assert.rejects(service.action({type:'refresh'}))}
+ finally{service.stop();db.close()}
+})

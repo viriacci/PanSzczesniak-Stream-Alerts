@@ -1,3 +1,4 @@
+import type {Scene} from './scene'
 import type {LiveState,LiveAction,Category} from './live'
 import type { ObsState,ObsAction,AgentState,AgentAction } from './obs'
 import type { QueueCommand, QueueState } from './queue'
@@ -17,6 +18,7 @@ export const IPC = {
   twitchLogout: 'pssa:twitch:logout',
   twitchConnect: 'pssa:twitch:connect',
   syncRewards: 'pssa:twitch:rewards',
+  saveScene:'pssa:scene:save',
   saveAlert: 'pssa:alerts:save',
   chooseMedia: 'pssa:alerts:media',
   importLegacy: 'pssa:alerts:import',
@@ -47,6 +49,7 @@ export interface PssaApi {
   twitchLogout(): Promise<void>
   twitchConnect(): Promise<void>
   syncRewards(): Promise<Reward[]>
+  saveScene(key:string,scene:Scene,title:string):Promise<AlertRule>
   saveAlert(rule:AlertRule): Promise<AlertRule>
   chooseMedia(kind:'image'|'audio'|'video'): Promise<string|null>
   importLegacy(): Promise<{count:number;warnings:string[]}|null>
