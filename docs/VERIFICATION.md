@@ -1,17 +1,7 @@
-# Weryfikacja etapu 1
-
-Kod bazowy: 29fc9cce245318f1e7cd3e03793e82f882c003d3.
-
-## Wykonane testy
-Lokalne środowisko Linux, Node 22.16.0. Odtworzone pliki testowe i moduły sprawdzono przez git hash-object; wszystkie pięć SHA blobów identyczne z repozytorium.
-Polecenie: node --experimental-strip-types --test tests/*.test.ts.
-Wynik: 6/6 PASS, 0 FAIL.
-- trwałość ustawień i idempotencja migracji,
-- ograniczenia SQLite, klucze obce, deduplikacja,
-- rollback nieudanej migracji,
-- odmowa downgrade schematu,
-- walidacja adresu dokumentu IPC,
-- walidacja typu danych IPC.
-
-## Niepotwierdzone
-Brak dostępu do npm w środowisku lokalnym. Docelowy Node 24, pełny typecheck, build Electron, smoke prawdziwego IPC i instalator Windows nie są jeszcze zweryfikowane. Workflow Windows ma wykonać te czynności i udostępnić artefakt, jeśli wszystkie przejdą. Po udanym uruchomieniu należy zatwierdzić lockfile. Nie przechodzić do etapu 2 przed rozwiązaniem ewentualnych błędów bramki.
+# Weryfikacja
+## Etap 1 — potwierdzony Windows
+GitHub Actions run 45355291216, commit 774df6039b5b44d8ab7ac3bbf308bd208f92a6d4, conclusion success. Instalacja zależności, typecheck, test, build, smoke Electron (IPC i SQLite), NSIS oraz upload artefaktu zakończone pomyślnie.
+https://github.com/viriacci/PanSzczesniak-Stream-Alerts/actions/runs/45355291216
+Instalator niepodpisany; nie jest publicznym wydaniem. Test instalacji u użytkownika pozostaje do wykonania.
+## Etap 2 — oczekuje na CI
+Dodano trzy testy jednostkowe walidacji layoutu, trwałości ustawień i przywracania okna. Smoke rozszerzony o rzeczywisty zapis layoutu przez IPC. CI ma uruchomić wszystkie testy, kompilację, smoke i NSIS. Nie oznaczać ich jako zaliczonych bez wyniku. Test ręczny: szerokość menu/inspektora, restart, monitor odłączony, focus i klawiatura, okno 700px, dialog resetu, wygląd na Windows.

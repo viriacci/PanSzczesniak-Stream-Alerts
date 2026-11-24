@@ -2,6 +2,7 @@ import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { IPC, parseCompact, type SystemStatus } from '../shared/contracts'
 import { getCompact, setCompact, schemaVersion } from './database'
+import { getLayout, setLayout } from './database/layout'
 import { isTrustedDocument } from './security/ipc-policy'
 
 export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: string, version: string): () => void {
@@ -24,7 +25,19 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
     if (args.length !== 1) throw new Error('Expected one argument')
     return setCompact(db, parseCompact(args[0]))
   })
+  ipcMain.handle(IPC.getLayout, (event, ...args: unknown[]) => {
+    authorize(event)
+    if (args.length !== 0) throw new Error('Unexpected arguments')
+    return getLayout(db)
+  })
+  ipcMain.handle(IPC.setLayout, (event, ...args: unknown[]) => {
+    authorize(event)
+    if (args.length !== 1) throw new Error('Expected one argument')
+    return setLayout(db, args[0])
+  })
   return () => {
+    ipcMain.removeHandler(IPC.getLayout)
+    ipcMain.removeHandler(IPC.setLayout)
     ipcMain.removeHandler(IPC.status)
     ipcMain.removeHandler(IPC.setCompact)
   }

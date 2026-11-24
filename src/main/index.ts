@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, session } from 'electron'
+import { app, BrowserWindow, dialog, session, screen } from 'electron'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
+import { readWindowState, writeWindowState } from './window-state'
 import { openDatabase } from './database'
 import { registerIpc } from './ipc'
 import { createLogger } from './logger'
@@ -49,8 +50,10 @@ async function start(): Promise<void> {
   const document = devUrl ? new URL(devUrl).href : pathToFileURL(file).href
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   session.defaultSession.setPermissionCheckHandler(() => false)
+  const state = readWindowState(db, screen.getAllDisplays().map(display => display.workArea))
   window = new BrowserWindow({
-    title: 'PSSA 2 Dev', width: 1180, height: 760, minWidth: 700, minHeight: 500,
+    title: 'PSSA 2 Dev', ...state.bounds, minWidth: 700, minHeight: 500,
+    titleBarStyle: 'hidden', titleBarOverlay: { color: '#111114', symbolColor: '#e8e7eb', height: 36 },
     show: false, backgroundColor: '#101012',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -66,6 +69,14 @@ async function start(): Promise<void> {
     if (smoke) fail()
     else dialog.showErrorBox('PSSA 2 Dev', 'Interfejs uległ awarii. Uruchom aplikację ponownie.')
   })
+  const activeWindow = window
+  const activeDb = db
+  activeWindow.on('close', () => {
+    if (cleaned || smoke) return
+    try { writeWindowState(activeDb, { bounds: activeWindow.getNormalBounds(), maximized: activeWindow.isMaximized() }) }
+    catch { console.warn('PSSA: unable to persist window bounds') }
+  })
+  if (state.maximized && !smoke) activeWindow.maximize()
   disposeIpc = registerIpc(window, db, document, app.getVersion())
   if (devUrl) await window.loadURL(document)
   else await window.loadFile(file)
@@ -73,7 +84,7 @@ async function start(): Promise<void> {
   if (smoke) {
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const passed = await window.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 1 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true)'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 1 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280)'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     app.quit()
@@ -92,7 +103,13 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
   app.on('window-all-closed', () => app.quit())
-  app.on('before-quit', cleanup)
+  app.on('before-quit', () => {
+    if (!cleaned && !smoke && db && window && !window.isDestroyed()) {
+      try { writeWindowState(db, { bounds: window.getNormalBounds(), maximized: window.isMaximized() }) }
+      catch { console.warn('PSSA: unable to persist window bounds') }
+    }
+    cleanup()
+  })
   app.on('quit', () => {
     if (smoke) {
       try { rmSync(directory, { recursive: true, force: true }) } catch { /* temporary files only */ }

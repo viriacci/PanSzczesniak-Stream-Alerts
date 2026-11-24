@@ -1,49 +1,82 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { SystemStatus } from '../../shared/contracts'
+import { bounds, defaultLayout, type LayoutPreferences, type PageId } from '../../shared/layout'
+import { allPages, groups } from './navigation'
+import { Button, ConfirmDialog, Panel, Status } from './components/ui'
+import { Icon } from './components/icons'
+import { ResizeHandle } from './components/ResizeHandle'
+import { PageContent } from './features/pages'
 
 export function App() {
-  const [status, setStatus] = useState<SystemStatus>()
-  const [error, setError] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    window.pssa.getStatus().then(value => {
-      if (active) setStatus(value)
-    }).catch(() => { if (active) setError(true) })
-    return () => { active = false }
-  }, [])
-
-  async function toggleCompact() {
-    if (!status || saving) return
-    setSaving(true)
-    setError(false)
-    try {
-      const compact = await window.pssa.setCompact(!status.compact)
-      setStatus(previous => previous ? { ...previous, compact } : previous)
-    } catch { setError(true) }
-    finally { setSaving(false) }
-  }
-
-  return (
-    <main className={status?.compact ? 'shell compact' : 'shell'}>
-      <header><span className="brand">PSSA</span><span className="tag">DEVELOPMENT</span></header>
-      <section className="panel">
-        <p className="eyebrow">ETAP 01 / FUNDAMENTY</p>
-        <h1>PanSzczesniak Stream Alerts</h1>
-        <p>Nowa aplikacja lokalna dla Twitcha i OBS.</p>
-        <dl>
-          <dt>Wersja</dt><dd>{status?.version ?? '—'}</dd>
-          <dt>Baza danych</dt><dd>{status ? 'SQLite · gotowa' : 'Oczekiwanie'}</dd>
-          <dt>Schemat</dt><dd>{status?.schemaVersion ?? '—'}</dd>
-          <dt>Twitch / OBS</dt><dd>Zaplanowane</dd>
-        </dl>
-        <button type="button" disabled={!status || saving} aria-pressed={status?.compact ?? false} onClick={toggleCompact}>
-          Tryb kompaktowy: {status?.compact ? 'włączony' : 'wyłączony'}
-        </button>
-        {error && <p role="alert">Nie udało się odczytać lub zapisać ustawień.</p>}
-      </section>
-      <footer>Interfejs diagnostyczny · Design System w etapie 2</footer>
-    </main>
-  )
+ const [status,setStatus]=useState<SystemStatus>()
+ const [layout,setLayout]=useState<LayoutPreferences>(defaultLayout)
+ const current=useRef<LayoutPreferences>(defaultLayout)
+ const queue=useRef<Promise<unknown>>(Promise.resolve())
+ const [ready,setReady]=useState(false)
+ const [busy,setBusy]=useState(false)
+ const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null)
+ const [confirm,setConfirm]=useState(false)
+ const [query,setQuery]=useState('')
+ const content=useRef<HTMLElement>(null)
+ const [narrow,setNarrow]=useState(()=>window.innerWidth<1080)
+ useEffect(()=>{
+   let active=true
+   Promise.all([window.pssa.getStatus(),window.pssa.getLayout()]).then(([s,l])=>{
+     if(active){setStatus(s);current.current=l;setLayout(l);setReady(true)}
+   }).catch(()=>{if(active)setNotice({text:'Nie udało się wczytać ustawień. Uruchom aplikację ponownie.',error:true})})
+   const resize=()=>setNarrow(window.innerWidth<1080)
+   window.addEventListener('resize',resize)
+   return ()=>{active=false;window.removeEventListener('resize',resize)}
+ },[])
+ const patch=useCallback((update:Partial<LayoutPreferences>,save=true)=>{
+   if(!ready)return
+   const next={...current.current,...update}
+   current.current=next;setLayout(next)
+   if(save)queue.current=queue.current.catch(()=>{}).then(()=>window.pssa.setLayout(next)).catch(()=>{setNotice({text:'Nie udało się zapisać układu.',error:true})})
+ },[ready])
+ const navigate=useCallback((page:PageId)=>{patch({page});content.current?.scrollTo({top:0});content.current?.focus()},[patch])
+ useEffect(()=>{
+   const onKey=(event:KeyboardEvent)=>{
+     if(!event.ctrlKey||event.altKey||event.shiftKey||event.metaKey||event.repeat||confirm)return
+     if(event.target instanceof HTMLElement && (['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName)||event.target.isContentEditable))return
+     if(event.key.toLowerCase()==='b'){event.preventDefault();patch({collapsed:!current.current.collapsed})}
+     if(event.key.toLowerCase()==='i'){event.preventDefault();patch({inspectorOpen:!current.current.inspectorOpen})}
+     if(event.key===','){event.preventDefault();navigate('settings')}
+   }
+   window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)
+ },[patch,navigate,confirm])
+ useEffect(()=>{if(!notice||notice.error)return;const timer=window.setTimeout(()=>setNotice(null),3500);return()=>window.clearTimeout(timer)},[notice])
+ async function toggleCompact(){
+   if(!status||busy)return
+   setBusy(true)
+   try{const compact=await window.pssa.setCompact(!status.compact);setStatus(s=>s?{...s,compact}:s);setNotice({text:'Zapisano wygląd aplikacji.',error:false})}
+   catch{setNotice({text:'Nie udało się zapisać ustawienia.',error:true})}
+   finally{setBusy(false)}
+ }
+ const reset=()=>{patch({...defaultLayout,page:'settings'});setConfirm(false)}
+ const item=allPages.find(p=>p.id===layout.page)??allPages[0]!
+ const collapsed=layout.collapsed
+ const inspector=layout.inspectorOpen&&!narrow
+ const sidebarSize=collapsed?64:layout.sidebarWidth
+ const styles={'--sidebar-width':sidebarSize+'px','--inspector-width':layout.inspectorWidth+'px'} as CSSProperties
+ const filtered=groups.map(group=>({...group,items:group.items.filter(p=>p.label.toLocaleLowerCase('pl').includes(query.toLocaleLowerCase('pl')))})).filter(g=>g.items.length)
+ return <div className={`app ${status?.compact?'compact':''}`} style={styles}>
+  <header className="titlebar"><div className="title-brand"><span className="brand-symbol">P</span><span>PSSA <small>STREAM ALERTS</small></span></div><span className="title-version">{status?.version??'2.0-dev'}</span><span className="title-caption">DEVELOPMENT BUILD</span></header>
+  <div className={`workspace ${inspector?'has-inspector':''}`}>
+   <aside className={`sidebar ${collapsed?'collapsed':''}`} aria-label="Nawigacja główna">
+    <div className="sidebar-top"><Button variant="ghost" title="Zwiń / rozwiń menu (Ctrl+B)" aria-label="Zwiń / rozwiń menu" aria-expanded={!collapsed} disabled={!ready} onClick={()=>patch({collapsed:!collapsed})}><Icon name="sidebar"/></Button>{!collapsed&&<label className="nav-search"><Icon name="search" size={15}/><input aria-label="Szukaj modułu" placeholder="Szukaj modułu" value={query} onChange={e=>setQuery(e.target.value)}/></label>}</div>
+    <nav>{(collapsed?groups:filtered).map(g=><div className="nav-group" key={g.label}>{!collapsed&&<h2>{g.label}</h2>}{g.items.map(p=><button key={p.id} type="button" disabled={!ready} className={`nav-link ${p.id===item.id?'active':''}`} aria-current={p.id===item.id?'page':undefined} aria-label={p.label} title={collapsed?p.label:undefined} onClick={()=>navigate(p.id)}><Icon name={p.icon}/>{!collapsed&&<span>{p.label}</span>}</button>)}</div>)}{!collapsed&&filtered.length===0&&<p className="nav-empty">Brak wyników</p>}</nav>
+    <div className="sidebar-bottom"><span className="account-avatar">P</span>{!collapsed&&<div><strong>Profil lokalny</strong><small>Niepołączony z Twitch</small></div>}</div>
+   </aside>
+   {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
+   <main className="content" tabIndex={-1} ref={content} id="main-content">
+    <header className="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div><Button variant="ghost" aria-label="Pokaż / ukryj inspektor" title={narrow?'Inspektor dostępny w szerszym oknie':'Inspektor (Ctrl+I)'} aria-pressed={layout.inspectorOpen} disabled={!ready||narrow} onClick={()=>patch({inspectorOpen:!layout.inspectorOpen})}><Icon name="inspector"/></Button></header>
+    <div className="page-body"><PageContent item={item} status={status} layout={layout} busy={busy||!ready} onCompact={toggleCompact} onReset={()=>setConfirm(true)} onIntegrations={()=>navigate('integrations')}/></div>
+   </main>
+   {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status>Offline</Status></div><div className="connection"><span>OBS Studio</span><Status>Offline</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
+  </div>
+  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status>Twitch niepołączony</Status><Status>OBS niepołączony</Status><span className="footer-right">PSSA DEV · ETAP 02</span></footer>
+  {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role={notice.error?'alert':'status'}><span>{notice.text}</span><Button variant="ghost" aria-label="Zamknij powiadomienie" onClick={()=>setNotice(null)}><Icon name="close" size={16}/></Button></div>}
+  {confirm&&<ConfirmDialog title="Przywrócić domyślny układ?" onClose={()=>setConfirm(false)} onConfirm={reset}>Zresetuje szerokość paneli i ich widoczność. Nie zmieni statystyk ani ustawień alertów.</ConfirmDialog>}
+ </div>
 }

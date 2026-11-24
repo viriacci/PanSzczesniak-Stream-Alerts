@@ -1,6 +1,10 @@
+import type { LayoutPreferences } from './layout'
+
 export const IPC = {
   status: 'pssa:system:status',
-  setCompact: 'pssa:settings:compact'
+  setCompact: 'pssa:settings:compact',
+  getLayout: 'pssa:layout:get',
+  setLayout: 'pssa:layout:set'
 } as const
 
 export interface SystemStatus {
@@ -11,6 +15,8 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  getLayout(): Promise<LayoutPreferences>
+  setLayout(value: LayoutPreferences): Promise<LayoutPreferences>
   getStatus(): Promise<SystemStatus>
   setCompact(value: boolean): Promise<boolean>
 }
