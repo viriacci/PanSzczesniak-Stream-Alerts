@@ -6,7 +6,7 @@
 
 PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łączy alerty, nagrody za punkty kanału, edycję scen i statystyki transmisji w jednym programie na Windows. Dane są przechowywane lokalnie.
 
-**Aktualne wydanie: 2.0.0 RC.22 (Beta).** [Pobierz instalator](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0-rc.22) · [Zgłoś błąd](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/issues)
+**PSSA 2.0.0** · [Pobierz instalator](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0) · [Zgłoś błąd](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/issues)
 
 ## Możliwości
 
@@ -20,8 +20,8 @@ PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łącz
 
 ## Instalacja
 
-1. Pobierz plik `PSSA-Setup-2.0.0-rc.22-x64.exe` z [wydania RC.22](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0-rc.22).
-2. Sprawdź SHA-256 z plikiem `SHA256SUMS.txt`. Instalator RC.22 nie ma podpisu cyfrowego.
+1. Pobierz plik `PSSA-Setup-2.0.0-x64.exe` z [wydania 2.0.0](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0).
+2. Sprawdź SHA-256 z plikiem `SHA256SUMS.txt`. Instalator nie ma podpisu cyfrowego. Pobierz go z oficjalnego wydania GitHub i uruchom ręcznie.
 3. Uruchom instalator, a następnie zaloguj się do Twitcha w PSSA.
 4. Skopiuj adres nakładki z Konfiguracji i dodaj go w OBS jako źródło przeglądarkowe (1920 × 1080). Opcjonalnie zainstaluj PSSA Control Dock w ustawieniach.
 5. Uruchom alert testowy i sprawdź obraz oraz dźwięk w OBS.
@@ -60,4 +60,4 @@ npm run dist:win
 
 [Historia zmian](CHANGELOG.md) · [Plan rozwoju](ROADMAP.md) · [Wydania](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases)
 
-Kod v2 jest rozwijany na gałęzi `develop/v2`. Starsza wersja Python pozostaje na `main` do czasu migracji wydania stabilnego. Kod natywnej wtyczki OBS ma oznaczenie GPL-2.0-or-later. Nie zakłada to automatycznie tej samej licencji dla pozostałej aplikacji.
+Wydania stabilne trafiają na `main`, a prace nad v2 na `develop/v2`. Starsza aplikacja Python jest zachowana na [`legacy/python`](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/tree/legacy/python). Kod natywnej wtyczki OBS ma oznaczenie GPL-2.0-or-later. Nie zakłada to automatycznie tej samej licencji dla pozostałej aplikacji.

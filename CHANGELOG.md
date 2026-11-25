@@ -1,6 +1,6 @@
 # Historia zmian
 
-## Unreleased
+## 2.0.0
 - Optymalizacja samouczków, renderowania scen, importu mediów i kolejki.
 - Poprawki autoryzacji oraz bezpieczeństwa aktualizatora.
 - Uporządkowanie dokumentacji i komentarzy.

@@ -66,7 +66,7 @@ test('staged restore preserves a pre-restore backup and applies exactly once',()
 })
 test('runtime preferences persist and reject invalid modes',()=>{
  const db=openDatabase(':memory:')
- try{assert.equal(preferences(db).mode,'studio');const v={...preferences(db),mode:'streaming' as const,onboarded:true};savePreferences(db,v);assert.deepEqual(preferences(db),v);assert.throws(()=>savePreferences(db,{...v,mode:'turbo'}));assert.deepEqual(preferences(db),v)}finally{db.close()}
+ try{assert.equal(preferences(db).mode,'studio');assert.equal(preferences(db).updates,'stable');const v={...preferences(db),mode:'streaming' as const,updates:'beta' as const,onboarded:true};savePreferences(db,v);assert.deepEqual(preferences(db),v);assert.throws(()=>savePreferences(db,{...v,mode:'turbo'}));assert.deepEqual(preferences(db),v)}finally{db.close()}
 })
 test('release selection follows channel, semantic version and fixed official repository URL',async()=>{
  const releases=[{tag_name:'v2.0.0-beta.9',draft:false,prerelease:true,html_url:'https://evil.example'},{tag_name:'v2.0.0-beta.10',draft:false,prerelease:true},{tag_name:'v1.9.0',draft:false,prerelease:false},{tag_name:'v3.0.0',draft:true,prerelease:false}]

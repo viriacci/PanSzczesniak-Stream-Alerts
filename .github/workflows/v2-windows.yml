@@ -121,13 +121,13 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: PSSA-2-Dev-Windows
-          run-id: 45568935962
+          run-id: 45574281592
           github-token: ${{ github.token }}
           path: previous-beta
       - name: Verify clean NSIS installation
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-*.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-x64.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one setup executable' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           if (Test-Path $dir) { throw 'Install path already exists' }
@@ -145,7 +145,7 @@ jobs:
         shell: pwsh
         run: |
           $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
-          $new = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-*.exe' -File)
+          $new = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-x64.exe' -File)
           if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Installer missing' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
@@ -177,7 +177,7 @@ jobs:
       - name: Render actual WPF preview
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.22-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-x64.exe').Path
           $preview = Join-Path $PWD 'dist/setup-preview.png'
           $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
           if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
@@ -190,7 +190,7 @@ jobs:
       - name: Verify updater self-cleanup after installer exit
         shell: pwsh
         run: |
-          $source = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.22-x64.exe').Path
+          $source = (Resolve-Path 'dist/PSSA-Setup-2.0.0-x64.exe').Path
           $folder = Join-Path $env:TEMP ('PSSA-update-' + [Guid]::NewGuid().ToString('N').Substring(0,6))
           New-Item -ItemType Directory -Path $folder | Out-Null
           $copy = Join-Path $folder (Split-Path $source -Leaf)
@@ -204,7 +204,7 @@ jobs:
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.22-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-x64.exe').Path
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
           function Run-Setup($path, $arguments) {
             Write-Host "Running $(Split-Path $path -Leaf) $arguments"
@@ -234,7 +234,7 @@ jobs:
         with:
           name: PSSA-Setup-Windows
           path: |
-            dist/PSSA-Setup-2.0.0-rc.22-x64.exe
+            dist/PSSA-Setup-2.0.0-x64.exe
             dist/SHA256SUMS.txt
             dist/setup-preview.png
           if-no-files-found: error
@@ -247,7 +247,7 @@ jobs:
       - name: Hash verified installer
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-*.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-x64.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one installer' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup[0].FullName).Hash.ToLowerInvariant()
           "$hash  $($setup[0].Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
@@ -255,14 +255,14 @@ jobs:
         with:
           name: PSSA-2-Dev-Windows
           path: |
-            dist/PSSA-2.0.0-*-x64.exe
+            dist/PSSA-2.0.0-x64.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error
 
   publish-beta:
     name: Publish verified Beta channel release
     needs: windows
-    if: success() && github.ref == 'refs/heads/develop/v2' && !contains(github.event.head_commit.message || '', '[audit-only]')
+    if: success() && github.ref == 'refs/heads/develop/v2' && !contains(github.event.head_commit.message || '', '[audit-only]') && !contains(github.event.head_commit.message || '', '[release-stable]')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -280,3 +280,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/publish-beta.sh
+
+  publish-stable:
+    name: Publish PSSA 2.0.0
+    needs: windows
+    if: success() && github.ref == 'refs/heads/develop/v2' && github.event_name == 'push' && contains(github.event.head_commit.message || '', '[release-stable]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: PSSA-Setup-Windows
+          path: release-package
+      - name: Publish verified stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 53acf3554139df4f7be38af507de4818513c4bfa
+        run: bash scripts/publish-stable.sh

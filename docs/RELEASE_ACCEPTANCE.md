@@ -26,4 +26,4 @@ Porównać Off, Studio, Streaming i Background w tej samej grze i scenie OBS. Ko
 
 ## Status 2.0.0
 
-Opublikowane RC.22 ma zakończony Windows CI. Zmiany optymalizacyjne po RC.22 są weryfikowane oddzielnie. Pełny ręczny audyt kodu oraz testy rzeczywistego stanowiska pozostają otwarte zgodnie z [raportem](AUDIT_RC22.md). Stabilny instalator wymaga ustalenia podpisu i ścieżki aktualizacji z niepodpisanych RC. Nie nadpisywać istniejących wydań.
+RC.22 i poprawki optymalizacyjne przeszły Windows CI (run 45576862358). Wydanie 2.0.0 zostało zaakceptowane do publikacji przez właściciela projektu pod warunkiem pozytywnego CI dla jego dokładnego commita. Pełny ręczny audyt i testy rzeczywistego stanowiska pozostają otwarte zgodnie z [raportem](AUDIT_RC22.md). Instalator 2.0.0 jest niepodpisany; wymagane ręczne pobranie i uruchomienie. Automatyczne uruchamianie niepodpisanych instalatorów Stable pozostaje zablokowane. Nie nadpisywać istniejących wydań.

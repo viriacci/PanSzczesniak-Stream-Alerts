@@ -1,6 +1,6 @@
 # Utrzymanie projektu
 
-Bieżąca gałąź v2: `develop/v2`. Wydanie publiczne: 2.0.0-rc.22.
+Bieżąca gałąź v2: `develop/v2`. Wersja: 2.0.0.
 
 - [Architektura](ARCHITECTURE.md)
 - [Odbiór wydania](RELEASE_ACCEPTANCE.md)
