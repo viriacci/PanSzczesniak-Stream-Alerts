@@ -10,3 +10,5 @@ RC.5 run 45517037799 PASS; użytkownik odrzucił wygląd stockowego NSIS. RC.6 W
 RC.6 first run 45518972169: WPF build succeeded, NSIS full tests succeeded, wrapper test exited 1; cause not yet proven. Added stage diagnostics, separate actual UI render gate, fallback registered location and explicit data-preserving uninstall. Do not release until wrapper succeeds.
 
 RC.6 run 45519937580: WPF compile PASS, actual preview FAIL with WIC 0x88982F60 decoding ICO in XAML. Separate PNG window resource; PE icon remains ICO. Render Content visual and verify preview file. Full wrapper tests still required.
+
+RC.7 commit 3091e93: CI 45528107883 success. Publiczny Client ID PSSA przekazany przez użytkownika i skonfigurowany jako domyślny identyfikator buildu (nie secret). Dodano regresję odświeżania publicznego tokenu i smoke obecności ID, bezpośrednie logowanie z onboardingu. Finalny test z rzeczywistym kontem Twitch nadal wymagany; main/stable bez zmian.

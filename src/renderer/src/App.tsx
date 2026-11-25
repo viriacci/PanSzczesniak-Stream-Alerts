@@ -94,7 +94,7 @@ export function App() {
   </div>
   <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">{theme.name} · PSSA</span></footer>
   {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role={notice.error?'alert':'status'}><span>{notice.text}</span><Button variant="ghost" aria-label="Zamknij powiadomienie" onClick={()=>setNotice(null)}><Icon name="close" size={16}/></Button></div>}
-  {ready&&runtime&&!runtime.onboarded&&<Onboarding runtime={runtime} save={saveRuntime} onIntegrations={()=>navigate('integrations')}/>}
+  {ready&&runtime&&!runtime.onboarded&&<Onboarding runtime={runtime} save={saveRuntime} onIntegrations={()=>{navigate('integrations');if(twitch?.publicLogin&&!twitch.login&&twitch.phase!=='authorizing')void window.pssa.twitchDeviceLogin().catch(()=>{})}}/>}
   {confirm&&<ConfirmDialog title="Przywrócić domyślny układ?" onClose={()=>setConfirm(false)} onConfirm={reset}>Zresetuje szerokość paneli, widoczność inspektora i układ menu. Nie zmieni statystyk ani ustawień alertów.</ConfirmDialog>}
  </div>
 }

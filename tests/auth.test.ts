@@ -58,3 +58,22 @@ test('logout during refresh cannot restore credentials',async()=>{
   assert.equal(f.auth.identity,undefined);assert.equal(f.auth.load(),false)
  }finally{f.auth.stop();f.db.close()}
 })
+
+test('public client reloads and rotates refresh token without a secret',async()=>{
+ let refreshes=0
+ const f=fixture(async(input,init)=>{
+  const url=String(input)
+  if(url.endsWith('/token')){
+   refreshes++;const body=new URLSearchParams(String(init?.body));assert.equal(body.has('client_secret'),false);assert.equal(body.get('refresh_token'),'old-refresh')
+   return response({access_token:'new-access',refresh_token:'rotated-refresh'})
+  }
+  if(url.endsWith('/validate'))return response({client_id:credentials.clientId,user_id:'42',login:'test',scopes})
+  return new Headers(init?.headers).get('Authorization')==='Bearer new-access'?response({data:[]}):response({},401)
+ })
+ try{
+  f.auth.stop();f.write({...credentials,secret:'',publicClient:true});assert.equal(f.auth.load(),true)
+  await f.auth.helix('users');assert.equal(refreshes,1)
+  const saved=f.db.prepare("SELECT value FROM settings WHERE key='twitch.secure.v1'").get()?.value
+  assert.equal(JSON.parse(Buffer.from(String(saved),'base64').toString()).refresh,'rotated-refresh')
+ }finally{f.auth.stop();f.db.close()}
+})

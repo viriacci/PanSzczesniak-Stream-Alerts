@@ -2,7 +2,7 @@ import {resolve} from 'node:path'
 import { defineConfig } from 'electron-vite'
 
 export default defineConfig({
-  main: {define:{PSSA_TWITCH_CLIENT_ID:JSON.stringify(process.env.PSSA_TWITCH_CLIENT_ID??'')},build:{sourcemap:'hidden',rollupOptions:{input:{index:resolve('src/main/index.ts'),agent:resolve('src/main/agent/entry.ts'),'read-worker':resolve('src/main/runtime/read-worker.ts')}}}},
+  main: {define:{PSSA_TWITCH_CLIENT_ID:JSON.stringify(process.env.PSSA_TWITCH_CLIENT_ID?.trim()||'s7jdtp55s1s9089njgjlzw5d3bb7xq')},build:{sourcemap:'hidden',rollupOptions:{input:{index:resolve('src/main/index.ts'),agent:resolve('src/main/agent/entry.ts'),'read-worker':resolve('src/main/runtime/read-worker.ts')}}}},
   preload: {build:{sourcemap:'hidden'}},
   renderer: {
     build:{sourcemap:'hidden'},
