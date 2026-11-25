@@ -129,15 +129,21 @@ export async function installObsDock(window:BrowserWindow):Promise<boolean>{
    "New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null",
    "New-Item -ItemType Directory -Path (Join-Path $root 'data') -Force | Out-Null",
    "$license=Join-Path (Split-Path $dll) 'COPYING'; if(Test-Path -LiteralPath $license){Copy-Item -LiteralPath $license -Destination (Join-Path $root 'COPYING') -Force}",
+   "try {",
    "$stage=$target+'.'+[Guid]::NewGuid().ToString('N')+'.tmp'",
-   "try { Copy-Item -LiteralPath $dll -Destination $stage -Force; if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $stage).Hash){exit 14}; if(Test-Path -LiteralPath $target){[IO.File]::Replace($stage,$target,$null)}else{[IO.File]::Move($stage,$target)} } finally { if(Test-Path -LiteralPath $stage){Remove-Item -LiteralPath $stage -Force} }",
-   "if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force}",
+   "$backup=$target+'.'+[Guid]::NewGuid().ToString('N')+'.bak'",
+   "try { Copy-Item -LiteralPath $dll -Destination $stage -Force; if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $stage).Hash){exit 14} } catch { exit 15 }",
+   "try { if(Test-Path -LiteralPath $target){[IO.File]::Replace($stage,$target,$backup,$true)}else{[IO.File]::Move($stage,$target)} } catch { exit 16 }",
+   "if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $target).Hash){if(Test-Path -LiteralPath $backup){[IO.File]::Replace($backup,$target,$stage,$true)};exit 14}",
+   "if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}",
+   "} finally { if($stage -and (Test-Path -LiteralPath $stage)){Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue} }",
+   "try { if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force} } catch { exit 17 }",
    "exit 0"
   ].join('\r\n')
   const encoded=Buffer.from(script,'utf16le').toString('base64')
-  const outer="$ErrorActionPreference='Stop'; $p=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList '-NoProfile -NonInteractive -EncodedCommand "+encoded+"' -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
+  const outer="$ErrorActionPreference='Stop'; try { $p=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList '-NoProfile -NonInteractive -EncodedCommand "+encoded+"' -Verb RunAs -Wait -PassThru; exit $p.ExitCode } catch { if($_.Exception.NativeErrorCode -eq 1223 -or $_.Exception.InnerException.NativeErrorCode -eq 1223){exit 18};exit 19 }"
   try{await run(outer,120000)}
-  catch(e){const code=(e as {code?:number}).code;throw Error(code===12?'Zamknij OBS i spróbuj ponownie.':code===14?'Weryfikacja pliku DLL nie powiodła się.':'Instalacja anulowana lub nie powiodła się.')}
+  catch(e){const code=(e as {code?:number}).code;throw Error(({12:'Zamknij OBS i spróbuj ponownie.',14:'Weryfikacja pliku DLL nie powiodła się.',15:'Nie można przygotować pliku DLL. Sprawdź uprawnienia i wolne miejsce.',16:'Nie można zastąpić DLL. Zamknij wszystkie procesy OBS i spróbuj ponownie.',17:'Nowa DLL jest zapisana, ale nie można usunąć starej kopii. Zamknij OBS.',18:'Anulowano uprawnienia administratora.',19:'Nie udało się uruchomić instalacji z uprawnieniami administratora.'} as Record<number,string>)[Number(code)]??'Instalacja wtyczki nie powiodła się (kod: '+String(code??'timeout')+').')}
   return true
  }finally{busy=false}
 }

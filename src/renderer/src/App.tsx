@@ -55,7 +55,7 @@ export function App() {
  const navigate=useCallback((page:PageId)=>{patch({page});if(page!=='settings')setEditing(false);content.current?.scrollTo({top:0});content.current?.focus()},[patch])
  useEffect(()=>{
    const onKey=(event:KeyboardEvent)=>{
-     if(!event.ctrlKey||event.altKey||event.shiftKey||event.metaKey||event.repeat||confirm)return
+     if(!event.ctrlKey||event.altKey||event.shiftKey||event.metaKey||event.repeat||confirm||document.querySelector('dialog[open]'))return
      if(event.target instanceof HTMLElement && (['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName)||event.target.isContentEditable))return
      if(event.key.toLowerCase()==='b'){event.preventDefault();patch({collapsed:!current.current.collapsed})}
      if(event.key.toLowerCase()==='i'){event.preventDefault();patch({inspectorOpen:!current.current.inspectorOpen})}

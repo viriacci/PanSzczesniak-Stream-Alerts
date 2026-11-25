@@ -232,3 +232,13 @@ svg { flex:none; }
 }
 
 @media(max-height:600px){.content:has(.queue-page){padding:8px}.content:has(.queue-page) .page-header{margin-bottom:8px}.content:has(.queue-page) .page-header .eyebrow,.content:has(.queue-page) .page-header p:not(.eyebrow){display:none}.content:has(.queue-page) .page-header h1{font-size:20px;margin:2px 0}}
+
+/* Responsive alert/reward tiles and native, viewport-bounded editor. */
+.rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(142px,100%),1fr));gap:10px;margin-top:12px}
+.rule-tile{min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:var(--radius);cursor:pointer;font:inherit;text-align:center}
+.rule-tile:hover,.rule-tile:focus-visible{border-color:var(--gold);outline:none}.rule-tile strong{overflow-wrap:anywhere;font-size:13px}.rule-tile small{color:var(--muted);font-size:11px}.rule-tile .status{margin-top:auto}
+.rule-tile-art{width:56px;height:56px;border-radius:12px;display:grid;place-items:center;background:var(--line-soft);color:var(--gold);overflow:hidden}.rule-tile-art img{width:44px;height:44px;object-fit:contain}
+.rule-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(660px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 56px);padding:0;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text);overflow:hidden;box-shadow:0 18px 70px #0009}
+.rule-dialog[open]{display:flex;flex-direction:column}.rule-dialog::backdrop{background:#000a}.rule-dialog-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}.rule-dialog-header h2{font-size:18px;overflow-wrap:anywhere;min-width:0}
+.rule-dialog .rule-dialog-form{margin:0;min-height:0;gap:0;overflow:hidden;display:flex;flex:1 1 auto}.rule-dialog-body{min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px;padding:14px 16px}.rule-dialog-footer{flex-shrink:0;padding:10px 16px;border-top:1px solid var(--line);background:var(--bg)}.rule-dialog-footer p{font-size:12px;margin-top:6px;overflow-wrap:anywhere}.rule-dialog .queue-fields{grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr))}
+@media(max-height:500px){.rule-dialog-header,.rule-dialog-footer{padding:8px 12px}.rule-dialog-body{padding:8px 12px;gap:8px}.rule-dialog-header h2{font-size:16px}}

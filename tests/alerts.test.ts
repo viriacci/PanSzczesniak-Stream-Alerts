@@ -47,3 +47,6 @@ test('media types cannot be swapped between image and audio',()=>{
  assert.throws(()=>parseRule({...defaultRule('raid'),image:'a'.repeat(64)+'.mp3'}))
  assert.throws(()=>parseRule({...defaultRule('raid'),audio:'a'.repeat(64)+'.png'}))
 })
+
+import {parseRewards,rewardImage} from '../src/shared/alerts.ts'
+test('reward tiles prefer Twitch custom artwork with safe CDN fallback',()=>{const custom='https://static-cdn.jtvnw.net/custom-reward-images/abc/4x.png',fallback='https://static-cdn.jtvnw.net/default.png';const items=parseRewards([{id:'a',title:'A',cost:50,image:{url_4x:custom},default_image:{url_4x:fallback},background_color:'#aabbcc'},{id:'b',title:'B',cost:10,image:{url_4x:'https://evil.example/a.png'},default_image:{url_4x:fallback}}]);assert.equal(items[0]?.image,custom);assert.equal(items[0]?.color,'#aabbcc');assert.equal(items[1]?.image,fallback);assert.equal(rewardImage('https://static-cdn.jtvnw.net.evil.example/a'),undefined)})

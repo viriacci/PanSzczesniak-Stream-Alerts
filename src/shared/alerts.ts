@@ -8,7 +8,16 @@ export interface AlertRule { key:string; enabled:boolean; title:string; image:st
 export interface Border {border_width:number;border_color:string;border_style:string}
 export interface AlertLayout { image:{x:number;y:number;width:number;height:number}&Border; caption:{x:number;y:number;width:number;height:number;font_size:number;font_color:string;bg_color:string;bg_opacity:number;font_family:string}&Border; anim_in:string;anim_out:string;anim_duration_ms:number }
 export interface TwitchState { phase:'disconnected'|'authorizing'|'connecting'|'connected'|'retrying'|'error'; login:string; detail:string; overlayUrl:string; clients:number; publicLogin?:boolean; deviceCode?:string }
-export interface Reward {id:string;title:string;cost:number}
+export interface Reward {id:string;title:string;cost:number;image?:string;color?:string}
+export function rewardImage(value:unknown):string|undefined{
+ if(typeof value!=='string'||value.length>2048)return undefined
+ try{const u=new URL(value);if(u.protocol==='https:'&&u.hostname==='static-cdn.jtvnw.net'&&!u.port&&!u.username&&!u.password)return u.href}catch{}
+ return undefined
+}
+export function parseRewards(data:unknown):Reward[]{
+ if(!Array.isArray(data))return []
+ return data.filter(x=>x&&typeof x.id==='string'&&typeof x.title==='string').map(x=>({id:x.id,title:x.title,cost:Math.max(0,Number(x.cost)||0),image:rewardImage(x.image?.url_4x)??rewardImage(x.image?.url_2x)??rewardImage(x.image?.url_1x)??rewardImage(x.default_image?.url_4x)??rewardImage(x.default_image?.url_1x),color:typeof x.background_color==='string'&&/^#[0-9a-f]{6}$/i.test(x.background_color)?x.background_color:undefined}))
+}
 export interface AlertState { profileId?:string; twitch:TwitchState; rules:AlertRule[]; rewards:Reward[]; queue:QueueState }
 export const templates:Record<AlertKind,string>={redemption:'{user} odbiera {reward}',raid:'{user} najeżdża z {viewers} widzami!',follow:'{user} zaczyna obserwować!',sub:'{user} subskrybuje!',prime_sub:'{user} subskrybuje z Prime!',resub:'{user} odnawia subskrypcję ({months} mies.)!',gift:'{user} podarował subskrypcję!',mass_gift:'{user} podarował {count} subskrypcji!',bits:'{user} przekazuje {bits} Bits!'}
 export function validKey(key:string):boolean {return (kinds as readonly string[]).includes(key)||/^reward:[a-zA-Z0-9_-]{1,128}$/.test(key)}

@@ -24,7 +24,7 @@ import { Overlay } from '../overlay/server'
 import { rules,saveRule,saveRules,saveScene } from './store'
 import { copyMedia,imageExt,audioExt,videoExt } from './media'
 import { importLegacy } from './import'
-import { defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
+import { parseRewards,defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
 export class AlertsService {
  private auth:Auth
  private live:LiveService
@@ -84,12 +84,12 @@ export class AlertsService {
   try{if(device)await this.auth.deviceLogin(clientId,code=>{if(g===this.generation)this.deviceCode=code});else await this.auth.login(clientId,secret);this.deviceCode='';if(g!==this.generation||this.stopped)return;this.phase='connecting';await this.connect()}
   catch{if(g===this.generation&&!this.stopped){this.phase='error';this.deviceCode='';this.detail=device?'Logowanie nie powiodło się. Spróbuj ponownie.':'Logowanie nie powiodło się. Sprawdź dane i redirect URI.'}throw Error('Logowanie Twitch nie powiodło się')}
  }
- async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start();void this.live.poll()}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
+ async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start();void this.live.poll();void this.sync().catch(()=>{})}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
  logout(){this.deviceCode='';this.generation++;this.live.reset();this.events.stop();this.auth.logout();this.rewards=[];this.phase='disconnected';this.detail=''}
  async sync(){const id=this.auth.identity?.userId;if(!id)throw Error('Zaloguj Twitch');const g=this.generation
   const data=await this.auth.helix('channel_points/custom_rewards?broadcaster_id='+encodeURIComponent(id))
   if(this.stopped||g!==this.generation)throw Error('Sesja zmieniona')
-  this.rewards=(Array.isArray(data.data)?data.data:[]).filter((x:any)=>typeof x.id==='string'&&typeof x.title==='string').map((x:any)=>({id:x.id,title:x.title,cost:Number(x.cost)||0}))
+  this.rewards=parseRewards(data.data)
   return this.rewards
  }
  saveScene(key:unknown,value:unknown,title:unknown,profile:unknown){assertActiveProfile(this.db,profile);return saveScene(this.db,key,value,title)}
