@@ -11,7 +11,7 @@ exe="PSSA-Setup-$version-x64.exe"
 dir="release-package"
 test -f "$dir/$exe"
 test -f "$dir/SHA256SUMS.txt"
-expected="$(awk -v file="$exe" '$2==file {print tolower($1)}' "$dir/SHA256SUMS.txt")"
+expected="$(awk -v file="$exe" '{sub(/\r$/, "", $2)} $2==file {print tolower($1)}' "$dir/SHA256SUMS.txt")"
 [[ "$expected" =~ ^[0-9a-f]{64}$ ]]
 actual="$(sha256sum "$dir/$exe" | cut -d' ' -f1)"
 [[ "$actual" == "$expected" ]]
@@ -34,7 +34,8 @@ gh release create "$tag" "$dir/$exe" "$dir/SHA256SUMS.txt" \
   --title "PSSA $version" --notes-file "$notes" --prerelease --draft --latest=false
 gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,assets > draft-release.json
 jq -e --arg exe "$exe" '.isDraft and .isPrerelease and ([.assets[].name]|index($exe)!=null) and ([.assets[].name]|index("SHA256SUMS.txt")!=null)' draft-release.json >/dev/null
-gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > release-api.json
+gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -s --arg tag "$tag" '[.[][] | select(.tag_name==$tag and .draft==true)] | if length==1 then .[0] else error("Draft not uniquely found") end' > release-api.json
 jq -e --arg exe "$exe" --arg digest "sha256:$actual" 'any(.assets[]; .name==$exe and .digest==$digest and .size>0)' release-api.json >/dev/null
 gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
-gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,url
+gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,url | tee published-release.json
+jq -e '.isPrerelease and (.isDraft|not)' published-release.json >/dev/null
