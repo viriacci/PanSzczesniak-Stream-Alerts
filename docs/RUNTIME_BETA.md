@@ -1,4 +1,4 @@
-# Etap 10 — beta, optymalizacja i dystrybucja
+# Tryby pracy i aktualizacje
 ## Tryby
 Studio: dotychczasowy polling UI 1.5–2s. Streaming: polling UI 5s, ograniczone przejścia CSS. Gdy dokument ukryty, UI pomija odczyty. Background: po jawnej akceptacji przejścia do tła BrowserWindow jest ukrywany i ładuje about:blank (odmontowanie React oraz jego timerów); proces Chromium nie jest gwarantowanie usuwany. Backend, EventSub, kolejka, OBS, Agent i zapis próbek działają bez zmian. Powrót z zasobnika lub drugiego uruchomienia PSSA w trybie Streaming. Zamknięcie aplikacji przez X/zakończ kończy silnik. Niezapisane szkice przepadają po wyładowaniu renderera — UI ostrzega. Nie są to pomiary oszczędności CPU/RAM/GPU; rzeczywiste pomiary pozostają otwarte.
 ## Backup i restore

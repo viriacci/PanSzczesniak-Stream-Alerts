@@ -49,7 +49,7 @@ export class RuntimeService{
  }
  measurementState(){return this.measurement.state()}
  async measurementStart(gpu:unknown){this.guard();if(typeof gpu!=='boolean')throw Error('Invalid GPU preference');if(this.measurement.active)throw Error('Measurement already active');const r=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Rozpocząć pomiar?',message:'PSSA będzie zapisywać rzeczywiste pomiary co 10 sekund, także w tle.',detail:'Pomiar sam nie uruchamia transmisji, nie symuluje alertów, kończy się po maks. 24 godzinach lub po zamknięciu PSSA. Dane pozostają na komputerze.',buttons:['Anuluj','Rozpocznij pomiar'],defaultId:0,cancelId:0});if(r.response!==1||this.stopped)return this.measurement.state();return this.beginMeasurement(gpu)}
- // Internal start path; renderer can only invoke the confirmation-gated IPC.
+ // IPC calls measurementStart, which requires confirmation.
  beginMeasurement(gpu:boolean){if(this.stopped||this.measurement.active)throw Error('Measurement unavailable');this.gpuEnabled=gpu;this.agentPrevious=undefined;this.agent?.setMeasurement(true);if(gpu)this.gpu.start();try{return this.measurement.start()}catch(e){this.stopCollectors();throw e}}
  private stopCollectors(){this.gpu.stop();this.agent?.setMeasurement(false);this.agentPrevious=undefined}
  measurementStop(){try{return this.measurement.stop()}finally{this.stopCollectors()}}

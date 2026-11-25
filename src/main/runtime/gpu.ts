@@ -1,6 +1,6 @@
 import {execFile,type ChildProcess} from 'node:child_process'
 import {join} from 'node:path'
-// Optional, actual Windows GPU engine counters, not a GPU memory or FPS estimate.
+// Windows GPU engine utilization counters.
 const script="$ErrorActionPreference='Stop'; $g=Get-CimInstance -ClassName Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine; $m=@{}; foreach($x in $g){if($x.Name -match 'luid_.*_phys_\\d+_eng_\\d+_engtype_.*$'){$k=$Matches[0];$m[$k]=[double]$m[$k]+[double]$x.UtilizationPercentage}}; if($m.Count -gt 0){[Console]::WriteLine([Math]::Min(100,($m.Values|Measure-Object -Maximum).Maximum).ToString([Globalization.CultureInfo]::InvariantCulture))}"
 export class GpuSampler{
  private child?:ChildProcess

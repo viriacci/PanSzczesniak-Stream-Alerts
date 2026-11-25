@@ -84,7 +84,7 @@ export function createBackup(db:DatabaseSync,media:string,destination:string){
   }
   out.exec('COMMIT');out.close();out=undefined
   if(statSync(temp).size>maxArchive)throw Error('Backup exceeds 1 GB')
-  // Windows rename is non-overwriting only when target doesn't exist; exclusive copy prevents overwrite on all platforms.
+  // Publish without replacing an existing backup.
   publishNew(temp,destination);rmSync(temp,{force:true})
   return count
  }finally{try{out?.close()}catch{}rmSync(temp,{force:true});rmSync(temp+'-journal',{force:true});rmSync(temp+'-wal',{force:true});rmSync(temp+'-shm',{force:true})}
@@ -102,7 +102,7 @@ export function restoreBackup(db:DatabaseSync,media:string,path:string){
  const src=openArchive(path)
  try{
   validateCopy(src);mkdirSync(media,{recursive:true})
-  // Content-addressed media is additive. Never delete the old library.
+  // Merge media by content hash.
   readAssets(src,(name,bytes)=>{
    const target=join(media,name)
    if(existsSync(target)){if(regular(target).size>maxFile)throw Error('Existing media too large');if(hash(readFileSync(target))===name.slice(0,64))return;throw Error('Existing media corrupt; repair before restore')}
@@ -113,7 +113,7 @@ export function restoreBackup(db:DatabaseSync,media:string,path:string){
    for(const t of [...tables].reverse())db.exec('DELETE FROM '+t)
    const del=db.prepare('DELETE FROM settings WHERE key=?');for(const key of settingKeys)del.run(key)
    copyData(src,db);validateData(db)
-   // Old pending alerts are historical, not commands to replay after restoring.
+   // Restored alerts must not replay.
    db.exec("UPDATE alert_queue SET status='skipped',reason='restored-backup',finished_at=created_at WHERE status IN ('pending','playing')")
    db.exec('COMMIT')
   }catch(e){db.exec('ROLLBACK');throw e}

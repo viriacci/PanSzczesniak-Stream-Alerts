@@ -28,7 +28,7 @@ public sealed class SparkRing : FrameworkElement
         var rect=new Rect(16,16,w-32,h-32);
         double t=clock.IsRunning?clock.Elapsed.TotalSeconds:5, progress=Math.Min(1,t/2.1);
         if(progress>=1) dc.DrawRoundedRectangle(null,ringPen,rect,24,24);
-        // Rounded perimeter, built clockwise from the top midpoint, then settles into a subtle outline.
+        // Clockwise rounded perimeter.
         if(t>4.5) return;
         var g=new RectangleGeometry(rect,24,24).GetFlattenedPathGeometry();
         for(int i=0;i<120;i++){
@@ -43,7 +43,7 @@ public sealed class SparkRing : FrameworkElement
             dc.DrawEllipse(colors[index],null,q,radius,radius*.8);
             if(i%11==0) dc.DrawEllipse(colors[Math.Max(0,index-4)],null,q,radius*2.5,radius*2.5);
         }
-        // A persistent, gradually formed ring of small sparks remains behind the moving head.
+        
         int count=(int)(progress*180);
         for(int i=0;i<count;i++){g.GetPointAtFractionLength(i/180.0,out Point p,out _);dc.DrawEllipse(colors[2+i%3],null,p,.65,.65);}
     }

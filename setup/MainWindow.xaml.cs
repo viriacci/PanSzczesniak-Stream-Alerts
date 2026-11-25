@@ -17,7 +17,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        // Scale to fit compact displays without changing the designed layout.
+        
         if(SystemParameters.WorkArea.Width<Width||SystemParameters.WorkArea.Height<Height){
             var scale=Math.Min(SystemParameters.WorkArea.Width/Width,SystemParameters.WorkArea.Height/Height)*.98;
             var root=(FrameworkElement)Content; root.LayoutTransform=new ScaleTransform(scale,scale);Width*=scale;Height*=scale;

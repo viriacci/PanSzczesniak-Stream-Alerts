@@ -2,7 +2,7 @@ import {parseScene} from '../../shared/scene.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import { defaultRule, kinds, parseRule, validKey, type AlertRule } from '../../shared/alerts.ts'
 const cache=new WeakMap<DatabaseSync,{raw:unknown;rules:AlertRule[]}>()
-// Callers treat rules as immutable; edits replace rules through saveRule/saveRules.
+// Cached rules are immutable. Use saveRule/saveRules to edit.
 export function rules(db:DatabaseSync):AlertRule[]{
  const raw=db.prepare("SELECT value FROM settings WHERE key='alerts.v1'").get()?.value
  const previous=cache.get(db);if(previous&&previous.raw===raw)return previous.rules

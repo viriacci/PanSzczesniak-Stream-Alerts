@@ -1,3 +1,5 @@
 # Frontend
-React bez frameworka UI. Wejście src/renderer/src/main.tsx → App → PageContent. navigation.ts definiuje moduły i ich kolejność; komponenty ui.tsx tworzą powtarzalny język wizualny. App przechowuje preferencje w stanie i ref, serializuje zapisy IPC, a ResizeHandle emituje podgląd podczas ruchu i zapis po zakończeniu. Nie zapisujemy w localStorage.
-Zadanie do samodzielnej analizy: prześledź kliknięcie nawigacji i odtworzenie ostatniej zakładki po ponownym uruchomieniu. Następnie prześledź różnicę między onChange i onCommit separatora. Przy kolejnych etapach nowe funkcje implementować w features/<moduł>, nie w monolitycznym App.
+
+React, TypeScript i SCSS bez dodatkowego frameworka UI. Moduły interfejsu znajdują się w `src/renderer/src/features`, komponenty wspólne w `components`. `navigation.ts` zawiera definicje stron, a `App.tsx` koordynuje stan aplikacji i preferencje układu. Zapisy przechodzą przez walidowany kontrakt IPC do SQLite, nie localStorage.
+
+`ResizeHandle` rozdziela podgląd zmiany wymiarów od zapisu po zakończeniu przeciągania. Style motywów i układów znajdują się w `styles/base.scss`.

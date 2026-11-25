@@ -1,5 +1,5 @@
 import type {Scene} from './scene.ts'
-// Pure, self-contained, also serialized into the OBS browser script.
+// Serialized into the OBS overlay.
 export function nextSceneFrame(scene:Scene,elapsed:number){
  let delay=Math.max(1,scene.duration-elapsed)
  for(const l of scene.layers){

@@ -1,6 +1,38 @@
 # Architektura
-Renderer (React/SCSS) → jawny kontrakt PssaApi → preload (contextBridge) → IPC (main) → serwisy i SQLite.
-Proces main ma wyłączny dostęp do bazy i systemu plików. Renderer nie ma Node, bezpośredniego ipcRenderer ani danych uwierzytelniających. IPC sprawdza konkretny webContents, główną ramkę, URL i argumenty. Nawigacja, popupy, webview i uprawnienia są zablokowane. CSP ogranicza zasoby, dev URL wyłącznie loopback. DevTools tylko poza pakietem.
-SQLite przez node:sqlite (bez dodatkowego natywnego addonu). API izolowane w module database. Migracje atomowe przez user_version, FK i WAL. Wyższa nieobsługiwana wersja bazy jest odrzucana. Czas w Unix epoch ms UTC, brak próbki != zero widzów. Źródło zapisane w stream_sessions i stream_events. Importer później odpowiada za scalanie sesji między źródłami.
-Kolejka, Twitch, OBS, overlay i agent zostaną osobnymi modułami w odpowiednich etapach. Nie ma jeszcze serwera sieciowego ani tokenów. Nie zapisujemy sekretów w ustawieniach. Na etapie 3 użyć aktualnego asynchronicznego API safeStorage i fail closed przy braku bezpiecznego magazynu.
-Logi zawierają stałe kody zdarzeń, bez dowolnych payloadów. W etapie 10 dojdzie diagnostyka z redakcją.
+
+PSSA jest aplikacją Electron z interfejsem React/TypeScript i lokalną bazą SQLite.
+
+## Procesy i granice
+
+```text
+React renderer -> PssaApi -> preload -> IPC -> main
+                                           |-- SQLite
+                                           |-- Twitch OAuth / EventSub
+                                           |-- OBS WebSocket
+                                           |-- HTTP/SSE overlay
+                                           |-- read workers
+                                           |-- runtime / updates
+
+OBS Control Dock -> authenticated local named pipe -> main
+Optional Agent   -> authenticated loopback HTTP   -> main
+```
+
+- `src/renderer`: interfejs, nawigacja, kreator i ustawienia.
+- `src/preload`: jawny kontrakt IPC przez contextBridge.
+- `src/main`: serwisy, pliki, baza danych, autoryzacja i cykl życia aplikacji.
+- `src/shared`: typy, walidacja, modele i wspólny renderer scen.
+- `obs-dock`: natywna wtyczka C++/Qt.
+- `setup`: instalator WPF z osadzonym pakietem NSIS.
+- `tests`: testy Node i regresje; smoke Electron w `src/main/index.ts`.
+
+## Dane
+
+SQLite (node:sqlite), migracje transakcyjne przez user_version, FK i WAL. Baza o nowszym nieobsługiwanym schemacie jest odrzucana. Czas zdarzeń: Unix epoch w milisekundach, UTC. Brak próbki widzów nie oznacza zera. Media identyfikowane są przez SHA-256 zawartości.
+
+## Bezpieczeństwo
+
+Renderer nie ma dostępu do Node ani surowego ipcRenderer. IPC sprawdza nadawcę, główną ramkę, adres dokumentu i argumenty. Poświadczenia Twitch i OBS korzystają z safeStorage. Nakładka, Agent i dock komunikują się lokalnie. Logi diagnostyczne nie powinny zawierać poświadczeń.
+
+## Wydajność
+
+Kolejka budzi się na zdarzenia i terminy odtwarzania. Raporty i indeks biblioteki korzystają z krótkotrwałego workera odczytu. Tryb Background odmontowuje interfejs, pozostawiając działające usługi.

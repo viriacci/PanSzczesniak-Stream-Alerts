@@ -14,7 +14,7 @@ const icons:Record<LayerKind,IconName>={text:'text',image:'image',video:'video',
 const zeroCrop:Crop={top:0,right:0,bottom:0,left:0}
 const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v))
 const stamp=stampKeyframe
-// Unsaved drafts survive navigation in this renderer session; never silently overwrite saved rules.
+// Keep unsaved drafts until the renderer closes.
 const drafts=new Map<string,Scene>()
 function keepDraft(key:string,scene:Scene){drafts.delete(key);drafts.set(key,scene);if(drafts.size>50)drafts.delete(drafts.keys().next().value!)}
 function NumberField({label,value,min,max,step=1,onChange}:{label:string;value:number;min:number;max:number;step?:number;onChange:(n:number)=>void}){

@@ -1,16 +1,10 @@
-# Handoff — 2.0.0-rc.3
-RC.2 afe100b3, run 45380348076 success, 83/83, audit 0, pełne Windows CI. Dwie odłożone funkcje wdrażane teraz zgodnie z użytkownikiem: skórki PSSA/ViviOnyx/Shiroe (koncepcje kolorystyczne, nie oficjalne brandbooki), świadomy pomiar rzeczywistej pracy w Diagnostyce i lokalne crash logi. Szczegóły docs/MEASUREMENT_AND_THEMES.md. 4 nowe testy Node, smoke IPC motywu i diagnostyki; CI oczekuje. Żadnych nowych npm dependencies, schema DB 5 bez zmian. Aktualizacja z RC.2. Nie publikować main/stable. Rzeczywiste pomiary Windows/OBS/Twitch i akceptacja skórki wymagane.
+# Utrzymanie projektu
 
-RC.3 commit 603d713, run 45382575827 pełny PASS. RC.4: paleta ViviOnyx zgodna z podanymi przez użytkownika HEX #141414, #843935, #ae9278; dostosowanie wykresów do motywu, test palety. CI RC.4 oczekuje.
+Bieżąca gałąź v2: `develop/v2`. Wydanie publiczne: 2.0.0-rc.22.
 
-RC.5: stylizowany NSIS MUI2, PSSA jako nazwa, generowane zasoby, niezależne checkboxy skrótów, dezinstalacja wykrytej instalacji, kompatybilność wewnętrznego exe i danych. docs/INSTALLER.md. CI oczekuje; nie publikować main/stable.
+- [Architektura](ARCHITECTURE.md)
+- [Odbiór wydania](RELEASE_ACCEPTANCE.md)
+- [Audyt RC.22](AUDIT_RC22.md)
+- [Historia weryfikacji](VERIFICATION.md)
 
-RC.5 run 45517037799 PASS; użytkownik odrzucił wygląd stockowego NSIS. RC.6 WPF bootstrapper (setup/), silnik NSIS wyłącznie po cichu, custom UI i spark ring, osobny artefakt PSSA-Setup-Windows. CI oczekuje. main bez zmian.
-
-RC.6 first run 45518972169: WPF build succeeded, NSIS full tests succeeded, wrapper test exited 1; cause not yet proven. Added stage diagnostics, separate actual UI render gate, fallback registered location and explicit data-preserving uninstall. Do not release until wrapper succeeds.
-
-RC.6 run 45519937580: WPF compile PASS, actual preview FAIL with WIC 0x88982F60 decoding ICO in XAML. Separate PNG window resource; PE icon remains ICO. Render Content visual and verify preview file. Full wrapper tests still required.
-
-RC.7 commit 3091e93: CI 45528107883 success. Publiczny Client ID PSSA przekazany przez użytkownika i skonfigurowany jako domyślny identyfikator buildu (nie secret). Dodano regresję odświeżania publicznego tokenu i smoke obecności ID, bezpośrednie logowanie z onboardingu. Finalny test z rzeczywistym kontem Twitch nadal wymagany; main/stable bez zmian.
-
-RC.7 final 9b91ce3 run45529428040 PASS. RC.8: Konfiguracja, logowanie zaawansowane w zwiniętych ustawieniach, migracja usuwająca zakładkę settings z drzewa, bezpośredni drag/drop bez przełącznika edycji, wskaźniki i sekcje details. Nie zmieniono mechanizmu instalacji, danych ani OAuth. CI oczekuje.
+Przed zmianą sprawdź aktualny HEAD, uruchom testy i zachowaj zgodność istniejących ustawień oraz schematu danych. Opublikowane instalatory nie są nadpisywane. Historyczne zapisy prac pozostają w historii Git i raportach audytowych.

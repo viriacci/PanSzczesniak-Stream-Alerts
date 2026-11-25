@@ -1,4 +1,4 @@
-# Visual Studio — etap 7
+# Kreator Alertów
 ## Model
 Scene v1 jest opcjonalnym polem AlertRule (SQLite settings oraz snapshot kolejki, bez zmiany schematu SQL). Rozdzielczość 320–3840 × 180–2160, długość 1–120 s, do 32 warstw. Kolejność tablicy od dołu do góry. Typy: tekst, obraz PNG/JPG/GIF/WebP, MP4/WebM, audio MP3/WAV/OGG/M4A, kształt i proste cząsteczki (24 na warstwę). SVG nie jest jeszcze obsługiwane. Obsługa kodeków i alpha WebM zależy od Chromium/OBS.
 Pozycja i rozmiar w procentach, pozycja oznacza środek. Obrót, krycie, tło, obramowanie, font, prostokąt/elipsa. Warstwy mają początek i koniec w ms, animacje wejścia/wyjścia z czasem do 3 s. {alert} w tekstach oznacza wyrenderowany szablon reguły z istniejącymi zmiennymi Twitch. Nie wykonujemy HTML ani własnych skryptów użytkownika.

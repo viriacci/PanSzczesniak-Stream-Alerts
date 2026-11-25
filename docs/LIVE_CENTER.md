@@ -1,4 +1,4 @@
-# Live Center — etap 6
+# Dashboard transmisji
 ## Dane
 Twitch Get Streams co 30 s, EventSub stream.online/offline uruchamia dodatkowy odczyt. Twitch ID transmisji + channel_id identyfikują sesję. Błąd API nie zamyka sesji i nie zapisuje 0 widzów; stan unknown. Potwierdzony offline lub nowe ID zamyka poprzednią sesję z czasem ostatniego potwierdzenia (dolne oszacowanie, end_quality=last-seen), nie wymyśla dokładnego końca. Ponowne wykrycie tego samego ID otwiera tę samą sesję. Nie ma danych z okresu wyłączonego PSSA. Odczyty są przybliżone i mogą być opóźnione po stronie Twitcha.
 SQLite schema 3: metadane sesji, kategoria każdej próbki, channel_id i pseudonim rozmówcy w stream_events, obs_samples z telemetrią i bitrate. Czasy Unix epoch ms UTC. Średnia to średnia arytmetyczna z próbek, peak to ich maksimum, nie oficjalne Twitch Analytics. Wykres ostatnich 480 próbek, przerwy >90s bez łączenia. Historia pełnych sesji zostaje w bazie.

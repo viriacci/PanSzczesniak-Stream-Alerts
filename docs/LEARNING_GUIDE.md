@@ -1,19 +1,13 @@
-# Przewodnik do samodzielnej nauki
-1. src/renderer/src/App.tsx — useState, useEffect, funkcje async i renderowanie warunkowe. Zobacz jak przełącznik jest sterowany stanem.
-2. styles/base.scss — zmienne, grid, flex, clamp, focus-visible, modyfikator compact.
-3. src/shared/contracts.ts — TypeScript, interfejsy, walidacja danych w runtime.
-4. src/preload/index.ts — bezpieczny adapter między przeglądarką i Node.
-5. src/main/ipc.ts — autoryzacja nadawcy, walidacja, wywołanie bazy.
-6. src/main/database/index.ts — migracje, transakcje, klucze obce, prepared statements.
-7. tests — testy zachowania zamiast testów szczegółów implementacji.
-Prześledź kliknięcie przycisku compact od JSX przez preload i IPC do SQLite, a potem zamknij i uruchom aplikację. To działający pionowy przekrój architektury.
+# Orientacja w kodzie
 
-## Etap 2
-- styles/base.scss: tokeny, responsywne media queries, flex/grid, stan focus, wariant compact.
-- components/ui.tsx: reużywalne komponenty, props, children i natywny dialog.
-- components/ResizeHandle.tsx: pointer events, useRef, klawiatura i dostępność.
-- navigation.ts i features/pages.tsx: mapowanie danych na interfejs, rozdział modułów.
-- App.tsx i shared/layout.ts: stan, serializacja zapisów oraz kontrakt walidowany przez main.
+| Obszar | Pliki |
+| --- | --- |
+| Interfejs i stan | `src/renderer/src/App.tsx`, `features/`, `navigation.ts` |
+| Style | `src/renderer/src/styles/base.scss` |
+| IPC | `src/shared/contracts.ts`, `src/preload/index.ts`, `src/main/ipc.ts` |
+| Dane | `src/main/database/`, `src/main/alerts/store.ts` |
+| Sceny | `features/studio.tsx`, `src/shared/scene.ts`, `src/shared/scene-player.ts` |
+| Nakładka | `src/main/overlay/server.ts` |
+| Testy | `tests/`, workflow Windows |
 
-## Visual Studio
-Prześledź studio.tsx → scene.ts → scene-player.ts → overlay/server.ts. Model oddzielony od renderowania, immutable updates i historia undo/redo, pointer capture, transformacje CSS, ResizeObserver, requestAnimationFrame, synchronizacja zegara. Zwróć uwagę na walidację modelu w main i brak innerHTML z danych użytkownika. 
+Zmiany modelu należy walidować po stronie main. Nowe komponenty modułów umieszczać w `features/`; wspólny kod renderowania scen musi działać również w przeglądarce OBS.

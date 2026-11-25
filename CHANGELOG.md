@@ -1,4 +1,41 @@
-# Changelog
+# Historia zmian
+
+## Unreleased
+- Optymalizacja samouczków, renderowania scen, importu mediów i kolejki.
+- Poprawki autoryzacji oraz bezpieczeństwa aktualizatora.
+- Uporządkowanie dokumentacji i komentarzy.
+
+## 2.0.0-rc.22
+- Nowy motyw Shiroe: ciepłe brązy, pergamin i klasyczna typografia.
+- Krótkie opisy zmiennych alertów i nagród; uproszczony interfejs.
+- [Szczegóły wydania](docs/releases/2.0.0-rc.22.md).
+
+## 2.0.0-rc.20
+- Centrum pomocy i sześć przewodników po interfejsie.
+- Dopasowanie logotypów skórek.
+
+## 2.0.0-rc.19
+- Kategorie i tagi transmisji, regulowany układ kolejki, ukrywanie historii.
+- Branding oraz sprzątanie instalatorów tymczasowych.
+
+## 2.0.0-rc.18
+- Skróty i uchwyty w kreatorze; aktualizacje Beta po weryfikacji SHA-256 i potwierdzeniu.
+
+## 2.0.0-rc.17
+- Rozbudowany kreator: keyframe'y, zmienne, fonty, cząsteczki i regulowane panele.
+
+## 2.0.0-rc.16
+- Przebudowany układ kreatora i inspektora.
+
+## 2.0.0-rc.15
+- Aktualizator dostępny w ustawieniach.
+
+## 2.0.0-rc.14
+- Warstwy, przycinanie, animacje, szablony i oś czasu.
+
+## 2.0.0-rc.7–rc.13
+- Logowanie urządzeniowe, nawigacja, kolejka testowa, natywny Control Dock, wykrywanie OBS i aktualizator.
+
 ## 2.0.0-rc.6
 - Osobny custom installer WPF, wbudowany silnik NSIS, animowane złote iskry wokół okna, aktualizacja i dezinstalacja.
 

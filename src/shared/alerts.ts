@@ -50,7 +50,7 @@ export function renderText(template:string,event:AlertEvent):string {
 
 export function testEvent(rule:AlertRule,id:string):AlertEvent{return {id,kind:rule.key.startsWith('reward:')?'redemption':rule.key as AlertKind,user:'Test PSSA',reward:rule.title,count:25,months:3}}
 
-/** Contextual UI labels only; persisted templates and event rendering stay unchanged. */
+
 export type AlertVariable='user'|'reward'|'viewers'|'bits'|'count'|'months'
 export type AlertVariableHint={key:AlertVariable;label:string}
 export function alertVariableHints(ruleKey:string):AlertVariableHint[]{

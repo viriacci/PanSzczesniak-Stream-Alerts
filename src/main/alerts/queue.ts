@@ -32,7 +32,7 @@ export class AlertQueue {
  get version(){return this.revision}
  onChange:()=>void=()=>{}
  private changed(){this.revision++;this.cached=undefined;this.pendingTotal=undefined;this.onChange()}
- // Null means no timer: wake on a new event, command, or transport change.
+ // null = wait for an event or transport change.
  nextDelay():number|null{
   if(this.stopped)return null
   const now=this.now()
@@ -44,7 +44,7 @@ export class AlertQueue {
   this.db=db;this.transport=transport;this.now=now
   const raw=db.prepare("SELECT value FROM settings WHERE key='queue.v1'").get()?.value
   try{this.settings=typeof raw==='string'?parseQueueSettings(JSON.parse(raw)):{...defaultQueueSettings}}catch{this.settings={...defaultQueueSettings}}
-  // A crash may have interrupted playback; it cannot prove that OBS finished.
+  // Recover interrupted playback after restart.
   db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason='restart-limit' WHERE status='playing' AND attempts>=3").run(this.now())
   db.exec("UPDATE alert_queue SET status='pending',reason='restart' WHERE status='playing'");this.hasPending=this.pendingCount()>0
  }
@@ -67,7 +67,7 @@ export class AlertQueue {
   return this.insert(source+':'+event.id,source,parseRule(rule),renderText(rule.template,event),event.count??event.months??0,eventVariables(event))
  }
  private insert(eventId:string,source:QueueSource,rule:AlertRule,text:string,count:number,variables?:Record<string,string>){
-  // Only the chosen scene is part of an immutable playback snapshot.
+  // Store the selected scene, not its variants.
   rule={...rule,variants:[]}
   if(this.stopped)throw Error('Queue stopped')
   if(this.db.prepare('SELECT id FROM alert_queue WHERE event_id=?').get(eventId))return false

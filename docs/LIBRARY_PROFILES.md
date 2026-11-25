@@ -1,4 +1,4 @@
-# Library, Profiles & Variants — etap 8
+# Biblioteka, profile i warianty
 ## Zasoby
 Wspólny katalog media, SHA-256 zawartości + rozszerzenie, bez kolejnej kopii dla identycznego pliku tego samego formatu. Import limit 50 MB na plik. Katalog na żądanie odkrywa pliki oraz referencje w aktywnych regułach, pozostałych profilach, szablonach, wariantach i snapshotach kolejki/historii. Nazwa użytkowa, folder logiczny (nie ścieżka dysku), do 12 tagów, wyszukiwanie, filtrowanie typu/folderu i brakujących, miniatury, podgląd audio/video. Wykrycie brakującego pliku nie usuwa referencji. Przywrócenie przez import identycznej zawartości. Nie implementowano usuwania fizycznych plików, aby uniknąć uszkodzenia historii i profili. Brak nowych zależności. SVG nadal nieobsługiwany.
 ## Profile

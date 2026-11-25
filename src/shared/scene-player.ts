@@ -1,5 +1,5 @@
 import type {Scene,Layer,Geometry} from './scene.ts'
-// This function is intentionally self-contained: OBS receives the same implementation via toString().
+// Serialized into the OBS overlay via toString(). Keep dependencies inside the function.
 export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,mediaBase:string,volume:number,onError:()=>void,sample:(layer:Layer,time:number)=>Geometry,variables:Record<string,string>={}){
  let disposed=false,master=volume/100,failed=false
  const fail=()=>{if(!disposed&&!failed){failed=true;onError()}}

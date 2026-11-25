@@ -1,4 +1,4 @@
-# Design System — etap 2
+# Interfejs i motywy
 Czarno-złoty interfejs PSSA: #101012 tło, #141417 nawigacja, #1b1b1e karty, #e3c048 akcent, #f2f2f2 tekst. Typografia: preferowane Inter/Cinzel/JetBrains Mono z systemowymi fallbackami (fonty jeszcze nie są dystrybuowane). Własne ikony SVG. Brak Tailwind, MUI i dodatkowych zależności UI.
 - Tokeny CSS w styles/base.scss, wariant kompaktowy przez zmienną --space, focus-visible, reduced-motion, responsywny układ.
 - Button, Panel, Status, Empty i ConfirmDialog w components/ui.tsx. Dialog korzysta z natywnego showModal, Escape i przywracania fokusu.
