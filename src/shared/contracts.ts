@@ -34,6 +34,7 @@ export const IPC = {
   analyticsReport:'pssa:analytics:report',
   analyticsImport:'pssa:analytics:import',
   analyticsExport:'pssa:analytics:export',
+  studioFonts:'pssa:studio:fonts',
   libraryState:'pssa:library:state',
   libraryAction:'pssa:library:action',
   liveState:'pssa:live:state',
@@ -93,6 +94,7 @@ export interface PssaApi {
   analyticsReport(filter:AnalyticsFilter):Promise<AnalyticsReport>
   analyticsImport():Promise<ImportResult|null>
   analyticsExport(filter:AnalyticsFilter,format:'csv'|'json'):Promise<boolean>
+  studioFonts():Promise<string[]>
   libraryState():Promise<LibraryState>
   libraryAction(value:LibraryAction):Promise<void>
   liveState():Promise<LiveState>

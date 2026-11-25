@@ -1,3 +1,4 @@
+import {studioFonts} from './studio-fonts'
 import {installObsDock,obsDockStatus} from './obs/dock-install'
 import type {RuntimeService} from './runtime/service'
 import type { ObsService } from './obs/service'
@@ -68,6 +69,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.analyticsReport,1,filter=>alerts.analyticsReport(filter)],
    [IPC.analyticsImport,0,()=>{runtime.requireOffline();return alerts.analyticsImport(()=>runtime.requireOffline())}],
    [IPC.analyticsExport,2,(filter,format)=>alerts.analyticsExport(filter,format)],
+   [IPC.studioFonts,0,()=>studioFonts()],
    [IPC.libraryState,0,()=>alerts.libraryState()],
    [IPC.libraryAction,1,value=>alerts.libraryAction(value)],
    [IPC.liveState,0,()=>alerts.liveState()],

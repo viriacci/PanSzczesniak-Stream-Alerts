@@ -26,6 +26,7 @@ const api: PssaApi = {
   analyticsReport:filter=>ipcRenderer.invoke(IPC.analyticsReport,filter),
   analyticsImport:()=>ipcRenderer.invoke(IPC.analyticsImport),
   analyticsExport:(filter,format)=>ipcRenderer.invoke(IPC.analyticsExport,filter,format),
+  studioFonts:()=>ipcRenderer.invoke(IPC.studioFonts),
   libraryState:()=>ipcRenderer.invoke(IPC.libraryState),
   libraryAction:value=>ipcRenderer.invoke(IPC.libraryAction,value),
   liveState:()=>ipcRenderer.invoke(IPC.liveState),

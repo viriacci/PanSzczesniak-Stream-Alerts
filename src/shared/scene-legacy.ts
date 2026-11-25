@@ -1,7 +1,7 @@
 import {makeLayer,type Scene,type Layer,type Animation} from './scene.ts'
 import {normalizeLayout,type AlertRule} from './alerts.ts'
 export function titleStyle(layer:Layer,reward:boolean):Layer{
- return {...layer,font:'Segoe UI',fontSize:64,fontWeight:700,color:'#ffffff',shadow:true,backgroundOpacity:0,borderWidth:0,borderStyle:'none',accentColor:reward?'#e3c048':undefined,accentAfter:reward?' odbiera ':undefined}
+ return {...layer,accentVariable:undefined,font:'Segoe UI',fontSize:64,fontWeight:700,color:'#ffffff',shadow:true,backgroundOpacity:0,borderWidth:0,borderStyle:'none',accentColor:reward?'#e3c048':undefined,accentAfter:reward?' odbiera ':undefined}
 }
 export function sceneForRule(rule:AlertRule):Scene{
  if(rule.scene)return rule.scene

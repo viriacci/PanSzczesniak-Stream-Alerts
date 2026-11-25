@@ -161,7 +161,7 @@ jobs:
       - name: Render actual WPF preview
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.16-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.17-x64.exe').Path
           $preview = Join-Path $PWD 'dist/setup-preview.png'
           $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
           if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
@@ -174,7 +174,7 @@ jobs:
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.16-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.17-x64.exe').Path
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
           function Run-Setup($path, $arguments) {
             Write-Host "Running $(Split-Path $path -Leaf) $arguments"
@@ -204,7 +204,7 @@ jobs:
         with:
           name: PSSA-Setup-Windows
           path: |
-            dist/PSSA-Setup-2.0.0-rc.16-x64.exe
+            dist/PSSA-Setup-2.0.0-rc.17-x64.exe
             dist/SHA256SUMS.txt
             dist/setup-preview.png
           if-no-files-found: error
