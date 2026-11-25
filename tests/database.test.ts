@@ -73,7 +73,7 @@ test('v4 database gains covering history and chat indexes without losing rows',(
  const db=openDatabase(':memory:',4)
  try{
   db.exec("INSERT INTO stream_sessions(channel_id,source,started_at) VALUES ('42','twitch',1000); INSERT INTO stream_events(session_id,source,external_id,kind,occurred_at,payload_json,chatter_key) VALUES (1,'twitch','chat1','chat',1000,'{}','a')")
-  migrate(db);assert.equal(schemaVersion(db),5)
+  migrate(db);assert.equal(schemaVersion(db),SCHEMA_VERSION)
   assert.equal(db.prepare('SELECT count(*) n FROM stream_events').get()?.n,1)
   const plan=db.prepare("EXPLAIN QUERY PLAN SELECT count(*),count(DISTINCT chatter_key) FROM stream_events WHERE session_id=? AND kind='chat'").all(1)
   assert.match(JSON.stringify(plan),/events_chat_by_session/)

@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 const migrations: readonly string[] = [
   `CREATE TABLE settings (
     key TEXT PRIMARY KEY, value TEXT NOT NULL
@@ -75,7 +75,8 @@ const migrations: readonly string[] = [
   ) STRICT;`,
   `CREATE INDEX alert_queue_history ON alert_queue(finished_at DESC,id DESC) WHERE status IN ('done','skipped','failed','suppressed');
   CREATE INDEX events_chat_by_session ON stream_events(session_id,chatter_key) WHERE kind='chat';
-  CREATE INDEX events_nonchat_by_session ON stream_events(session_id,kind) WHERE kind<>'chat';`
+  CREATE INDEX events_nonchat_by_session ON stream_events(session_id,kind) WHERE kind<>'chat';`,
+  `CREATE TABLE alert_history_hidden(id INTEGER PRIMARY KEY REFERENCES alert_queue(id) ON DELETE CASCADE) STRICT;`
 ]
 
 export function schemaVersion(db: DatabaseSync): number {
@@ -108,7 +109,6 @@ export function openDatabase(path: string, version=SCHEMA_VERSION): DatabaseSync
     db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;')
     if(!Number.isInteger(version)||version<1||version>SCHEMA_VERSION)throw Error('Unsupported schema target')
     migrate(db,migrations.slice(0,version))
-    if(version>=5)db.exec('CREATE TABLE IF NOT EXISTS alert_history_hidden(id INTEGER PRIMARY KEY REFERENCES alert_queue(id) ON DELETE CASCADE)')
     return db
   } catch (error) {
     db.close()

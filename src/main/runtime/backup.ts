@@ -10,7 +10,7 @@ import {parseRule,validMedia} from '../../shared/alerts.ts'
 import {parseQueueSettings} from '../../shared/queue.ts'
 import {parseRuntime} from '../../shared/runtime.ts'
 import {config,activeProfile} from '../library/store.ts'
-const tables=['stream_sessions','viewer_samples','stream_events','obs_samples','imported_summaries','alert_queue'] as const
+const tables=['stream_sessions','viewer_samples','stream_events','obs_samples','imported_summaries','alert_queue','alert_history_hidden'] as const
 const settingKeys=['compact','layout.v1','window.v1','alerts.v1','queue.v1','library.v1','library.active','live.chat.salt','runtime.v1']
 const maxArchive=1024*1024*1024,maxFile=50*1024*1024
 const hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex')
@@ -19,6 +19,7 @@ function regular(path:string){const s=lstatSync(path);if(!s.isFile()||s.isSymbol
 function columns(db:DatabaseSync,table:string){return db.prepare('PRAGMA table_info('+table+')').all().map(x=>String(x.name))}
 function copyData(from:DatabaseSync,to:DatabaseSync){
  for(const t of tables){
+  if(t==='alert_history_hidden'&&schemaVersion(from)<6)continue
   const cols=columns(to,t),sql=cols.join(','),ins=to.prepare('INSERT INTO '+t+'('+sql+') VALUES ('+cols.map(()=>'?').join(',')+')')
   for(const row of from.prepare('SELECT '+sql+' FROM '+t).iterate())ins.run(...cols.map(k=>row[k] as SQLInputValue))
  }
@@ -41,7 +42,7 @@ function openArchive(path:string){
  if(regular(path).size>maxArchive||['-wal','-shm','-journal'].some(s=>existsSync(path+s)))throw Error('Backup too large or has sidecar files')
  const db=new DatabaseSync(path,{readOnly:true})
  try{db.exec('PRAGMA trusted_schema=OFF; PRAGMA query_only=ON')
-  const version=schemaVersion(db);if(version!==4&&version!==SCHEMA_VERSION)throw Error('Unsupported backup schema')
+  const version=schemaVersion(db);if(version!==4&&version!==5&&version!==SCHEMA_VERSION)throw Error('Unsupported backup schema')
   const expected=openDatabase(':memory:',version)
   try{
    expected.exec('CREATE TABLE backup_manifest(key TEXT PRIMARY KEY,value TEXT NOT NULL) STRICT; CREATE TABLE backup_media(name TEXT PRIMARY KEY,bytes BLOB NOT NULL) STRICT;')
