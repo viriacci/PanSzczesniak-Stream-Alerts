@@ -160,3 +160,5 @@ test('independent test waits offline and observes volume, mute, ACK and replay',
   f.q.command({type:'replay',id:f.q.state().history[0]!.id});f.advance(500);assert.equal(f.last()!.volume,0);f.ack()
  }finally{f.q.stop();f.db.close()}
 })
+
+test('history deletion hides completed alert, preserves deduplication and rejects pending',()=>{const f=fixture();try{f.q.enqueue(f.event('keep'),f.rule);const id=f.q.state().pending[0]!.id;assert.throws(()=>f.q.command({type:'delete-history',id}));f.q.command({type:'skip',id});assert.equal(f.q.state().history[0]?.id,id);f.q.command({type:'delete-history',id});assert.equal(f.q.state().history.length,0);assert.equal(f.q.enqueue(f.event('keep'),f.rule),false);assert.equal(f.db.prepare('SELECT count(*) n FROM alert_queue').get()?.n,1)}finally{f.q.stop();f.db.close()}})

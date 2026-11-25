@@ -5,7 +5,7 @@ import { parseRule, renderText,eventVariables, type AlertEvent, type AlertRule }
 import { defaultQueueSettings,parseQueueSettings,parseQueueCommand,type QueueItem,type QueueSummary,type QueueSource,type QueueState,type QueueStatus,type Playback,type QueueSettings } from '../../shared/queue.ts'
 
 // Partial index predicate must remain identical to schema migration 5.
-export const historyQueryTail=" FROM alert_queue INDEXED BY alert_queue_history WHERE status IN ('done','skipped','failed','suppressed') ORDER BY finished_at DESC,id DESC LIMIT 100"
+export const historyQueryTail=" FROM alert_queue INDEXED BY alert_queue_history WHERE status IN ('done','skipped','failed','suppressed') AND id NOT IN (SELECT id FROM alert_history_hidden) ORDER BY finished_at DESC,id DESC LIMIT 100"
 
 export interface Transport {
  online():boolean
@@ -140,6 +140,9 @@ export class AlertQueue {
      else if(item.status==='pending')this.db.prepare("UPDATE alert_queue SET status='skipped',finished_at=?,reason='manual' WHERE id=?").run(this.now(),item.id)
      else throw Error('Alert is not pending')
      break
+    case 'delete-history':
+     if(item.status==='pending'||item.status==='playing')throw Error('Alert is still active')
+     this.db.prepare('INSERT OR IGNORE INTO alert_history_hidden(id) VALUES (?)').run(item.id);break
     case 'replay':
      if(item.status==='pending'||item.status==='playing')throw Error('Alert is still active')
      if(!this.insert('replay:'+randomUUID(),'replay',item.rule,item.text,0,item.variables))throw Error('Queue is full')

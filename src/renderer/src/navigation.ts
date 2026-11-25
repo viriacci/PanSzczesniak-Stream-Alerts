@@ -12,7 +12,6 @@ export const groups: {label:string;items:NavItem[]}[] = [
  {id:'library',label:'Biblioteka',icon:'folder',stage:8,description:'Zarządzanie obrazami, wideo i dźwiękami.'},
  {id:'dashboard',label:'Dashboard',icon:'dashboard',stage:2,description:'Stan aplikacji i najważniejsze informacje o transmisji.'}]},
  {label:'Analiza',items:[
- {id:'activity',label:'Aktywność',icon:'activity',stage:6,description:'Zdarzenia Twitcha, aktywność czatu i historia bieżącej sesji.'},
  {id:'analytics',label:'Analityka',icon:'chart',stage:9,description:'Porównania okresów 7, 14, 30 i 180 dni oraz import historii.'}]},
  {label:'Ustawienia',items:[
  {id:'integrations',label:'Konfiguracja',icon:'plug',stage:3,description:'Połączenie z Twitchem i OBS.'},

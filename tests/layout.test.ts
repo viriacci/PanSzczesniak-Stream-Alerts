@@ -66,6 +66,6 @@ test('RC.8 defaults migrate while preserving custom layout and collapse state',(
  const next=parseLayout({...defaultLayout,navigation:old,sidebarWidth:300,page:'dashboard'})
  assert.deepEqual(next.navigation.nodes.map(n=>n.id),['alerts-group','assets','live','system'])
  assert.equal((findNode(next.navigation.nodes,'live') as any).collapsed,true);assert.equal(next.sidebarWidth,300);assert.equal(next.page,'dashboard')
- const custom={...old,hidden:['studio']};assert.deepEqual(parseLayout({...defaultLayout,navigation:custom}).navigation,custom)
+ const custom={...old,hidden:['studio']};assert.equal(findNode(parseLayout({...defaultLayout,navigation:custom}).navigation.nodes,'activity'),undefined);assert.equal(parseLayout({...defaultLayout,page:'activity'}).page,'queue')
  assert.equal(defaultLayout.page,'queue');assert.equal((defaultLayout.navigation.nodes[0] as any).children[1].id,'rewards')
 })

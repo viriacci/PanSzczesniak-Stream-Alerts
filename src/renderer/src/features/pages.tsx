@@ -40,7 +40,7 @@ export function PageContent({update,checkUpdate,openUpdate,runtime,saveRuntime,l
  </>
  if(item.id==='diagnostics')return <MemoDiagnostics/>
  if(item.id==='documentation')return <><Panel title="Skróty klawiaturowe"><dl className="details"><dt>Ctrl + B</dt><dd>Zwiń / rozwiń menu</dd><dt>Ctrl + I</dt><dd>Inspektor</dd><dt>Ctrl + ,</dt><dd>Ustawienia</dd><dt>Strzałki / Home / End</dt><dd>Zmiana szerokości aktywnego separatora</dd><dt>Esc</dt><dd>Zamknij okno dialogowe</dd></dl></Panel><Panel title="Przewodnik po projekcie"><p>Dokumentacja techniczna i materiały do nauki znajdują się w katalogu docs repozytorium PSSA.</p></Panel></>
- if(item.id==='queue'||item.id==='activity')return <MemoQueue state={alertState?.queue} historyOnly={item.id==='activity'}/>
+ if(item.id==='queue'||item.id==='activity')return <MemoQueue state={alertState?.queue}/>
  if(item.id==='integrations')return <><TwitchPage state={alertState}/><ObsPage obs={obs} agent={agent}/><MigrationPanel/></>
  if(item.id==='alerts'||item.id==='rewards')return <AlertsPage key={item.id+':'+(alertState?.profileId??'default')} state={alertState} rewards={item.id==='rewards'}/>
  return <Panel title={item.label} action={<Status>Etap {item.stage}</Status>}><Empty title="Moduł w przygotowaniu">{item.description} Funkcjonalność nie jest jeszcze dostępna.</Empty></Panel>

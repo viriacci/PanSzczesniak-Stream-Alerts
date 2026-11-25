@@ -108,6 +108,7 @@ export function openDatabase(path: string, version=SCHEMA_VERSION): DatabaseSync
     db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;')
     if(!Number.isInteger(version)||version<1||version>SCHEMA_VERSION)throw Error('Unsupported schema target')
     migrate(db,migrations.slice(0,version))
+    if(version>=5)db.exec('CREATE TABLE IF NOT EXISTS alert_history_hidden(id INTEGER PRIMARY KEY REFERENCES alert_queue(id) ON DELETE CASCADE)')
     return db
   } catch (error) {
     db.close()
