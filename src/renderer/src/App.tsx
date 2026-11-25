@@ -2,6 +2,7 @@ import {SidebarNav} from './features/navigation'
 import type {Navigation} from '../../shared/layout'
 import {themes} from '../../shared/themes'
 import {BRAND} from '../../shared/brand'
+import {useUpdate,UpdatePopup} from './features/update'
 import {useRuntime,Onboarding} from './features/runtime'
 import {useLive} from './features/live'
 import {useObs} from './features/obs'
@@ -28,6 +29,9 @@ export function App() {
  const current=useRef<LayoutPreferences>(defaultLayout)
  const queue=useRef<Promise<unknown>>(Promise.resolve())
  const [ready,setReady]=useState(false)
+ const {info:updateInfo,remind:dockReminder}=useUpdate(ready)
+ const [dismissedUpdate,setDismissedUpdate]=useState<{version:string;until:number}>()
+ const [updateOpen,setUpdateOpen]=useState(false)
  const [busy,setBusy]=useState(false)
  const [dockStatus,setDockStatus]=useState<'missing'|'update'|'current'|'unavailable'>('missing')
  const [dockBusy,setDockBusy]=useState(false)
@@ -76,6 +80,8 @@ export function App() {
  useEffect(()=>{if(!ready||layout.page!=='settings')return;let active=true;void window.pssa.obsDockStatus().then(s=>{if(active)setDockStatus(s)}).catch(()=>{});return()=>{active=false}},[ready,layout.page])
  const installDock=async()=>{setDockBusy(true);try{if(await window.pssa.installObsDock()){setDockStatus(await window.pssa.obsDockStatus());setNotice({text:'Wtyczka OBS gotowa. Uruchom OBS ponownie.',error:false})}}catch(e){setNotice({text:e instanceof Error?e.message.replace(/^Error invoking remote method '[^']+': Error: /,''):'Nie udało się zainstalować wtyczki OBS.',error:true})}finally{setDockBusy(false)}}
  const reset=()=>{patch({...defaultLayout,page:'settings'});setConfirm(false)}
+ const updateAvailable=updateInfo?.state==='available'&&!(dismissedUpdate?.version===updateInfo.version&&dismissedUpdate.until>Date.now())
+ const updateBlocked=live?.phase==='live'||live?.phase==='unknown'||!!obs?.metrics?.streaming||!!obs?.metrics?.recording
  const item=allPages.find(p=>p.id===layout.page)??allPages[0]!
  const collapsed=layout.collapsed
  const inspector=layout.inspectorOpen&&!narrow
@@ -92,11 +98,14 @@ export function App() {
    {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className="content" tabIndex={-1} ref={content} id="main-content">
     <header className="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div>{item.id==='settings'&&<Button disabled={!ready||busy||dockBusy||dockStatus==='unavailable'} onClick={()=>void installDock()}>{dockBusy?'Instalowanie…':dockStatus==='update'?'Aktualizuj wtyczkę OBS':dockStatus==='current'?'Zainstaluj ponownie wtyczkę OBS':'Dodaj wtyczkę do OBS'}</Button>}</header>
+    {updateAvailable&&runtime?.onboarded&&<div className="update-banner" role="status"><Icon name="bolt"/><div><strong>Nowa wersja PSSA: {updateInfo?.version}</strong><small>Aktualizacja dostępna</small></div><Button variant="primary" onClick={()=>setUpdateOpen(true)}>Zobacz</Button><Button variant="ghost" aria-label="Przypomnij później" onClick={()=>setDismissedUpdate({version:updateInfo!.version,until:Date.now()+21600000})}><Icon name="close"/></Button></div>}
+    {dockReminder&&dockStatus!=='current'&&<div className="update-banner"><Icon name="plug"/><div><strong>Zaktualizuj wtyczkę OBS</strong><small>Zamknij OBS i przejdź do ustawień.</small></div><Button onClick={()=>navigate('settings')}>Ustawienia</Button></div>}
     <div className="page-body"><PageContent runtime={runtime} saveRuntime={saveRuntime} live={live} obs={obs} agent={agent} alertState={alertState} item={item} status={status} layout={layout} busy={busy||!ready} onCompact={toggleCompact} onReset={()=>setConfirm(true)} onLayout={patch} onNavigation={navChange} editingMenu={editing} onEditMenu={editMenu} onIntegrations={()=>navigate('integrations')}/></div>
    </main>
    {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase??'Offline'}</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
   </div>
   <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">{theme.name} · PSSA</span></footer>
+  {updateOpen&&updateInfo?.state==='available'&&<UpdatePopup info={updateInfo} current={status?.version??''} blocked={updateBlocked} onClose={()=>{setUpdateOpen(false);setDismissedUpdate({version:updateInfo.version,until:Date.now()+21600000})}/>}
   {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role={notice.error?'alert':'status'}><span>{notice.text}</span><Button variant="ghost" aria-label="Zamknij powiadomienie" onClick={()=>setNotice(null)}><Icon name="close" size={16}/></Button></div>}
   {ready&&runtime&&!runtime.onboarded&&<Onboarding runtime={runtime} save={saveRuntime} onIntegrations={()=>{navigate('integrations');if(twitch?.publicLogin&&!twitch.login&&twitch.phase!=='authorizing')void window.pssa.twitchDeviceLogin().catch(()=>{})}}/>}
   {confirm&&<ConfirmDialog title="Przywrócić domyślny układ?" onClose={()=>setConfirm(false)} onConfirm={reset}>Zresetuje szerokość paneli, widoczność inspektora i układ menu. Nie zmieni statystyk ani ustawień alertów.</ConfirmDialog>}

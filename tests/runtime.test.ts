@@ -114,3 +114,7 @@ test('v4 archives remain restorable after v5 index migration',()=>{
   assert.equal(db.prepare('PRAGMA user_version').get()?.user_version,5)
  }finally{db.close();rmSync(root,{recursive:true,force:true})}
 })
+
+import {releaseAsset} from '../src/main/runtime/updates.ts'
+import {downloadRelease,safeReleaseRedirect} from '../src/main/runtime/update-download.ts'
+test('release updater accepts only exact GitHub installer with digest, checks actual bytes',async()=>{const root=tmp();const bytes=Buffer.alloc(2048,42),sha256=createHash('sha256').update(bytes).digest('hex'),name='PSSA-Setup-2.0.0-rc.13-x64.exe',url='https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/download/v2.0.0-rc.13/'+name;const release={tag_name:'v2.0.0-rc.13',assets:[{name,browser_download_url:url,size:bytes.length,digest:'sha256:'+sha256}]};try{const asset=releaseAsset(release,'2.0.0-rc.13')!;assert.ok(asset);assert.equal(releaseAsset({...release,assets:[{...release.assets[0],digest:null}]},'2.0.0-rc.13'),undefined);assert.equal(safeReleaseRedirect('https://release-assets.githubusercontent.com/a'),true);assert.equal(safeReleaseRedirect('https://release-assets.githubusercontent.com.evil.com/a'),false);await assert.rejects(()=>downloadRelease(asset,root,(async()=>new Response(Buffer.alloc(2048))) as typeof fetch),/SHA256/);assert.equal(readdirSync(root).length,0);const path=await downloadRelease(asset,root,(async()=>new Response(bytes)) as typeof fetch);assert.deepEqual(readFileSync(path),bytes)}finally{rmSync(root,{recursive:true,force:true})}})

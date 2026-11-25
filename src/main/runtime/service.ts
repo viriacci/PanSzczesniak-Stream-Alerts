@@ -14,7 +14,12 @@ import {join} from 'node:path'
 import {statSync,existsSync} from 'node:fs'
 import {createBackup,stageRestore} from './backup'
 import {preferences,savePreferences} from './preferences'
-import {checkRelease} from './updates'
+import {checkRelease,compareVersions} from './updates'
+import {downloadRelease} from './update-download'
+import {execFile} from 'node:child_process'
+import {promisify} from 'node:util'
+import {mkdtemp,rm} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
 import {type Diagnostics,type RuntimePreferences,type UpdateInfo} from '../../shared/runtime'
 import {schemaVersion} from '../database'
 export class RuntimeService{
@@ -30,6 +35,7 @@ export class RuntimeService{
  private update?:Promise<UpdateInfo>
  private cached:UpdateInfo={state:'none',version:'',url:'',detail:'Nie sprawdzano aktualizacji.'}
  private checkedAt=0
+ private downloading=false
  private timer?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,private directory:string,private window:()=>BrowserWindow|undefined,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void){
   this.crashes=new CrashLog(directory,app.getVersion(),'main');this.agentCrashes=new CrashLog(directory,app.getVersion(),'agent')
@@ -90,5 +96,41 @@ export class RuntimeService{
   try{const value=await task;if(!this.stopped&&channel===this.state().updates){this.cached=value;this.checkedAt=Date.now()}return value}finally{if(this.update===task)this.update=undefined}
  }
  updateInfo(){return this.cached}
+ private async updateSafe(){
+  this.requireOffline()
+  if(process.platform!=='win32'||!app.isPackaged)throw Error('Instalator dostępny dla Windows x64.')
+  const exe=join(process.env.SystemRoot??'C:\\Windows','System32','tasklist.exe')
+  const {stdout}=await promisify(execFile)(exe,['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000})
+  if(/"obs64\.exe"/i.test(stdout))throw Error('Zamknij OBS przed aktualizacją PSSA.')
+  if(this.agent?.snapshot().online)throw Error('Zakończ niezależnego Agenta przed aktualizacją.')
+ }
+ private async trustedInstaller(file:string){
+  const quote=(v:string)=>"'"+v.replaceAll("'","''")+"'"
+  const script="$ErrorActionPreference='Stop'; $a=Get-AuthenticodeSignature -LiteralPath "+quote(process.execPath)+"; $b=Get-AuthenticodeSignature -LiteralPath "+quote(file)+"; if($a.Status -eq 'Valid' -and $b.Status -eq 'Valid' -and $a.SignerCertificate.Thumbprint -eq $b.SignerCertificate.Thumbprint){'trusted'}else{'manual'}"
+  try{const {stdout}=await promisify(execFile)(join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:20000});return stdout.trim()==='trusted'}catch{return false}
+ }
+ dockUpdateReminder(){try{const row=this.db.prepare("SELECT value FROM settings WHERE key='update.obs.reminder'").get();return typeof row?.value==='string'&&compareVersions(app.getVersion(),row.value)>=0}catch{return false}}
+ clearDockUpdateReminder(){this.db.prepare("DELETE FROM settings WHERE key='update.obs.reminder'").run()}
+ async downloadUpdate(alsoDock:unknown):Promise<'cancelled'|'manual'|'launched'>{
+  if(typeof alsoDock!=='boolean'||this.downloading||this.stopped)throw Error('Aktualizacja niedostępna.')
+  const info=this.cached;if(info.state!=='available'||!info.asset)throw Error('Wydanie nie zawiera instalatora ze zweryfikowaną sumą SHA256.')
+  this.downloading=true;let dir='',keep=false
+  try{
+   await this.updateSafe()
+   const choice=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Aktualizacja PSSA',message:'Pobrać PSSA '+info.version+'?',detail:'Zapisz rozpoczętą edycję. PSSA sprawdzi sumę SHA256 oraz podpis instalatora. OBS musi pozostać zamknięty.',buttons:['Anuluj','Pobierz'],defaultId:0,cancelId:0})
+   if(choice.response!==1)return 'cancelled'
+   dir=await mkdtemp(join(tmpdir(),'PSSA-update-'))
+   const file=await downloadRelease(info.asset,dir)
+   const trusted=await this.trustedInstaller(file)
+   if(alsoDock)this.db.prepare("INSERT INTO settings(key,value) VALUES ('update.obs.reminder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(info.version)
+   if(!trusted){keep=true;shell.showItemInFolder(file);return 'manual'}
+   await this.updateSafe()
+   const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Instalator zweryfikowany',message:'Uruchomić instalator i zakończyć PSSA?',detail:'Podpis i suma SHA256 są zgodne. Instalator zachowa istniejący katalog programu.',buttons:['Anuluj','Zainstaluj'],defaultId:0,cancelId:0})
+   if(confirm.response!==1){keep=true;shell.showItemInFolder(file);return 'manual'}
+   await this.updateSafe()
+   const result=await shell.openPath(file);if(result)throw Error('Nie można uruchomić instalatora.')
+   keep=true;setTimeout(()=>app.quit(),100);return 'launched'
+  }finally{this.downloading=false;if(dir&&!keep)await rm(dir,{recursive:true,force:true}).catch(()=>{})}
+ }
  async openUpdate(){if(this.cached.state!=='available'||!this.cached.url.startsWith('https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/'))throw Error('No update');await shell.openExternal(this.cached.url)}
 }

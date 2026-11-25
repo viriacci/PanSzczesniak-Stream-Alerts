@@ -3,6 +3,8 @@ import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
   obsDockStatus:()=>ipcRenderer.invoke(IPC.obsDockStatus),
+  updateDownload:alsoDock=>ipcRenderer.invoke(IPC.updateDownload,alsoDock),
+  updateDockReminder:()=>ipcRenderer.invoke(IPC.updateDockReminder),
   installObsDock:()=>ipcRenderer.invoke(IPC.installObsDock),
   measurementState:()=>ipcRenderer.invoke(IPC.measurementState),
   measurementStart:gpu=>ipcRenderer.invoke(IPC.measurementStart,gpu),

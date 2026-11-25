@@ -43,7 +43,9 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
    [IPC.obsDockStatus,0,()=>obsDockStatus()],
-   [IPC.installObsDock,0,()=>installObsDock(window)],
+   [IPC.installObsDock,0,async()=>{const ok=await installObsDock(window);if(ok)runtime.clearDockUpdateReminder();return ok}],
+   [IPC.updateDownload,1,value=>runtime.downloadUpdate(value)],
+   [IPC.updateDockReminder,0,()=>runtime.dockUpdateReminder()],
    [IPC.measurementState,0,()=>runtime.measurementState()],
    [IPC.measurementStart,1,gpu=>runtime.measurementStart(gpu)],
    [IPC.measurementStop,0,()=>runtime.measurementStop()],
@@ -86,7 +88,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.importLegacy,0,()=>alerts.import()],
    [IPC.testAlert,1,key=>{if(typeof key!=='string'||!validKey(key))throw Error('Invalid alert');return alerts.test(key)}]
   ]
-  const dialogs=new Set<string>([IPC.installObsDock,IPC.measurementStart,IPC.measurementExport,IPC.crashExport,IPC.backupCreate,IPC.backupRestore,IPC.diagnosticsExport,IPC.analyticsImport,IPC.analyticsExport,IPC.chooseMedia,IPC.importLegacy])
+  const dialogs=new Set<string>([IPC.installObsDock,IPC.updateDownload,IPC.measurementStart,IPC.measurementExport,IPC.crashExport,IPC.backupCreate,IPC.backupRestore,IPC.diagnosticsExport,IPC.analyticsImport,IPC.analyticsExport,IPC.chooseMedia,IPC.importLegacy])
   let dialogOpen=false
   for(const [channel,count,handler] of handlers)ipcMain.handle(channel,async(event,...args:unknown[])=>{authorize(event);if(args.length!==count)throw Error('Invalid arguments');if(!dialogs.has(channel))return handler(...args);if(dialogOpen)throw Error('Another file operation is active');dialogOpen=true;try{return await handler(...args)}finally{dialogOpen=false}})
   return () => {
