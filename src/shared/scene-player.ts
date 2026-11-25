@@ -61,10 +61,10 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
     if(should&&!node.playing&&!node.started){
      node.started=true
      node.playing=true
-     try{media.currentTime=Math.max(0,(time-l.start)/1000)}catch{}
+     try{media.currentTime=Math.max(0,(time-l.start+(l.mediaOffsetMs??0))/1000)}catch{}
      void media.play().catch(()=>{if(!disposed&&node.playing)fail()})
     }else if(!should&&node.playing){node.playing=false;node.started=false;media.pause()}
-    if(!play&&active&&media instanceof HTMLVideoElement&&media.readyState>=1){const target=Math.max(0,Math.min(Number.isFinite(media.duration)?media.duration:Infinity,(time-l.start)/1000));if(Math.abs(media.currentTime-target)>.15)try{media.currentTime=target}catch{}}
+    if(!play&&active&&media instanceof HTMLVideoElement&&media.readyState>=1){const target=Math.max(0,Math.min(Number.isFinite(media.duration)?media.duration:Infinity,(time-l.start+(l.mediaOffsetMs??0))/1000));if(Math.abs(media.currentTime-target)>.15)try{media.currentTime=target}catch{}}
    }
   }
  }

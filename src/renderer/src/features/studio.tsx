@@ -35,7 +35,7 @@ function StudioEditor({rule,base,profile}:{rule:AlertRule;base:string;profile:st
  const text=renderText(rule.template,event)
  const assign=(next:Scene)=>{current.current=next;keepDraft(draftKey,next);setScene(next);setDirty(true)}
  const remember=(before:Scene)=>{past.current=[...past.current.slice(-49),before];future.current=[]}
- const signature=JSON.stringify({...scene,layers:scene.layers.map(({x,y,width,height,rotation,opacity,keyframes,crop,start,end,enterMs,exitMs,...rest})=>rest)})
+ const signature=JSON.stringify({...scene,layers:scene.layers.map(({x,y,width,height,rotation,opacity,keyframes,crop,start,end,enterMs,exitMs,mediaOffsetMs,...rest})=>rest)})
  function change(next:Scene){setPlaying(false);remember(current.current);assign(next)}
  function patch(p:Partial<Layer>){if(!layer||layer.locked)return;const animated:Partial<Geometry>={};for(const k of geometryKeys)if(p[k]!==undefined)animated[k]=p[k];let next={...layer,...p};if(layer.keyframes?.length&&Object.keys(animated).length){const staticProps={...p};for(const k of geometryKeys)delete staticProps[k];next={...stamp(layer,time,animated),...staticProps}}if(p.start!==undefined||p.end!==undefined)next=retimeLayer(next,next.start,next.end);change({...scene,layers:scene.layers.map(l=>l.id===layer.id?next:l)})}
  function addKey(){if(!layer||layer.locked||layer.kind==='audio')return;change({...scene,layers:scene.layers.map(l=>l.id===layer.id?stamp(l,time):l)});setEditMode(true)}

@@ -8,7 +8,7 @@ import {pendingRestore} from './runtime/backup'
 import {preferences,savePreferences} from './runtime/preferences'
 import type {RuntimePreferences} from '../shared/runtime'
 import { createHash } from 'node:crypto'
-import { makeLayer,type Scene } from '../shared/scene'
+import { makeLayer,sampleLayer,type Scene } from '../shared/scene'
 import { AgentBridge } from './agent/bridge'
 import { ObsService } from './obs/service'
 import { AlertsService } from './alerts/service'
@@ -252,6 +252,8 @@ async function start(): Promise<void> {
     if(cardSmoke!==true)throw Error('Alert/reward card renderer smoke failed');
 
     activeWindow.setSize(originalSize[0]!,originalSize[1]!);
+    const studioSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{const wait=async f=>{for(let i=0;i<150;i++){const v=f();if(v)return v;await new Promise(r=>setTimeout(r,50))}throw Error('Studio controls timeout')};document.querySelector('[data-nav-id="studio"]').click();await wait(()=>document.querySelector('.studio-pro'));const add=[...document.querySelectorAll('.studio-add button')].find(b=>b.textContent.includes('Tekst'));add.click();const key=await wait(()=>[...document.querySelectorAll('.studio-timeline button')].find(b=>b.textContent.includes('Dodaj keyframe')&&!b.disabled));key.click();await wait(()=>document.querySelector('.studio-key'));const bg=document.querySelector('[aria-label="Tło podglądu"]');bg.value='color';bg.dispatchEvent(new Event('change',{bubbles:true}));await wait(()=>document.querySelector('[aria-label="Kolor tła podglądu"]'));const input=document.querySelector('[aria-label="Nazwa szablonu"]');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'Smoke template');input.dispatchEvent(new Event('input',{bubbles:true}));const save=await wait(()=>[...document.querySelectorAll('.studio-templatebar button')].find(b=>b.textContent==='Zapisz szablon'&&!b.disabled));save.click();await wait(()=>[...document.querySelectorAll('[aria-label="Szablon"] option')].some(o=>o.textContent==='Smoke template'));document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.queue-page'));return true})()`);
+    if(studioSmoke!==true)throw Error('Studio editor smoke failed');
     if(!(await activeWindow.webContents.executeJavaScript('new Promise(r=>setTimeout(()=>r([...document.querySelectorAll(".content,.queue-page,.queue-page .panel")].every(e=>e.scrollWidth<=e.clientWidth+1)),150))')))throw Error('Large queue overflow');
     console.log('PSSA smoke: IPC and database');
     const passed = await activeWindow.webContents.executeJavaScript(
@@ -279,7 +281,7 @@ async function start(): Promise<void> {
       const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGN8fMCDgRTARJLqUQ2jGoaUBgAQ3wILGYFI4wAAAABJRU5ErkJggg==','base64')
       const asset=createHash('sha256').update(png).digest('hex')+'.png'
       mkdirSync(join(directory,'media'),{recursive:true});writeFileSync(join(directory,'media',asset),png)
-      const scene:Scene={version:1,width:1920,height:1080,duration:1500,layers:[{...makeLayer('image','smoke-image',1500),asset},{...makeLayer('text','smoke-text',1500),text:'Multi-layer smoke'}]}
+      const scene:Scene={version:1,width:1920,height:1080,duration:1500,layers:[{...makeLayer('image','smoke-image',1500),asset,crop:{top:10,right:5,bottom:0,left:0},keyframes:[{...sampleLayer(makeLayer('image','k1',1500),0),time:0,easing:'linear'},{...sampleLayer(makeLayer('image','k2',1500),0),x:90,time:1200,easing:'linear'}]},{...makeLayer('text','smoke-text',1500),text:'Multi-layer smoke'}]}
       const exercise=async(value:Scene,expected:'done'|'failed')=>{
         const previous=new Set(activeAlerts.state().queue.history.map(x=>x.id))
         const saved=await activeWindow.webContents.executeJavaScript('window.pssa.saveScene("raid",'+JSON.stringify(value)+',"Raid","default")')
@@ -291,7 +293,7 @@ async function start(): Promise<void> {
             if(completed.status!==expected||expected==='failed'&&completed.reason!=='media-error'||expected==='done'&&!rendered)throw Error('Scene media smoke failed')
             return
           }
-          if(expected==='done'&&await preview.webContents.executeJavaScript('(()=>{const i=document.querySelector("#stage img");return !!i&&i.naturalWidth===16&&i.parentElement.style.display!=="none"&&document.getElementById("stage").textContent.includes("Multi-layer smoke")})()'))rendered=true
+          if(expected==='done'&&await preview.webContents.executeJavaScript('(()=>{const i=document.querySelector("#stage img");return !!i&&i.naturalWidth===16&&i.parentElement.style.display!=="none"&&i.parentElement.style.clipPath.startsWith("inset(10% 5%")&&parseFloat(i.parentElement.style.left)>50&&document.getElementById("stage").textContent.includes("Multi-layer smoke")})()'))rendered=true
           await new Promise(resolve=>setTimeout(resolve,80))
         }
         throw Error('Scene media smoke timeout')

@@ -7,7 +7,7 @@ export const geometryKeys:GeometryKey[]=['x','y','width','height','rotation','op
 export type Geometry=Pick<Layer,GeometryKey>
 export interface Keyframe extends Geometry {time:number;easing:'linear'|'smooth'|'hold'}
 export interface Crop {top:number;right:number;bottom:number;left:number}
-export interface Layer {crop?:Crop;keyframes?:Keyframe[];fontWeight?:number;shadow?:boolean;accentColor?:string;accentAfter?:string;id:string;name:string;kind:LayerKind;x:number;y:number;width:number;height:number;rotation:number;opacity:number;visible:boolean;locked:boolean;start:number;end:number;enter:Animation;exit:Animation;enterMs:number;exitMs:number;asset:string;text:string;color:string;background:string;backgroundOpacity:number;font:string;fontSize:number;borderWidth:number;borderColor:string;borderStyle:'none'|'solid'|'dashed'|'dotted'|'double';volume:number;shape:'rect'|'ellipse'}
+export interface Layer {mediaOffsetMs?:number;crop?:Crop;keyframes?:Keyframe[];fontWeight?:number;shadow?:boolean;accentColor?:string;accentAfter?:string;id:string;name:string;kind:LayerKind;x:number;y:number;width:number;height:number;rotation:number;opacity:number;visible:boolean;locked:boolean;start:number;end:number;enter:Animation;exit:Animation;enterMs:number;exitMs:number;asset:string;text:string;color:string;background:string;backgroundOpacity:number;font:string;fontSize:number;borderWidth:number;borderColor:string;borderStyle:'none'|'solid'|'dashed'|'dotted'|'double';volume:number;shape:'rect'|'ellipse'}
 export interface Scene {version:1;width:number;height:number;duration:number;layers:Layer[]}
 const number=(v:unknown,min:number,max:number)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max)throw Error('Invalid scene number');return v}
 const str=(v:unknown,max:number)=>{if(typeof v!=='string'||v.length>max)throw Error('Invalid scene text');return v}
@@ -30,6 +30,7 @@ export function parseScene(input:unknown):Scene{
   if(asset&&(!formats||!new RegExp('^[a-f0-9]{64}\\.('+formats+')$','i').test(asset)))throw Error('Invalid layer media')
   const font=str(a.font,80);if(!/^[\p{L}\p{N} _-]+$/u.test(font))throw Error('Invalid font')
   const optional:Partial<Layer>={}
+  if(a.mediaOffsetMs!==undefined)optional.mediaOffsetMs=number(a.mediaOffsetMs,0,86400000)
   if(a.crop!==undefined){if(!a.crop||typeof a.crop!=='object')throw Error('Invalid crop');const c=a.crop as Record<string,unknown>;const crop={top:number(c.top,0,99),right:number(c.right,0,99),bottom:number(c.bottom,0,99),left:number(c.left,0,99)};if(crop.left+crop.right>=100||crop.top+crop.bottom>=100)throw Error('Invalid crop');optional.crop=crop}
   if(a.keyframes!==undefined){if(!Array.isArray(a.keyframes)||a.keyframes.length>120)throw Error('Invalid keyframes');let previous=-1;optional.keyframes=a.keyframes.map((v:unknown)=>{if(!v||typeof v!=='object')throw Error('Invalid keyframe');const k=v as Record<string,unknown>,time=number(k.time,start,end);if(!Number.isInteger(time)||time<=previous)throw Error('Invalid keyframe time');previous=time;return {time,x:number(k.x,0,100),y:number(k.y,0,100),width:number(k.width,1,100),height:number(k.height,1,100),rotation:number(k.rotation,-360,360),opacity:number(k.opacity,0,100),easing:one(k.easing,['linear','smooth','hold'] as const)}})}
   if(a.fontWeight!==undefined)optional.fontWeight=number(a.fontWeight,100,900)
@@ -59,7 +60,7 @@ export function sampleLayer(l:Layer,time:number):Geometry{
 }
 export function retimeLayer(l:Layer,start:number,end:number,shift=0):Layer{
  const frames=l.keyframes?.map(k=>({...k,time:k.time+shift})).filter(k=>k.time>=start&&k.time<=end)
- return {...l,start,end,enterMs:Math.min(l.enterMs,end-start),exitMs:Math.min(l.exitMs,end-start),...(frames?{keyframes:frames}:{})}
+ return {...l,start,end,enterMs:Math.min(l.enterMs,end-start),exitMs:Math.min(l.exitMs,end-start),...(frames?{keyframes:frames}:{}),...((l.kind==='video'||l.kind==='audio')&&(l.mediaOffsetMs!==undefined||start!==l.start+shift)?{mediaOffsetMs:Math.max(0,Math.min(86400000,(l.mediaOffsetMs??0)+start-l.start-shift))}:{})}
 }
 export function fitMediaSize(w:number,h:number,sceneWidth:number,sceneHeight:number){
  const ratio=w/h*sceneHeight/sceneWidth
