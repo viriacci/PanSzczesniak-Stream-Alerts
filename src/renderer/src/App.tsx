@@ -16,6 +16,8 @@ import { Icon } from './components/icons'
 import { ResizeHandle } from './components/ResizeHandle'
 import { useAlerts } from './features/alerts'
 import { PageContent } from './features/pages'
+import { HelpCenter, GuidedTour } from './features/help'
+import type { TourPage } from './features/help-content'
 
 export function App() {
  const {runtime,saveRuntime}=useRuntime()
@@ -30,6 +32,8 @@ export function App() {
  const current=useRef<LayoutPreferences>(defaultLayout)
  const queue=useRef<Promise<unknown>>(Promise.resolve())
  const [ready,setReady]=useState(false)
+ const [helpOpen,setHelpOpen]=useState(false)
+ const [tourPage,setTourPage]=useState<TourPage>()
  const {info:updateInfo,remind:dockReminder,check:checkUpdate}=useUpdate(ready)
  const [dismissedUpdate,setDismissedUpdate]=useState<{version:string;until:number}>()
  const [updateOpen,setUpdateOpen]=useState(false)
@@ -83,7 +87,7 @@ export function App() {
  const reset=()=>{patch({...defaultLayout,page:'settings'});setConfirm(false)}
  const updateAvailable=updateInfo?.state==='available'&&(layout.page==='settings'||!(dismissedUpdate?.version===updateInfo.version&&dismissedUpdate.until>Date.now()))
  const updateBlocked=live?.phase==='live'||live?.phase==='unknown'||!!obs?.metrics?.streaming||!!obs?.metrics?.recording
- const item=allPages.find(p=>p.id===layout.page)??allPages[0]!
+ const item=allPages.find(p=>p.id===(tourPage??layout.page))??allPages[0]!
  const collapsed=layout.collapsed
  const inspector=layout.inspectorOpen&&!narrow
  const sidebarSize=collapsed?64:layout.sidebarWidth
@@ -98,7 +102,7 @@ export function App() {
    </aside>
    {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className={'content '+(item.id==='studio'?'content--studio':'')} tabIndex={-1} ref={content} id="main-content">
-    <header className="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div>{item.id==='settings'&&<Button disabled={!ready||busy||dockBusy||dockStatus==='unavailable'} onClick={()=>void installDock()}>{dockBusy?'Instalowanie…':dockStatus==='update'?'Aktualizuj wtyczkę OBS':dockStatus==='current'?'Zainstaluj ponownie wtyczkę OBS':'Dodaj wtyczkę do OBS'}</Button>}</header>
+    <header className="page-header" data-tour="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div>{item.id==='settings'&&<Button disabled={!ready||busy||dockBusy||dockStatus==='unavailable'} onClick={()=>void installDock()}>{dockBusy?'Instalowanie…':dockStatus==='update'?'Aktualizuj wtyczkę OBS':dockStatus==='current'?'Zainstaluj ponownie wtyczkę OBS':'Dodaj wtyczkę do OBS'}</Button>}</header>
     {updateAvailable&&<div className="update-banner" role="status"><Icon name="bolt"/><div><strong>Nowa wersja PSSA: {updateInfo?.version}</strong><small>Aktualizacja dostępna</small></div><Button variant="primary" onClick={()=>setUpdateOpen(true)}>Aktualizuj PSSA</Button><Button variant="ghost" aria-label="Przypomnij później" onClick={()=>setDismissedUpdate({version:updateInfo!.version,until:Date.now()+21600000})}><Icon name="close"/></Button></div>}
     {dockReminder&&dockStatus!=='current'&&<div className="update-banner"><Icon name="plug"/><div><strong>Zaktualizuj wtyczkę OBS</strong><small>Zamknij OBS i przejdź do ustawień.</small></div><Button onClick={()=>navigate('settings')}>Ustawienia</Button></div>}
     <div className="page-body"><PageContent update={updateInfo} checkUpdate={checkUpdate} openUpdate={()=>setUpdateOpen(true)} runtime={runtime} saveRuntime={saveRuntime} live={live} obs={obs} agent={agent} alertState={alertState} item={item} status={status} layout={layout} busy={busy||!ready} onCompact={toggleCompact} onReset={()=>setConfirm(true)} onLayout={patch} onNavigation={navChange} editingMenu={editing} onEditMenu={editMenu} onIntegrations={()=>navigate('integrations')}/></div>
@@ -106,6 +110,9 @@ export function App() {
    {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase??'Offline'}</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
   </div>
   <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">PSSA</span></footer>
+  <button type="button" className="help-launch" data-help-launch aria-label="Instrukcja i pomoc" title="Instrukcja i pomoc" disabled={!ready||!!(runtime&&!runtime.onboarded)} onClick={()=>setHelpOpen(true)}>?</button>
+  {helpOpen&&<HelpCenter initial={item.id} onClose={()=>setHelpOpen(false)} onStart={page=>{setHelpOpen(false);setTourPage(page);content.current?.scrollTo({top:0})}}/>}
+  {tourPage&&<GuidedTour key={tourPage} page={tourPage} onClose={()=>{setTourPage(undefined);content.current?.scrollTo({top:0})}}/>}
   {updateOpen&&updateInfo?.state==='available'&&<UpdatePopup info={updateInfo} current={status?.version??''} blocked={updateBlocked} onClose={()=>{setUpdateOpen(false);setDismissedUpdate({version:updateInfo.version,until:Date.now()+21600000})}}/>}
   {notice&&<div className={`toast ${notice.error?'toast-error':''}`} role={notice.error?'alert':'status'}><span>{notice.text}</span><Button variant="ghost" aria-label="Zamknij powiadomienie" onClick={()=>setNotice(null)}><Icon name="close" size={16}/></Button></div>}
   {ready&&runtime&&!runtime.onboarded&&<Onboarding runtime={runtime} save={saveRuntime} onIntegrations={()=>{navigate('integrations');if(twitch?.publicLogin&&!twitch.login&&twitch.phase!=='authorizing')void window.pssa.twitchDeviceLogin().catch(()=>{})}}/>}

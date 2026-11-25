@@ -3,8 +3,8 @@ import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 're
 export function Button({ children, variant = 'secondary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & {variant?: 'primary'|'secondary'|'ghost'}) {
   return <button type="button" {...props} className={`button button--${variant} ${className}`}>{children}</button>
 }
-export function Panel({ title, detail, action, children, className = '' }: {title: string; detail?: string; action?: ReactNode; children: ReactNode; className?: string}) {
-  return <section className={`panel ${className}`}><header className="panel-heading"><div><h2>{title}</h2>{detail && <p>{detail}</p>}</div>{action}</header>{children}</section>
+export function Panel({ title, detail, action, children, className = '', tourId }: {title: string; detail?: string; action?: ReactNode; children: ReactNode; className?: string; tourId?:string}) {
+  return <section className={`panel ${className}`}><header className="panel-heading" data-tour={tourId}><div><h2>{title}</h2>{detail && <p>{detail}</p>}</div>{action}</header>{children}</section>
 }
 export function Status({ children, tone = 'neutral' }: {children: ReactNode; tone?: 'neutral'|'ready'|'warning'}) {
   return <span className={`status status--${tone}`}><span className="status-dot" aria-hidden="true"/>{children}</span>
