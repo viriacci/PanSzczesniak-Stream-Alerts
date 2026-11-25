@@ -51,6 +51,7 @@ foreach($size in @(16,32,48,64,128,256)) {
   $canvas=Canvas $size $size;$b=$canvas[0];$g=$canvas[1]
   Mark $g 0 0 $size
   $g.Dispose()
+  if($size -eq 64){$b.Save((Join-Path $dir 'pssa-window.png'),[Drawing.Imaging.ImageFormat]::Png)}
   $ms=[IO.MemoryStream]::new()
   $b.Save($ms,[Drawing.Imaging.ImageFormat]::Png)
   $images+=@(@{size=$size;bytes=$ms.ToArray()})

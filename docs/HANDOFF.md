@@ -8,3 +8,5 @@ RC.5: stylizowany NSIS MUI2, PSSA jako nazwa, generowane zasoby, niezależne che
 RC.5 run 45517037799 PASS; użytkownik odrzucił wygląd stockowego NSIS. RC.6 WPF bootstrapper (setup/), silnik NSIS wyłącznie po cichu, custom UI i spark ring, osobny artefakt PSSA-Setup-Windows. CI oczekuje. main bez zmian.
 
 RC.6 first run 45518972169: WPF build succeeded, NSIS full tests succeeded, wrapper test exited 1; cause not yet proven. Added stage diagnostics, separate actual UI render gate, fallback registered location and explicit data-preserving uninstall. Do not release until wrapper succeeds.
+
+RC.6 run 45519937580: WPF compile PASS, actual preview FAIL with WIC 0x88982F60 decoding ICO in XAML. Separate PNG window resource; PE icon remains ICO. Render Content visual and verify preview file. Full wrapper tests still required.

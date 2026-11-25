@@ -83,7 +83,7 @@ public partial class MainWindow : Window
     }
     public async Task SavePreview(string file){
         await Task.Delay(700);UpdateLayout();
-        var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);
+        var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render((Visual)Content);
         var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var output=File.Create(file);encoder.Save(output);
     }

@@ -146,6 +146,7 @@ jobs:
           $preview = Join-Path $PWD 'dist/setup-preview.png'
           $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
           if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
+          if ((Get-Item $preview).Length -lt 10000) { throw 'WPF preview is unexpectedly small' }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pssa-setup-preview
