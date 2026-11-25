@@ -24,3 +24,10 @@ export function parseCandidates(value:unknown):ObsCandidate[]{
  }
  return result
 }
+
+export type DockInstallStatus='missing'|'update'|'current'|'unavailable'
+export function compareDockHashes(bundled:string|null,installed:readonly string[]):DockInstallStatus{
+ if(!bundled)return 'unavailable'
+ if(!installed.length)return 'missing'
+ return installed.length===1&&installed[0]===bundled?'current':'update'
+}

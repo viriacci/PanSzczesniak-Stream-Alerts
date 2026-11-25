@@ -1,4 +1,4 @@
-import {installObsDock} from './obs/dock-install'
+import {installObsDock,obsDockStatus} from './obs/dock-install'
 import type {RuntimeService} from './runtime/service'
 import type { ObsService } from './obs/service'
 import type { AgentBridge } from './agent/bridge'
@@ -42,6 +42,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
     return setLayout(db, args[0])
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
+   [IPC.obsDockStatus,0,()=>obsDockStatus()],
    [IPC.installObsDock,0,()=>installObsDock(window)],
    [IPC.measurementState,0,()=>runtime.measurementState()],
    [IPC.measurementStart,1,gpu=>runtime.measurementStart(gpu)],

@@ -3,7 +3,9 @@ import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
 import {join} from 'node:path'
 import {existsSync} from 'node:fs'
-import {dockLayout,obsVersion,parseCandidates,type ObsCandidate} from './dock-detection'
+import {readFile} from 'node:fs/promises'
+import {createHash} from 'node:crypto'
+import {compareDockHashes,dockLayout,obsVersion,parseCandidates,type DockInstallStatus,type ObsCandidate} from './dock-detection'
 const exec=promisify(execFile)
 const quoted=(s:string)=>"'"+s.replaceAll("'","''")+"'"
 const powerShell=()=>join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe')
@@ -74,12 +76,22 @@ async function detect(manual?:string):Promise<ObsCandidate[]>{
  const {stdout}=await run(discovery+(manual?"\nAdd-OBS "+quoted(manual)+" 'Wybór ręczny'\n":automatic)+"\nConvertTo-Json -InputObject @($result.ToArray()) -Depth 4 -Compress")
  return parseCandidates(JSON.parse(stdout.trim()||'[]'))
 }
+const bundledDll=()=>join(process.resourcesPath,'obs-dock','pssa-control-dock.dll')
+const dockRoot=()=>join(process.env.ProgramData??'C:\\ProgramData','obs-studio','plugins','pssa-control-dock')
+async function hash(path:string){try{return createHash('sha256').update(await readFile(path)).digest('hex')}catch{return null}}
+export async function obsDockStatus():Promise<DockInstallStatus>{
+ if(process.platform!=='win32'||!app.isPackaged)return 'unavailable'
+ const [bundle,...installed]=await Promise.all([hash(bundledDll()),hash(join(dockRoot(),'bin','64bit','pssa-control-dock.dll')),hash(join(dockRoot(),'pssa-control-dock.dll'))])
+ return compareDockHashes(bundle??null,installed.filter((v):v is string=>v!==null))
+}
 let busy=false
 export async function installObsDock(window:BrowserWindow):Promise<boolean>{
  if(busy||process.platform!=='win32'||!app.isPackaged)throw Error('Wtyczka dostępna w instalacji Windows x64.')
  busy=true
  try{
-  const dll=join(process.resourcesPath,'obs-dock','pssa-control-dock.dll')
+  const dll=bundledDll()
+  const installed=await obsDockStatus()
+  const action=installed==='update'?'Zaktualizuj':installed==='current'?'Zainstaluj ponownie':'Zainstaluj'
   if(!existsSync(dll))throw Error('Brak pliku wtyczki w instalacji PSSA.')
   let candidates:ObsCandidate[]=[]
   try{candidates=await detect()}catch{ /* Manual fallback when discovery is unavailable. */ }
@@ -104,7 +116,7 @@ export async function installObsDock(window:BrowserWindow):Promise<boolean>{
    version={major:r.response===2?33:31,label:r.response===2?'33 (wybór ręczny)':'31–32 (wybór ręczny)'}
   }
   const layout=dockLayout(version.major)
-  const confirm=await dialog.showMessageBox(window,{type:'question',title:'Dodaj wtyczkę do OBS',message:'Zainstalować PSSA Control Dock?',detail:'OBS '+version.label+' · '+chosen.source+'\n'+chosen.path+'\n\nZamknij OBS przed instalacją. Windows poprosi o uprawnienia administratora. Wtyczka trafi do wspólnego katalogu ProgramData.',buttons:['Anuluj','Zainstaluj'],defaultId:0,cancelId:0})
+  const confirm=await dialog.showMessageBox(window,{type:'question',title:'Dodaj wtyczkę do OBS',message:action+' PSSA Control Dock?',detail:'OBS '+version.label+' · '+chosen.source+'\n'+chosen.path+'\n\nZamknij OBS przed instalacją. Windows poprosi o uprawnienia administratora. Wtyczka trafi do wspólnego katalogu ProgramData.',buttons:['Anuluj',action],defaultId:0,cancelId:0})
   if(confirm.response!==1)return false
   const script=[
    "$ErrorActionPreference='Stop'",
@@ -117,8 +129,8 @@ export async function installObsDock(window:BrowserWindow):Promise<boolean>{
    "New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null",
    "New-Item -ItemType Directory -Path (Join-Path $root 'data') -Force | Out-Null",
    "$license=Join-Path (Split-Path $dll) 'COPYING'; if(Test-Path -LiteralPath $license){Copy-Item -LiteralPath $license -Destination (Join-Path $root 'COPYING') -Force}",
-   "Copy-Item -LiteralPath $dll -Destination $target -Force",
-   "if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $target).Hash){exit 14}",
+   "$stage=$target+'.'+[Guid]::NewGuid().ToString('N')+'.tmp'",
+   "try { Copy-Item -LiteralPath $dll -Destination $stage -Force; if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $stage).Hash){exit 14}; if(Test-Path -LiteralPath $target){[IO.File]::Replace($stage,$target,$null)}else{[IO.File]::Move($stage,$target)} } finally { if(Test-Path -LiteralPath $stage){Remove-Item -LiteralPath $stage -Force} }",
    "if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force}",
    "exit 0"
   ].join('\r\n')

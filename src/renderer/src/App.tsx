@@ -29,6 +29,8 @@ export function App() {
  const queue=useRef<Promise<unknown>>(Promise.resolve())
  const [ready,setReady]=useState(false)
  const [busy,setBusy]=useState(false)
+ const [dockStatus,setDockStatus]=useState<'missing'|'update'|'current'|'unavailable'>('missing')
+ const [dockBusy,setDockBusy]=useState(false)
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null)
  const [confirm,setConfirm]=useState(false)
  const [query,setQuery]=useState('')
@@ -71,6 +73,8 @@ export function App() {
  }
  const navChange=useCallback((navigation:Navigation)=>patch({navigation}),[patch])
  const editMenu=()=>{setEditing(v=>!v);setQuery('');if(layout.collapsed)patch({collapsed:false})}
+ useEffect(()=>{if(!ready||layout.page!=='settings')return;let active=true;void window.pssa.obsDockStatus().then(s=>{if(active)setDockStatus(s)}).catch(()=>{});return()=>{active=false}},[ready,layout.page])
+ const installDock=async()=>{setDockBusy(true);try{if(await window.pssa.installObsDock()){setDockStatus(await window.pssa.obsDockStatus());setNotice({text:'Wtyczka OBS gotowa. Uruchom OBS ponownie.',error:false})}}catch(e){setNotice({text:e instanceof Error?e.message.replace(/^Error invoking remote method '[^']+': Error: /,''):'Nie udało się zainstalować wtyczki OBS.',error:true})}finally{setDockBusy(false)}}
  const reset=()=>{patch({...defaultLayout,page:'settings'});setConfirm(false)}
  const item=allPages.find(p=>p.id===layout.page)??allPages[0]!
  const collapsed=layout.collapsed
@@ -87,7 +91,7 @@ export function App() {
    </aside>
    {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className="content" tabIndex={-1} ref={content} id="main-content">
-    <header className="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div>{item.id==='settings'&&<Button disabled={!ready||busy} onClick={()=>void window.pssa.installObsDock().then(ok=>{if(ok)setNotice({text:'Wtyczka zainstalowana. Uruchom OBS ponownie.',error:false})}).catch(e=>setNotice({text:String(e?.message??'Nie udało się zainstalować wtyczki OBS.'),error:true}))}>Dodaj wtyczkę do OBS</Button>}</header>
+    <header className="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1><p>{item.description}</p></div>{item.id==='settings'&&<Button disabled={!ready||busy||dockBusy||dockStatus==='unavailable'} onClick={()=>void installDock()}>{dockBusy?'Instalowanie…':dockStatus==='update'?'Aktualizuj wtyczkę OBS':dockStatus==='current'?'Zainstaluj ponownie wtyczkę OBS':'Dodaj wtyczkę do OBS'}</Button>}</header>
     <div className="page-body"><PageContent runtime={runtime} saveRuntime={saveRuntime} live={live} obs={obs} agent={agent} alertState={alertState} item={item} status={status} layout={layout} busy={busy||!ready} onCompact={toggleCompact} onReset={()=>setConfirm(true)} onLayout={patch} onNavigation={navChange} editingMenu={editing} onEditMenu={editMenu} onIntegrations={()=>navigate('integrations')}/></div>
    </main>
    {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase??'Offline'}</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3><p>{item.description}</p><small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}

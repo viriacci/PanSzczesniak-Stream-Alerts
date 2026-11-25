@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {obsVersion,dockLayout,parseCandidates} from '../src/main/obs/dock-detection.ts'
+import {obsVersion,dockLayout,parseCandidates,compareDockHashes} from '../src/main/obs/dock-detection.ts'
 test('OBS version discovery ignores zero metadata and parses real version fields',()=>{
  assert.deepEqual(obsVersion(['0','0.0.0.0','32.2.2.0']),{major:32,label:'32.2.2'})
  assert.deepEqual(obsVersion(['','33.0.0-rc1']),{major:33,label:'33.0.0'})
@@ -14,4 +14,8 @@ test('OBS candidates are deduplicated and invalid executable names rejected',()=
  const path='D:\\Steam\\steamapps\\common\\OBS Studio\\bin\\64bit\\obs64.exe'
  const c={path,source:'Steam',versions:['32.2.2'],portable:false}
  assert.deepEqual(parseCandidates([c,{...c,path:path.toUpperCase()},{...c,path:'C:\\setup.exe'},null]),[c])
+})
+
+test('installed dock status uses bundled DLL hash, detects old or duplicate versions',()=>{
+ assert.equal(compareDockHashes('new',[]),'missing');assert.equal(compareDockHashes('new',['old']),'update');assert.equal(compareDockHashes('new',['new']),'current');assert.equal(compareDockHashes('new',['new','old']),'update');assert.equal(compareDockHashes(null,[]),'unavailable')
 })

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type PssaApi } from '../shared/contracts'
 
 const api: PssaApi = {
+  obsDockStatus:()=>ipcRenderer.invoke(IPC.obsDockStatus),
   installObsDock:()=>ipcRenderer.invoke(IPC.installObsDock),
   measurementState:()=>ipcRenderer.invoke(IPC.measurementState),
   measurementStart:gpu=>ipcRenderer.invoke(IPC.measurementStart,gpu),
