@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, renameSync, statSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
-type EventCode = 'startup' | 'ready' | 'startup-failed' | 'renderer-gone' | 'shutdown'
+type EventCode = 'startup' | 'ready' | 'startup-failed' | 'renderer-gone' | 'shutdown' | 'dock-control-unavailable'
 export function createLogger(directory: string) {
   const file = join(directory, 'application.log')
   return (event: EventCode): void => {
