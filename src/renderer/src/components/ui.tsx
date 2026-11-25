@@ -9,8 +9,8 @@ export function Panel({ title, detail, action, children, className = '', tourId 
 export function Status({ children, tone = 'neutral' }: {children: ReactNode; tone?: 'neutral'|'ready'|'warning'}) {
   return <span className={`status status--${tone}`}><span className="status-dot" aria-hidden="true"/>{children}</span>
 }
-export function Empty({ title, children }: {title: string; children: ReactNode}) {
-  return <div className="empty"><div className="empty-mark" aria-hidden="true">◇</div><h3>{title}</h3><p>{children}</p></div>
+export function Empty({ title, children }: {title: string; children?: ReactNode}) {
+  return <div className="empty"><div className="empty-mark" aria-hidden="true">◇</div><h3>{title}</h3>{children&&<p>{children}</p>}</div>
 }
 export function ConfirmDialog({ title, children, onClose, onConfirm }: {title: string; children: ReactNode; onClose: () => void; onConfirm: () => void}) {
   const ref = useRef<HTMLDialogElement>(null)

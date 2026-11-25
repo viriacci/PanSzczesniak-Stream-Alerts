@@ -49,3 +49,21 @@ export function renderText(template:string,event:AlertEvent):string {
 }
 
 export function testEvent(rule:AlertRule,id:string):AlertEvent{return {id,kind:rule.key.startsWith('reward:')?'redemption':rule.key as AlertKind,user:'Test PSSA',reward:rule.title,count:25,months:3}}
+
+/** Contextual UI labels only; persisted templates and event rendering stay unchanged. */
+export type AlertVariable='user'|'reward'|'viewers'|'bits'|'count'|'months'
+export type AlertVariableHint={key:AlertVariable;label:string}
+export function alertVariableHints(ruleKey:string):AlertVariableHint[]{
+ const kind=ruleKey.startsWith('reward:')?'redemption':ruleKey
+ const user=(label:string):AlertVariableHint=>({key:'user',label})
+ switch(kind){
+ case 'raid':return [user('kanał raidujący'),{key:'viewers',label:'liczba widzów'}]
+ case 'follow':return [user('obserwujący')]
+ case 'sub':case 'prime_sub':return [user('subskrybent')]
+ case 'resub':return [user('subskrybent'),{key:'months',label:'łączna liczba miesięcy'}]
+ case 'gift':case 'mass_gift':return [user('darczyńca'),{key:'count',label:'liczba podarowanych subów'}]
+ case 'bits':return [user('darczyńca'),{key:'bits',label:'liczba Bits'}]
+ case 'redemption':return [user('odbierający nagrodę'),{key:'reward',label:'nazwa nagrody'}]
+ default:return [user('nazwa użytkownika')]
+ }
+}

@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {defaultRule,parseRule,renderText,normalizeLayout} from '../src/shared/alerts.ts'
+import {defaultRule,parseRule,renderText,normalizeLayout,alertVariableHints} from '../src/shared/alerts.ts'
 import {normalizeEvent,subscriptions} from '../src/main/twitch/events.ts'
 import {openDatabase} from '../src/main/database/index.ts'
 import {rules,saveRule} from '../src/main/alerts/store.ts'
@@ -50,3 +50,15 @@ test('media types cannot be swapped between image and audio',()=>{
 
 import {parseRewards,rewardImage} from '../src/shared/alerts.ts'
 test('reward tiles prefer Twitch custom artwork with safe CDN fallback',()=>{const custom='https://static-cdn.jtvnw.net/custom-reward-images/abc/4x.png',fallback='https://static-cdn.jtvnw.net/default.png';const items=parseRewards([{id:'a',title:'A',cost:50,image:{url_4x:custom},default_image:{url_4x:fallback},background_color:'#aabbcc'},{id:'b',title:'B',cost:10,image:{url_4x:'https://evil.example/a.png'},default_image:{url_4x:fallback}}]);assert.equal(items[0]?.image,custom);assert.equal(items[0]?.color,'#aabbcc');assert.equal(items[1]?.image,fallback);assert.equal(rewardImage('https://static-cdn.jtvnw.net.evil.example/a'),undefined)})
+
+test('variable hints match actual event payloads and never change templates',()=>{
+ const cases={raid:['user','viewers'],follow:['user'],sub:['user'],prime_sub:['user'],resub:['user','months'],gift:['user','count'],mass_gift:['user','count'],bits:['user','bits'],redemption:['user','reward'],'reward:abc':['user','reward']}
+ for(const [key,expected] of Object.entries(cases)){
+  const hints=alertVariableHints(key)
+  assert.deepEqual(hints.map(h=>h.key),expected,key)
+  assert.ok(hints.every(h=>h.label.length>0),key)
+  const tokens=[...defaultRule(key).template.matchAll(/\{([a-z_]+)\}/g)].map(m=>m[1])
+  assert.ok(tokens.every(t=>expected.includes(t!)),key)
+ }
+ assert.equal(renderText('{user} {viewers}',{id:'e',kind:'raid',user:'X',count:12}),'X 12')
+})

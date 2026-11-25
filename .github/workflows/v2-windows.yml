@@ -105,7 +105,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: PSSA-2-Dev-Windows
-          run-id: 45565631157
+          run-id: 45568935962
           github-token: ${{ github.token }}
           path: previous-beta
       - name: Verify clean NSIS installation
@@ -161,7 +161,7 @@ jobs:
       - name: Render actual WPF preview
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.20-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.21-x64.exe').Path
           $preview = Join-Path $PWD 'dist/setup-preview.png'
           $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
           if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
@@ -174,7 +174,7 @@ jobs:
       - name: Verify updater self-cleanup after installer exit
         shell: pwsh
         run: |
-          $source = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.20-x64.exe').Path
+          $source = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.21-x64.exe').Path
           $folder = Join-Path $env:TEMP ('PSSA-update-' + [Guid]::NewGuid().ToString('N').Substring(0,6))
           New-Item -ItemType Directory -Path $folder | Out-Null
           $copy = Join-Path $folder (Split-Path $source -Leaf)
@@ -188,7 +188,7 @@ jobs:
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.20-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.21-x64.exe').Path
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
           function Run-Setup($path, $arguments) {
             Write-Host "Running $(Split-Path $path -Leaf) $arguments"
@@ -218,7 +218,7 @@ jobs:
         with:
           name: PSSA-Setup-Windows
           path: |
-            dist/PSSA-Setup-2.0.0-rc.20-x64.exe
+            dist/PSSA-Setup-2.0.0-rc.21-x64.exe
             dist/SHA256SUMS.txt
             dist/setup-preview.png
           if-no-files-found: error
