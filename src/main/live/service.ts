@@ -3,7 +3,8 @@ import type {DatabaseSync} from 'node:sqlite'
 import type {Auth} from '../twitch/auth.ts'
 import type {AlertEvent} from '../../shared/alerts.ts'
 import type {ObsState} from '../../shared/obs.ts'
-import {parseLiveAction,type LiveState,type Category} from '../../shared/live.ts'
+import {parseLiveAction,channelTags,type LiveState,type Category} from '../../shared/live.ts'
+import {rewardImage} from '../../shared/alerts.ts'
 import {observe,parseStream,recordEvent,recordObs,summarize} from './store.ts'
 
 export function bitrateBetween(before:{at:number;bytes:number;duration:number},after:{at:number;bytes:number;duration:number}):number|null{
@@ -62,11 +63,11 @@ export class LiveService{
     this.id=observe(this.db,channel,stream,at)
     if(previous!==this.id){this.lastObs=undefined;this.lastObsAt=0}
     if(stream&&this.id!==null){
-     this.current={...blank(),phase:'live',channel:identity.login,title:stream.title,category:stream.category,categoryId:stream.categoryId,startedAt:stream.startedAt,lastSampleAt:at,viewers:stream.viewers,...summarize(this.db,this.id),bitrate:previous===this.id?this.current.bitrate:null}
+     this.current={...blank(),phase:'live',channel:identity.login,title:stream.title,category:stream.category,categoryId:stream.categoryId,tags:channelTags(raw.tags),startedAt:stream.startedAt,lastSampleAt:at,viewers:stream.viewers,...summarize(this.db,this.id),bitrate:previous===this.id?this.current.bitrate:null}
      this.lastSummary=at;this.summaryDirty=false
     }else{
      this.current={...blank(),phase:'offline',channel:identity.login,lastSampleAt:at,detail:'Kanał nie nadaje'}
-     try{const result=await this.auth.helix('channels?broadcaster_id='+encodeURIComponent(channel));if(!valid())return;const info=result?.data?.[0];if(info?.broadcaster_id===channel){this.current.title=typeof info.title==='string'?info.title:'';this.current.category=typeof info.game_name==='string'?info.game_name:'';this.current.categoryId=typeof info.game_id==='string'?info.game_id:''}}catch{/* offline remains confirmed */}
+     try{const result=await this.auth.helix('channels?broadcaster_id='+encodeURIComponent(channel));if(!valid())return;const info=result?.data?.[0];if(info?.broadcaster_id===channel){this.current.title=typeof info.title==='string'?info.title:'';this.current.category=typeof info.game_name==='string'?info.game_name:'';this.current.categoryId=typeof info.game_id==='string'?info.game_id:'';this.current.tags=channelTags(info.tags)}}catch{/* offline remains confirmed */}
     }
    }catch{if(valid()){this.current={...this.current,phase:'unknown',channel:identity.login,viewers:null,bitrate:null,detail:'Brak aktualnych danych Twitch; zapis nie jest uzupełniany zerami'};this.lastObs=undefined}}
   }
@@ -111,14 +112,10 @@ export class LiveService{
   if(action.type==='search'){
    const result=await this.auth.helix('search/categories?first=20&query='+encodeURIComponent(action.query))
    if(g!==this.generation||this.auth.identity?.userId!==channel)throw Error('Session changed')
-   return (Array.isArray(result?.data)?result.data:[]).filter((v:any)=>typeof v.id==='string'&&typeof v.name==='string').slice(0,20).map((v:any)=>({id:v.id,name:v.name}))
+   return (Array.isArray(result?.data)?result.data:[]).filter((v:any)=>typeof v.id==='string'&&typeof v.name==='string').slice(0,20).map((v:any)=>{const image=rewardImage(typeof v.box_art_url==='string'?v.box_art_url.replaceAll('{width}','104').replaceAll('{height}','144'):undefined);return {id:v.id,name:v.name,...(image?{image}:{})}})
   }
   if(!this.auth.canManage)throw Error('Reconnect Twitch with broadcast permission')
-  if(action.type==='update')await this.auth.helix('channels?broadcaster_id='+encodeURIComponent(channel),{title:action.title,game_id:action.categoryId},'PATCH')
-  else {
-   if(this.current.phase!=='live')throw Error('Stream not live')
-   await this.auth.helix('streams/markers',{user_id:channel,description:action.description},'POST')
-  }
+  if(action.type==='update')await this.auth.helix('channels?broadcaster_id='+encodeURIComponent(channel),{title:action.title,game_id:action.categoryId,...(action.tags!==undefined?{tags:action.tags}:{})},'PATCH')
   if(g!==this.generation||this.auth.identity?.userId!==channel)throw Error('Session changed')
   await this.poll(true);return null
  }

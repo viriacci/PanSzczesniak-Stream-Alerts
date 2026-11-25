@@ -98,8 +98,8 @@ test('broadcast permissions and action validation',async()=>{
   canManage=true;await service.poll()
   await service.action({type:'update',title:'Title',categoryId:'10'})
   assert.ok(calls.some(c=>c.method==='PATCH'&&c.path==='channels?broadcaster_id=42'))
-  await service.action({type:'marker',description:'Highlight'})
-  assert.ok(calls.some(c=>c.method==='POST'&&c.path==='streams/markers'))
+  await service.action({type:'update',title:'Title',categoryId:'10',tags:['Polska','Gaming']})
+  assert.ok(calls.some(c=>c.method==='PATCH'&&JSON.stringify(c.body).includes('Polska')));assert.throws(()=>parseLiveAction({type:'update',title:'Title',categoryId:'10',tags:['bad tag']}));assert.throws(()=>parseLiveAction({type:'marker',description:'Highlight'}))
  }finally{service.stop();db.close()}
 })
 test('late response after account reset cannot write the old stream',async()=>{
