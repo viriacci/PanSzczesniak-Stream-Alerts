@@ -180,11 +180,11 @@ async function start(): Promise<void> {
       target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer,clientY:rect.top+rect.height/2}));
       await until(async()=> (await window.pssa.getLayout()).navigation.nodes.find(n=>n.id==='assets')?.children.some(n=>n.id==='studio'));
       document.querySelector('.sidebar-bottom button[aria-label="Ustawienia"]').click();
-      await until(()=>document.querySelector('.settings-section'));
+      await until(()=>document.querySelectorAll('.settings-section').length===8);
       const sections=[...document.querySelectorAll('.settings-section')];
       if(sections.length!==8||sections.some(s=>s.open)||!sections[0].textContent.includes('Ukryj zakładki'))throw Error('Settings not collapsed');
       sections[0].querySelector('summary').click();if(!sections[0].open)throw Error('Settings disclosure failed');
-      if(!sections.some(s=>s.querySelector('summary').textContent==='Logowanie zaawansowane'))throw Error('Advanced login missing');
+      if(!sections.some(s=>s.querySelector('summary span').textContent==='Logowanie zaawansowane'))throw Error('Advanced login missing');
       document.querySelector('[data-nav-id="integrations"]').click();
       await until(()=>document.querySelector('.page-header h1')?.textContent==='Konfiguracja');
       return !document.querySelector('input[type="password"][autocomplete="off"][required]');
