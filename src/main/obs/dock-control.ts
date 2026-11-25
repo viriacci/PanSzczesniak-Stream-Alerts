@@ -26,7 +26,10 @@ export class DockControl{
  private server?:Server
  private sockets=new Set<Socket>()
  private address=''
- constructor(private dir:string,private exe:string,private handlers:DockHandlers){}
+ private dir:string
+ private exe:string
+ private handlers:DockHandlers
+ constructor(dir:string,exe:string,handlers:DockHandlers){this.dir=dir;this.exe=exe;this.handlers=handlers}
  async start():Promise<DockDescriptor>{
   const name='pssa-dock-'+randomBytes(16).toString('hex'),token=randomBytes(32).toString('hex')
   this.address=process.platform==='win32'?'\\\\.\\pipe\\'+name:join(this.dir,name+'.sock')
