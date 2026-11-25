@@ -1,11 +1,11 @@
 import type { AlertRule } from './alerts.ts'
 export type QueueStatus='pending'|'playing'|'done'|'skipped'|'failed'|'suppressed'
 export type QueueSource='twitch'|'test'|'replay'
-export interface QueueItem {id:number;source:QueueSource;key:string;title:string;text:string;rule:AlertRule;status:QueueStatus;priority:number;position:number;attempts:number;createdAt:number;finishedAt:number|null;reason:string}
+export interface QueueItem {variables?:Record<string,string>;id:number;source:QueueSource;key:string;title:string;text:string;rule:AlertRule;status:QueueStatus;priority:number;position:number;attempts:number;createdAt:number;finishedAt:number|null;reason:string}
 export interface QueueSettings {paused:boolean;muted:boolean;volume:number;gapMs:number}
-export type QueueSummary=Omit<QueueItem,'rule'>
+export type QueueSummary=Omit<QueueItem,'rule'|'variables'>
 export interface QueueState {settings:QueueSettings;current:QueueSummary|null;pending:QueueSummary[];pendingCount:number;history:QueueSummary[];online:boolean}
-export interface Playback {attempt:string;rule:AlertRule;text:string;volume:number}
+export interface Playback {variables?:Record<string,string>;attempt:string;rule:AlertRule;text:string;volume:number}
 export type QueueCommand={type:'test'}|{type:'settings';settings:QueueSettings}|{type:'skip'|'replay';id:number}|{type:'move';id:number;direction:-1|1}|{type:'priority';id:number;priority:number}
 export const defaultQueueSettings:QueueSettings={paused:false,muted:false,volume:100,gapMs:500}
 export function intRange(v:unknown,min:number,max:number):v is number{return typeof v==='number'&&Number.isInteger(v)&&v>=min&&v<=max}

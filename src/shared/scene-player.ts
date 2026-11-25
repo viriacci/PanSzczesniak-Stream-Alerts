@@ -1,6 +1,6 @@
 import type {Scene,Layer,Geometry} from './scene.ts'
 // This function is intentionally self-contained: OBS receives the same implementation via toString().
-export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,mediaBase:string,volume:number,onError:()=>void,sample:(layer:Layer,time:number)=>Geometry){
+export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,mediaBase:string,volume:number,onError:()=>void,sample:(layer:Layer,time:number)=>Geometry,variables:Record<string,string>={}){
  let disposed=false,master=volume/100,failed=false
  const fail=()=>{if(!disposed&&!failed){failed=true;onError()}}
  root.replaceChildren()
@@ -14,8 +14,8 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   Object.assign(el.style,{position:'absolute',boxSizing:'border-box',left:layer.x+'%',top:layer.y+'%',width:layer.width+'%',height:layer.height+'%',display:'none',overflow:'hidden',border:layer.borderWidth+'px '+layer.borderStyle+' '+layer.borderColor,background:layer.background+Math.round(layer.backgroundOpacity*255/100).toString(16).padStart(2,'0'),borderRadius:layer.shape==='ellipse'?'50%':'0'})
   let media:HTMLMediaElement|undefined
   if(layer.kind==='text'){
-   const value=layer.text.replaceAll('{alert}',text),at=layer.accentAfter&&layer.accentColor?value.indexOf(layer.accentAfter):-1
-   if(at>=0){const split=at+layer.accentAfter!.length,content=document.createElement('span'),accent=document.createElement('span');content.append(document.createTextNode(value.slice(0,split)));accent.textContent=value.slice(split);accent.style.color=layer.accentColor!;content.append(accent);el.append(content)}else el.textContent=value
+   const vars={...variables,alert:text},value=layer.text.replace(/\{([a-z_]+)\}/g,(token,key)=>Object.hasOwn(vars,key)?vars[key]!:token),at=layer.accentAfter&&layer.accentColor?value.indexOf(layer.accentAfter):-1
+   if(layer.accentVariable&&layer.accentColor){const content=document.createElement('span');let last=0;for(const m of layer.text.matchAll(/\{([a-z_]+)\}/g)){content.append(document.createTextNode(layer.text.slice(last,m.index)));const token=document.createElement('span');token.textContent=Object.hasOwn(vars,m[1]!)?vars[m[1]!]!:m[0];if(m[1]===layer.accentVariable)token.style.color=layer.accentColor;content.append(token);last=m.index!+m[0].length}content.append(document.createTextNode(layer.text.slice(last)));el.append(content)}else if(at>=0){const split=at+layer.accentAfter!.length,content=document.createElement('span'),accent=document.createElement('span');content.append(document.createTextNode(value.slice(0,split)));accent.textContent=value.slice(split);accent.style.color=layer.accentColor!;content.append(accent);el.append(content)}else el.textContent=value
    Object.assign(el.style,{color:layer.color,fontFamily:layer.font+', sans-serif',fontSize:layer.fontSize+'px',fontWeight:String(layer.fontWeight??400),textShadow:layer.shadow?'0 3px 12px #000c,0 1px 3px #000':'none',whiteSpace:'pre-wrap',overflowWrap:'anywhere',alignItems:'center',justifyContent:'center',textAlign:'center'})
   }else if(layer.kind==='image'&&layer.asset&&layer.visible){
    const image=document.createElement('img');image.alt='';image.onerror=()=>{if(!disposed&&layer.visible)fail()};if(layer.visible)readiness.push(new Promise<void>((resolve,reject)=>{image.addEventListener('load',()=>resolve(),{once:true});image.addEventListener('error',()=>reject(Error('Image load failed')),{once:true})}));image.src=mediaBase+layer.asset
@@ -26,7 +26,7 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
    if(media instanceof HTMLVideoElement){media.playsInline=true;Object.assign(media.style,{width:'100%',height:'100%',objectFit:'contain'})}
    el.append(media)
   }else if(layer.kind==='particles'){
-   for(let i=0;i<24;i++){const dot=document.createElement('span');Object.assign(dot.style,{position:'absolute',left:((i*37)%100)+'%',top:((i*61)%100)+'%',width:(3+i%5)+'%',aspectRatio:'1',borderRadius:'50%',background:layer.color});el.append(dot)}
+   const cv=document.createElement('canvas');cv.width=640;cv.height=360;Object.assign(cv.style,{width:'100%',height:'100%'});el.append(cv)
   }
   board.append(el);return {layer,el,media,playing:false,started:false,lastDisplay:'none',lastOpacity:'',lastTransform:'',lastParticles:-Infinity}
  })
@@ -54,7 +54,7 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
     const g=sample(l,time),crop=l.crop;Object.assign(el.style,{left:g.x+'%',top:g.y+'%',width:g.width+'%',height:g.height+'%',clipPath:crop?'inset('+crop.top+'% '+crop.right+'% '+crop.bottom+'% '+crop.left+'%)':'none'})
     const opacity=String(g.opacity/100*a.a*b.a),transform='translate(-50%,-50%) translate('+(a.x+b.x)+'%,'+(a.y+b.y)+'%) rotate('+g.rotation+'deg) scale('+a.s*b.s+')'
     if(node.lastOpacity!==opacity){el.style.opacity=opacity;node.lastOpacity=opacity}if(node.lastTransform!==transform){el.style.transform=transform;node.lastTransform=transform}
-    if(l.kind==='particles'&&(Math.abs(time-node.lastParticles)>=33||edit)){node.lastParticles=time;for(let i=0;i<el.children.length;i++){const dot=el.children[i] as HTMLElement;dot.style.transform='translateY('+(-((time/30+i*7)%100))+'%)';dot.style.opacity=String(.3+.7*Math.abs(Math.sin(time/500+i)))}}
+    if(l.kind==='particles'&&(Math.abs(time-node.lastParticles)>=15||edit)){node.lastParticles=time;const cv=el.firstElementChild as HTMLCanvasElement,ctx=cv.getContext('2d');if(ctx){ctx.clearRect(0,0,cv.width,cv.height);const t=Math.max(0,time-l.start)/1000*(l.particleSpeed??100)/100;for(let i=0;i<(l.particleCount??48);i++){const phase=(t*(.15+(i%7)*.025)+((i*61)%101)/101)%1,x=((i*137.51)%cv.width)+Math.sin(t*2+i)*14,y=cv.height*(1-phase),size=3+i%8,shape=l.particleShape??'mixed',kind=shape==='mixed'?['circle','square','star','diamond'][i%4]:shape;ctx.save();ctx.translate(x,y);ctx.rotate(t*.6+i);ctx.globalAlpha=Math.sin(phase*Math.PI)*.9;ctx.fillStyle=l.color;ctx.beginPath();if(kind==='circle')ctx.arc(0,0,size,0,Math.PI*2);else if(kind==='square')ctx.rect(-size,-size,size*2,size*2);else{const n=kind==='star'?10:4;for(let j=0;j<n;j++){const a=j*Math.PI*2/n,r=kind==='star'&&j%2?size*.45:size;const px=Math.cos(a)*r,py=Math.sin(a)*r;if(j)ctx.lineTo(px,py);else ctx.moveTo(px,py)}ctx.closePath()}ctx.fill();ctx.restore()}}}
    }
    if(media){
     const should=active&&play&&time>=l.start&&time<l.end

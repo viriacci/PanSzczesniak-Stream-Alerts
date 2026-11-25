@@ -13,7 +13,7 @@ export function nextSceneFrame(scene:Scene,elapsed:number){
    const exit=l.end-l.exitMs
    delay=Math.min(delay,elapsed>=exit?16:exit-elapsed)
   }
-  if(l.kind==='particles')delay=Math.min(delay,33)
+  if(l.kind==='particles')delay=Math.min(delay,16)
  }
  return Math.max(1,delay)
 }

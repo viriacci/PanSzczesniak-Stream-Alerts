@@ -7,7 +7,8 @@ export const geometryKeys:GeometryKey[]=['x','y','width','height','rotation','op
 export type Geometry=Pick<Layer,GeometryKey>
 export interface Keyframe extends Geometry {time:number;easing:'linear'|'smooth'|'hold'}
 export interface Crop {top:number;right:number;bottom:number;left:number}
-export interface Layer {mediaOffsetMs?:number;crop?:Crop;keyframes?:Keyframe[];fontWeight?:number;shadow?:boolean;accentColor?:string;accentAfter?:string;id:string;name:string;kind:LayerKind;x:number;y:number;width:number;height:number;rotation:number;opacity:number;visible:boolean;locked:boolean;start:number;end:number;enter:Animation;exit:Animation;enterMs:number;exitMs:number;asset:string;text:string;color:string;background:string;backgroundOpacity:number;font:string;fontSize:number;borderWidth:number;borderColor:string;borderStyle:'none'|'solid'|'dashed'|'dotted'|'double';volume:number;shape:'rect'|'ellipse'}
+export type ParticleShape='circle'|'square'|'star'|'diamond'|'mixed'
+export interface Layer {particleShape?:ParticleShape;particleCount?:number;particleSpeed?:number;accentVariable?:string;mediaOffsetMs?:number;crop?:Crop;keyframes?:Keyframe[];fontWeight?:number;shadow?:boolean;accentColor?:string;accentAfter?:string;id:string;name:string;kind:LayerKind;x:number;y:number;width:number;height:number;rotation:number;opacity:number;visible:boolean;locked:boolean;start:number;end:number;enter:Animation;exit:Animation;enterMs:number;exitMs:number;asset:string;text:string;color:string;background:string;backgroundOpacity:number;font:string;fontSize:number;borderWidth:number;borderColor:string;borderStyle:'none'|'solid'|'dashed'|'dotted'|'double';volume:number;shape:'rect'|'ellipse'}
 export interface Scene {version:1;width:number;height:number;duration:number;layers:Layer[]}
 const number=(v:unknown,min:number,max:number)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max)throw Error('Invalid scene number');return v}
 const str=(v:unknown,max:number)=>{if(typeof v!=='string'||v.length>max)throw Error('Invalid scene text');return v}
@@ -30,6 +31,10 @@ export function parseScene(input:unknown):Scene{
   if(asset&&(!formats||!new RegExp('^[a-f0-9]{64}\\.('+formats+')$','i').test(asset)))throw Error('Invalid layer media')
   const font=str(a.font,80);if(!/^[\p{L}\p{N} _-]+$/u.test(font))throw Error('Invalid font')
   const optional:Partial<Layer>={}
+  if(a.particleShape!==undefined)optional.particleShape=one(a.particleShape,['circle','square','star','diamond','mixed'] as const)
+  if(a.particleCount!==undefined)optional.particleCount=Math.round(number(a.particleCount,1,120))
+  if(a.particleSpeed!==undefined)optional.particleSpeed=number(a.particleSpeed,10,300)
+  if(a.accentVariable!==undefined)optional.accentVariable=one(a.accentVariable,['','alert','user','reward','viewers','bits','count','months'] as const)
   if(a.mediaOffsetMs!==undefined)optional.mediaOffsetMs=number(a.mediaOffsetMs,0,86400000)
   if(a.crop!==undefined){if(!a.crop||typeof a.crop!=='object')throw Error('Invalid crop');const c=a.crop as Record<string,unknown>;const crop={top:number(c.top,0,99),right:number(c.right,0,99),bottom:number(c.bottom,0,99),left:number(c.left,0,99)};if(crop.left+crop.right>=100||crop.top+crop.bottom>=100)throw Error('Invalid crop');optional.crop=crop}
   if(a.keyframes!==undefined){if(!Array.isArray(a.keyframes)||a.keyframes.length>120)throw Error('Invalid keyframes');let previous=-1;optional.keyframes=a.keyframes.map((v:unknown)=>{if(!v||typeof v!=='object')throw Error('Invalid keyframe');const k=v as Record<string,unknown>,time=number(k.time,start,end);if(!Number.isInteger(time)||time<=previous)throw Error('Invalid keyframe time');previous=time;return {time,x:number(k.x,0,100),y:number(k.y,0,100),width:number(k.width,1,100),height:number(k.height,1,100),rotation:number(k.rotation,-360,360),opacity:number(k.opacity,0,100),easing:one(k.easing,['linear','smooth','hold'] as const)}})}
@@ -73,4 +78,18 @@ export function scaleMedia(w:number,h:number,dx:number,dy:number,lock:boolean){
  const factor=Math.abs(dx/w)>Math.abs(dy/h)?1+dx/w:1+dy/h
  const s=Math.max(Math.max(1/w,1/h),Math.min(Math.min(100/w,100/h),factor))
  return {width:w*s,height:h*s}
+}
+
+export function stampKeyframe(l:Layer,time:number,p:Partial<Geometry>={},easing?:Keyframe['easing']):Layer{
+ const t=Math.round(Math.max(l.start,Math.min(l.end,time))),frames=[...(l.keyframes??[])],existing=frames.find(k=>k.time===t)
+ if(!frames.length&&t>l.start)frames.push({...sampleLayer(l,l.start),time:l.start,easing:'linear'})
+ if(!existing&&frames.length>=120)return l
+ const k={...sampleLayer(l,t),...p,time:t,easing:easing??existing?.easing??'linear' as const}
+ return {...l,keyframes:[...frames.filter(k=>k.time!==t),k].sort((a,b)=>a.time-b.time)}
+}
+export function resizeCorner(g:Geometry,dx:number,dy:number,w:number,h:number,sx:number,sy:number,lock:boolean,center:boolean):Geometry{
+ const a=g.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a),lx=(c*dx+s*dy)*100/w,ly=(-s*dx+c*dy)*100/h
+ const size=scaleMedia(g.width,g.height,lx*sx*(center?2:1),ly*sy*(center?2:1),lock)
+ const mx=center?0:(size.width-g.width)*sx*w/200,my=center?0:(size.height-g.height)*sy*h/200
+ return {...g,...size,x:Math.max(0,Math.min(100,g.x+(c*mx-s*my)*100/w)),y:Math.max(0,Math.min(100,g.y+(s*mx+c*my)*100/h))}
 }

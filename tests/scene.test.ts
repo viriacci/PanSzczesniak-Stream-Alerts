@@ -59,7 +59,7 @@ test('scene scheduler sleeps through static layers and wakes at precise boundari
  assert.equal(nextSceneFrame(animated,1300),2400)
  assert.equal(nextSceneFrame(animated,3700),16)
  const particles={...scene,layers:[{...layer,kind:'particles' as const}]}
- assert.equal(nextSceneFrame(particles,1200),33)
+ assert.equal(nextSceneFrame(particles,1200),16)
  assert.equal(typeof new Function('return ('+nextSceneFrame.toString()+')')(),'function')
 })
 test('rules cache invalidates after update and does not retain rolled back profile data',()=>{
@@ -73,3 +73,6 @@ import {testEvent,renderText} from '../src/shared/alerts.ts'
 test('keyframes interpolate, move with timeline, retain image ratio, and validate crop',()=>{const l={...fixture().layers[0]!,crop:{top:10,right:5,bottom:0,left:0},keyframes:[{...sampleLayer(fixture().layers[0]!,0),time:0,easing:'linear' as const},{...sampleLayer(fixture().layers[0]!,0),x:90,time:1000,easing:'linear' as const}]};assert.equal(sampleLayer(l,500).x,70);assert.deepEqual(parseScene({...fixture(),layers:[l]}).layers[0],l);assert.equal(retimeLayer(l,500,5000,500).keyframes?.[0]?.time,500);assert.throws(()=>parseScene({...fixture(),layers:[{...l,crop:{top:0,bottom:0,left:60,right:60}}]}));const m=fitMediaSize(800,600,1920,1080),r=scaleMedia(m.width,m.height,10,2,true);assert.ok(Math.abs(r.width/r.height-m.width/m.height)<1e-9);const raid=defaultRule('raid');assert.match(renderText(raid.template,testEvent(raid,'test')),/25/);assert.equal(sceneForRule(raid).layers[0]?.backgroundOpacity,0)})
 
 test('default legacy layout gets modern title; custom saved scenes stay intact; explicit title style preserves identity and timeline',()=>{const raid=defaultRule('raid'),l=sceneForRule({...raid,layout:normalizeLayout({})}).layers[0]!;assert.equal(l.backgroundOpacity,0);assert.equal(l.fontWeight,700);const old={...fixture().layers[0]!,backgroundOpacity:90,background:'#843935',start:500};const scene={...fixture(),layers:[old]};assert.deepEqual(sceneForRule({...raid,scene}),scene);const styled=titleStyle(old,true);assert.equal(styled.id,old.id);assert.equal(styled.start,500);assert.equal(styled.backgroundOpacity,0);assert.equal(styled.accentColor,'#e3c048');assert.equal(parseScene({...scene,layers:[styled]}).layers[0]?.fontWeight,700)})
+
+import {stampKeyframe,resizeCorner} from '../src/shared/scene.ts'
+test('first keyframe at 2s preserves initial geometry and interpolates; corners anchor opposite or center',()=>{const l={...makeLayer('image','k',5000),width:10,height:10};const k=stampKeyframe(l,2000,{width:20,height:20});assert.equal(k.keyframes?.length,2);assert.equal(sampleLayer(k,0).width,10);assert.equal(sampleLayer(k,1000).width,15);assert.equal(sampleLayer(k,2000).width,20);const g=sampleLayer(l,0),r=resizeCorner(g,100,50,1000,500,1,1,true,false);assert.equal(r.width,20);assert.equal(r.height,20);assert.equal(r.x-r.width/2,g.x-g.width/2);assert.equal(r.y-r.height/2,g.y-g.height/2);const c=resizeCorner(g,50,25,1000,500,-1,-1,true,true);assert.equal(c.x,g.x);assert.equal(c.y,g.y)})

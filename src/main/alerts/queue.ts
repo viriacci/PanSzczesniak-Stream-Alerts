@@ -1,7 +1,7 @@
 import {queueTestRule} from './test-tone.ts'
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import { parseRule, renderText, type AlertEvent, type AlertRule } from '../../shared/alerts.ts'
+import { parseRule, renderText,eventVariables, type AlertEvent, type AlertRule } from '../../shared/alerts.ts'
 import { defaultQueueSettings,parseQueueSettings,parseQueueCommand,type QueueItem,type QueueSummary,type QueueSource,type QueueState,type QueueStatus,type Playback,type QueueSettings } from '../../shared/queue.ts'
 
 // Partial index predicate must remain identical to schema migration 5.
@@ -48,8 +48,8 @@ export class AlertQueue {
   db.exec("UPDATE alert_queue SET status='pending',reason='restart' WHERE status='playing'");this.hasPending=this.pendingCount()>0
  }
  private decode(row:any):QueueItem{
-  const rule=parseRule(JSON.parse(row.rule_json))
-  return {id:Number(row.id),source:row.source,key:row.rule_key,title:rule.title,text:row.text,rule,status:row.status,priority:row.priority,position:row.position,attempts:row.attempts,createdAt:row.created_at,finishedAt:row.finished_at,reason:row.reason}
+  const raw=JSON.parse(row.rule_json),rule=parseRule(raw)
+  return {variables:raw.eventVariables,id:Number(row.id),source:row.source,key:row.rule_key,title:rule.title,text:row.text,rule,status:row.status,priority:row.priority,position:row.position,attempts:row.attempts,createdAt:row.created_at,finishedAt:row.finished_at,reason:row.reason}
  }
  private get(id:number){const row=this.db.prepare('SELECT * FROM alert_queue WHERE id=?').get(id);return row?this.decode(row):undefined}
  private pendingCount(){return Number(this.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='pending'").get()?.n??0)}
@@ -63,9 +63,9 @@ export class AlertQueue {
   const state={settings:{...this.settings},current:current?this.summary(current):null,pending,pendingCount:this.pendingCount(),history,online};this.cached={revision:this.revision,online,state};return state
  }
  enqueue(event:AlertEvent,rule:AlertRule,source:QueueSource='twitch'){
-  return this.insert(source+':'+event.id,source,parseRule(rule),renderText(rule.template,event),event.count??event.months??0)
+  return this.insert(source+':'+event.id,source,parseRule(rule),renderText(rule.template,event),event.count??event.months??0,eventVariables(event))
  }
- private insert(eventId:string,source:QueueSource,rule:AlertRule,text:string,count:number){
+ private insert(eventId:string,source:QueueSource,rule:AlertRule,text:string,count:number,variables?:Record<string,string>){
   // Only the chosen scene is part of an immutable playback snapshot.
   rule={...rule,variants:[]}
   if(this.stopped)throw Error('Queue stopped')
@@ -80,7 +80,7 @@ export class AlertQueue {
   if(!reason&&this.pendingCount()+(this.current?1:0)>=1000)reason='capacity'
   const position=Number(this.db.prepare('SELECT coalesce(max(id),0)+1 AS n FROM alert_queue').get()?.n??1)
   this.db.prepare('INSERT INTO alert_queue(event_id,source,rule_key,rule_json,text,status,priority,position,created_at,finished_at,reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-   .run(eventId,source,rule.key,JSON.stringify(rule),text,reason?'suppressed':'pending',rule.priority,position,now,reason?now:null,reason)
+   .run(eventId,source,rule.key,JSON.stringify({...rule,eventVariables:variables}),text,reason?'suppressed':'pending',rule.priority,position,now,reason?now:null,reason)
   if(!reason)this.hasPending=true;else this.totals.suppressed++;this.changed();this.tick()
   return !reason
  }
@@ -99,7 +99,7 @@ export class AlertQueue {
   const item=this.decode(row),attempt=randomUUID()
   this.db.prepare("UPDATE alert_queue SET status='playing',attempts=attempts+1,reason='' WHERE id=?").run(item.id)
   this.current={id:item.id,attempt,deadline:now+item.rule.duration*1000+10000,rule:item.rule};this.changed()
-  try{if(!this.transport.send({attempt,rule:item.rule,text:item.text,volume:this.effective(item.rule)}))this.interrupted('overlay-disconnected')}catch{if(this.current)this.interrupted('transport-error')}
+  try{if(!this.transport.send({attempt,rule:item.rule,text:item.text,variables:item.variables,volume:this.effective(item.rule)}))this.interrupted('overlay-disconnected')}catch{if(this.current)this.interrupted('transport-error')}
  }
  acknowledge(attempt:string,result:'done'|'media-error'='done'){
   if(this.current?.attempt!==attempt)return false
@@ -142,7 +142,7 @@ export class AlertQueue {
      break
     case 'replay':
      if(item.status==='pending'||item.status==='playing')throw Error('Alert is still active')
-     if(!this.insert('replay:'+randomUUID(),'replay',item.rule,item.text,0))throw Error('Queue is full')
+     if(!this.insert('replay:'+randomUUID(),'replay',item.rule,item.text,0,item.variables))throw Error('Queue is full')
      break
     case 'priority':
      if(item.status!=='pending')throw Error('Alert is not pending')

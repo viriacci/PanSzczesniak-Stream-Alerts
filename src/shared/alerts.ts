@@ -42,8 +42,9 @@ export function parseRule(value:unknown):AlertRule {
  const scene=v.scene===undefined?undefined:parseScene(v.scene)
  return {scene,variants:parseVariants(v.variants),priority:integer(v.priority,5,0,10),cooldown:integer(v.cooldown,0,0,3600),volume:integer(v.volume,100,0,100),minCount:integer(v.minCount,0,0,1000000),key:v.key,enabled:v.enabled,title:v.title,template:v.template,image:v.image,audio:v.audio,duration:scene?scene.duration/1000:v.duration,layout:normalizeLayout(v.layout)}
 }
+export function eventVariables(event:AlertEvent):Record<string,string>{return {user:event.user,reward:event.reward??'',viewers:String(event.count??0),bits:String(event.count??0),count:String(event.count??0),months:String(event.months??0)}}
 export function renderText(template:string,event:AlertEvent):string {
- const vars:Record<string,string>={user:event.user,reward:event.reward??'',viewers:String(event.count??0),bits:String(event.count??0),count:String(event.count??0),months:String(event.months??0)}
+ const vars=eventVariables(event)
  return template.replace(/\{([a-z_]+)\}/g,(token,key:string)=>Object.hasOwn(vars,key)?vars[key]!:token)
 }
 
