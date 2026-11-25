@@ -36,7 +36,6 @@ Var pssaOptionsDialog
 
 !macro customPageAfterChangeDir
   Page custom PssaOptionsShow PssaOptionsLeave
-!macroend
 
 Function PssaOptionsShow
   !insertmacro MUI_HEADER_TEXT "Dostosuj PSSA" "Wybierz skróty i zarządzaj instalacją."
@@ -97,6 +96,7 @@ Function PssaRemove
     MessageBox MB_OK|MB_ICONSTOP "Nie udało się uruchomić dezinstalatora."
   pssaRemoveCancel:
 FunctionEnd
+!macroend
 
 !macro customInstall
   # Electron-builder creates its normal links first; explicit choices take precedence.
