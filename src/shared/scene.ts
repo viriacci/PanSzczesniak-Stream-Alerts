@@ -93,3 +93,11 @@ export function resizeCorner(g:Geometry,dx:number,dy:number,w:number,h:number,sx
  const mx=center?0:(size.width-g.width)*sx*w/200,my=center?0:(size.height-g.height)*sy*h/200
  return {...g,...size,x:Math.max(0,Math.min(100,g.x+(c*mx-s*my)*100/w)),y:Math.max(0,Math.min(100,g.y+(s*mx+c*my)*100/h))}
 }
+
+export function resizeEdge(g:Geometry,dx:number,dy:number,w:number,h:number,edge:keyof Crop,center:boolean):Geometry{
+ const a=g.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a),lx=(c*dx+s*dy)*100/w,ly=(-s*dx+c*dy)*100/h
+ const sx=edge==='right'?1:edge==='left'?-1:0,sy=edge==='bottom'?1:edge==='top'?-1:0
+ const size=scaleMedia(g.width,g.height,lx*sx*(center?2:1),ly*sy*(center?2:1),false)
+ const mx=center?0:(size.width-g.width)*sx*w/200,my=center?0:(size.height-g.height)*sy*h/200
+ return {...g,...size,x:Math.max(0,Math.min(100,g.x+(c*mx-s*my)*100/w)),y:Math.max(0,Math.min(100,g.y+(s*mx+c*my)*100/h))}
+}

@@ -286,3 +286,13 @@ svg { flex:none; }
 @media(min-width:960px) and (max-width:1100px) and (min-height:680px){
  .content--studio .studio-commandbar{padding:4px;gap:3px;justify-content:flex-start}.studio-commandgroup{padding-left:3px;gap:2px}.studio-commandgroup .button{padding:4px 6px;min-height:27px}.studio-project-picker strong{font-size:12px}.studio-project-picker select{max-width:150px}.studio-savegroup{margin-left:0}.studio-resizable .studio-workspace{grid-template-columns:minmax(108px,var(--studio-left)) 6px minmax(0,1fr) 6px minmax(155px,var(--studio-right))}.studio-pro .studio-workspace>.panel{padding:6px}.studio-pro .studio-add{grid-template-columns:1fr 1fr;gap:3px}.studio-pro .studio-add .button{min-height:30px;flex-wrap:wrap;justify-content:center;font-size:10px;padding:3px}.studio-pro .studio-preview-tools{font-size:10px;gap:4px;padding-top:4px}.studio-pro .studio-preview-tools select{max-width:120px}.studio-pro .studio-preview-tools small{display:none}.studio-pro .studio-preview .panel-heading{gap:3px}.studio-pro .studio-preview .panel-heading .button{padding:4px 5px;min-height:26px}.studio-pro .studio-timeline{padding:7px}.studio-pro .studio-timeline-hint{display:none}.studio-pro .studio-layers>.alert-actions{gap:3px;flex-wrap:wrap}.studio-pro .studio-layers>.alert-actions .button{padding:4px 6px;min-height:25px}
 }
+
+/* Invisible, independently hit-tested edge grips. Avoid heavy hover bars. */
+.studio-pro .studio-crop-box.crop-quick{border:0;box-shadow:none}
+.studio-pro .studio-crop-box.crop-quick .studio-crop-handle{background:transparent!important;box-shadow:none!important;outline:none;border:0;border-radius:0;padding:0;z-index:3}
+.studio-pro .studio-crop-box.crop-quick .studio-crop-handle:focus-visible{outline:1px dashed var(--gold);outline-offset:-1px}
+.studio-pro .studio-crop-box.crop-quick .crop-top,.studio-pro .studio-crop-box.crop-quick .crop-bottom{cursor:ns-resize;height:8px;width:calc(100% - 14px);left:7px}
+.studio-pro .studio-crop-box.crop-quick .crop-left,.studio-pro .studio-crop-box.crop-quick .crop-right{cursor:ew-resize;width:8px;height:calc(100% - 14px);top:7px}
+.studio-pro .studio-crop-box.crop-quick .crop-top{top:-4px}.studio-pro .studio-crop-box.crop-quick .crop-bottom{bottom:-4px}.studio-pro .studio-crop-box.crop-quick .crop-left{left:-4px}.studio-pro .studio-crop-box.crop-quick .crop-right{right:-4px}
+.studio-pro .studio-resize{z-index:5}.studio-pro .studio-crop-box.crop-active{border:1px solid #65d9c4;box-shadow:0 0 0 9999px #0003}
+.studio-pro .studio-crop-box.crop-active .studio-crop-handle{background:#65d9c4;border:0;box-shadow:none}

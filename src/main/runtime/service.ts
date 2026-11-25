@@ -106,8 +106,8 @@ export class RuntimeService{
  }
  private async trustedInstaller(file:string){
   const quote=(v:string)=>"'"+v.replaceAll("'","''")+"'"
-  const script="$ErrorActionPreference='Stop'; $a=Get-AuthenticodeSignature -LiteralPath "+quote(process.execPath)+"; $b=Get-AuthenticodeSignature -LiteralPath "+quote(file)+"; if($a.Status -eq 'Valid' -and $b.Status -eq 'Valid' -and $a.SignerCertificate.Thumbprint -eq $b.SignerCertificate.Thumbprint){'trusted'}else{'manual'}"
-  try{const {stdout}=await promisify(execFile)(join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:20000});return stdout.trim()==='trusted'}catch{return false}
+  const script="$ErrorActionPreference='Stop'; $a=Get-AuthenticodeSignature -LiteralPath "+quote(process.execPath)+"; $b=Get-AuthenticodeSignature -LiteralPath "+quote(file)+"; if($a.Status -eq 'Valid' -and $b.Status -eq 'Valid' -and $a.SignerCertificate.Thumbprint -eq $b.SignerCertificate.Thumbprint){'trusted'}elseif($b.Status -eq 'NotSigned'){'unsigned'}else{'untrusted'}"
+  try{const {stdout}=await promisify(execFile)(join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:20000});const value=stdout.trim();return value==='trusted'?'trusted':value==='unsigned'?'unsigned':'untrusted'}catch{return 'untrusted'}
  }
  dockUpdateReminder(){try{const row=this.db.prepare("SELECT value FROM settings WHERE key='update.obs.reminder'").get();return typeof row?.value==='string'&&compareVersions(app.getVersion(),row.value)>=0}catch{return false}}
  clearDockUpdateReminder(){this.db.prepare("DELETE FROM settings WHERE key='update.obs.reminder'").run()}
@@ -122,14 +122,13 @@ export class RuntimeService{
    dir=await mkdtemp(join(tmpdir(),'PSSA-update-'))
    const file=await downloadRelease(info.asset,dir)
    const trusted=await this.trustedInstaller(file)
-   if(alsoDock)this.db.prepare("INSERT INTO settings(key,value) VALUES ('update.obs.reminder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(info.version)
-   if(!trusted){await this.updateSafe();keep=true;shell.showItemInFolder(file);return 'manual'}
+   if(trusted==='untrusted')throw Error('Nie można potwierdzić podpisu instalatora. Automatyczne uruchomienie zablokowane. Sprawdź wydanie na GitHubie.')
    await this.updateSafe()
-   const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Instalator zweryfikowany',message:'Uruchomić instalator i zakończyć PSSA?',detail:'Podpis i suma SHA256 są zgodne. Instalator zachowa istniejący katalog programu.',buttons:['Anuluj','Zainstaluj'],defaultId:0,cancelId:0})
-   if(confirm.response!==1){keep=true;shell.showItemInFolder(file);return 'manual'}
+   const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:trusted==='trusted'?'Instalator zweryfikowany':'Niepodpisany instalator Beta',message:'Uruchomić instalator i zakończyć PSSA?',detail:trusted==='trusted'?'Podpis i suma SHA256 są zgodne. Instalator zachowa istniejący katalog programu.':'SHA256 pobranego pliku jest zgodne z oficjalnym wydaniem GitHub, ale instalator nie ma podpisu cyfrowego. Uruchom tylko jeśli ufasz wydawcy. Windows może poprosić o dodatkowe potwierdzenie.',buttons:['Anuluj',trusted==='trusted'?'Zainstaluj':'Uruchom niepodpisany instalator'],defaultId:0,cancelId:0})
+   if(confirm.response!==1)return 'cancelled'
    await this.updateSafe()
-   const result=await shell.openPath(file);if(result)throw Error('Nie można uruchomić instalatora.')
-   keep=true;setTimeout(()=>app.quit(),100);return 'launched'
+   const result=await shell.openPath(file);if(result)throw Error('Nie można uruchomić instalatora: '+result)
+   keep=true;if(alsoDock)this.db.prepare("INSERT INTO settings(key,value) VALUES ('update.obs.reminder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(info.version);setTimeout(()=>app.quit(),100);return 'launched'
   }finally{this.downloading=false;if(dir&&!keep)await rm(dir,{recursive:true,force:true}).catch(()=>{})}
  }
  async openUpdate(){if(this.cached.state!=='available'||!this.cached.url.startsWith('https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/'))throw Error('No update');await shell.openExternal(this.cached.url)}
