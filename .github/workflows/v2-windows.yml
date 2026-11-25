@@ -41,6 +41,10 @@ jobs:
           if ($null -eq $r.metadata.vulnerabilities.total -or $r.metadata.vulnerabilities.total -ne 0) { throw 'Dependency audit failed' }
       - name: Complete source and dependency inventory
         run: node scripts/audit-inventory.mjs
+      - name: Source-line security and lifecycle triage
+        run: node scripts/audit-source-lines.mjs
+      - name: Check audit patch whitespace
+        run: git diff --check 2af0e04098d0f73c68e0542553cd300973b8b5e2 HEAD
       - name: SBOM
         shell: pwsh
         run: npm sbom --package-lock-only --sbom-format cyclonedx | Set-Content -Encoding utf8 sbom.json
@@ -53,14 +57,26 @@ jobs:
           node --experimental-strip-types scripts/performance.mjs . | Set-Content -Encoding utf8 perf-after.json
           if ($LASTEXITCODE -ne 0) { throw 'Current benchmark failed' }
           git worktree remove baseline
+          git worktree add --detach baseline-rc22 2af0e04098d0f73c68e0542553cd300973b8b5e2
+          node --experimental-strip-types scripts/performance.mjs baseline-rc22 | Set-Content -Encoding utf8 perf-rc22-before.json
+          if ($LASTEXITCODE -ne 0) { throw 'RC.22 benchmark failed' }
+          git worktree remove baseline-rc22
+          $before = Get-Content perf-rc22-before.json -Raw | ConvertFrom-Json
+          $after = Get-Content perf-after.json -Raw | ConvertFrom-Json
+          foreach ($item in $before.results) {
+            $current = $after.results | Where-Object name -eq $item.name
+            if ($null -eq $current -or $current.sqlPrepares -gt $item.sqlPrepares) { throw "SQL regression: $($item.name)" }
+          }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pssa-technical-audit
           path: |
             audit-inventory.json
+            audit-source-lines.json
             sbom.json
             perf-before.json
             perf-after.json
+            perf-rc22-before.json
           if-no-files-found: error
       - run: npm run typecheck
       - run: npm test
@@ -246,7 +262,7 @@ jobs:
   publish-beta:
     name: Publish verified Beta channel release
     needs: windows
-    if: success() && github.ref == 'refs/heads/develop/v2'
+    if: success() && github.ref == 'refs/heads/develop/v2' && !contains(github.event.head_commit.message || '', '[audit-only]')
     runs-on: ubuntu-latest
     permissions:
       contents: write

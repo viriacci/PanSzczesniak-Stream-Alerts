@@ -25,12 +25,13 @@ export class AlertQueue {
  private stopped=false
  private hasPending=false
  private revision=0
+ private pendingTotal?:number
  private totals={done:0,failed:0,suppressed:0,retried:0}
  telemetry(){return {...this.totals,queuePending:this.pendingCount(),queuePlaying:!!this.current}}
  private cached?:{revision:number;online:boolean;state:QueueState}
  get version(){return this.revision}
  onChange:()=>void=()=>{}
- private changed(){this.revision++;this.cached=undefined;this.onChange()}
+ private changed(){this.revision++;this.cached=undefined;this.pendingTotal=undefined;this.onChange()}
  // Null means no timer: wake on a new event, command, or transport change.
  nextDelay():number|null{
   if(this.stopped)return null
@@ -52,7 +53,7 @@ export class AlertQueue {
   return {variables:raw.eventVariables,id:Number(row.id),source:row.source,key:row.rule_key,title:rule.title,text:row.text,rule,status:row.status,priority:row.priority,position:row.position,attempts:row.attempts,createdAt:row.created_at,finishedAt:row.finished_at,reason:row.reason}
  }
  private get(id:number){const row=this.db.prepare('SELECT * FROM alert_queue WHERE id=?').get(id);return row?this.decode(row):undefined}
- private pendingCount(){return Number(this.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='pending'").get()?.n??0)}
+ private pendingCount(){return this.pendingTotal??=(Number(this.db.prepare("SELECT count(*) AS n FROM alert_queue WHERE status='pending'").get()?.n??0))}
  private summary(row:any):QueueSummary{return {id:Number(row.id),source:row.source,key:row.rule_key,title:typeof row.title==='string'?row.title:row.rule_key,text:row.text,status:row.status,priority:row.priority,position:row.position,attempts:row.attempts,createdAt:row.created_at,finishedAt:row.finished_at,reason:row.reason}}
  state():QueueState{
   const online=this.transport.online();if(this.cached?.revision===this.revision&&this.cached.online===online)return this.cached.state
@@ -110,16 +111,14 @@ export class AlertQueue {
   const item=this.get(active.id)
   if(item&&item.attempts<3){this.totals.retried++;this.db.prepare("UPDATE alert_queue SET status='pending',reason=? WHERE id=?").run(reason,active.id)}
   else {this.totals.failed++;this.db.prepare("UPDATE alert_queue SET status='failed',finished_at=?,reason=? WHERE id=?").run(this.now(),reason,active.id)}
-  this.hasPending=true;this.changed();this.current=undefined;try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
-  this.nextAt=this.now()+this.settings.gapMs
+  this.hasPending=true;this.current=undefined;this.nextAt=this.now()+this.settings.gapMs;this.changed();try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
  }
  private finish(status:QueueStatus,reason:string,cancel:boolean){
   const active=this.current;if(!active)return
   this.db.prepare('UPDATE alert_queue SET status=?,finished_at=?,reason=? WHERE id=?').run(status,this.now(),reason,active.id)
   if(status==='done')this.totals.done++;if(status==='failed')this.totals.failed++
-  this.current=undefined;this.changed()
+  this.current=undefined;this.nextAt=this.now()+this.settings.gapMs;this.changed()
   if(cancel)try{this.transport.cancel(active.attempt)}catch{/* transport already lost */}
-  this.nextAt=this.now()+this.settings.gapMs
  }
  command(input:unknown){
   const command=parseQueueCommand(input)

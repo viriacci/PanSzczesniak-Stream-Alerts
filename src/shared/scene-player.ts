@@ -28,7 +28,7 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   }else if(layer.kind==='particles'){
    const cv=document.createElement('canvas');cv.width=640;cv.height=360;Object.assign(cv.style,{width:'100%',height:'100%'});el.append(cv)
   }
-  board.append(el);return {layer,el,media,playing:false,started:false,lastDisplay:'none',lastOpacity:'',lastTransform:'',lastParticles:-Infinity}
+  board.append(el);return {layer,el,media,playing:false,started:false,lastDisplay:'none',lastOpacity:'',lastTransform:'',lastParticles:-Infinity,lastGeometry:undefined as Geometry|undefined,lastCrop:undefined as string|undefined}
  })
  function scale(){const s=Math.min(root.clientWidth/scene.width,root.clientHeight/scene.height);board.style.transform='translate(-50%, -50%) scale('+s+')'}
  const observer=new ResizeObserver(scale);observer.observe(root);scale()
@@ -51,7 +51,14 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
    const display=active&&l.kind!=='audio'?(l.kind==='text'?'flex':'block'):'none';if(node.lastDisplay!==display){el.style.display=display;node.lastDisplay=display}
    if(active){
     const a=effect(l.enter,edit||!l.enterMs?1:(time-l.start)/l.enterMs),b=effect(l.exit,edit||!l.exitMs?1:(l.end-time)/l.exitMs)
-    const g=sample(l,time),crop=l.crop;Object.assign(el.style,{left:g.x+'%',top:g.y+'%',width:g.width+'%',height:g.height+'%',clipPath:crop?'inset('+crop.top+'% '+crop.right+'% '+crop.bottom+'% '+crop.left+'%)':'none'})
+    const g=sample(l,time),previous=node.lastGeometry,crop=l.crop
+    if(!previous||previous.x!==g.x)el.style.left=g.x+'%'
+    if(!previous||previous.y!==g.y)el.style.top=g.y+'%'
+    if(!previous||previous.width!==g.width)el.style.width=g.width+'%'
+    if(!previous||previous.height!==g.height)el.style.height=g.height+'%'
+    node.lastGeometry=g
+    const clip=crop?'inset('+crop.top+'% '+crop.right+'% '+crop.bottom+'% '+crop.left+'%)':'none'
+    if(node.lastCrop!==clip){el.style.clipPath=clip;node.lastCrop=clip}
     const opacity=String(g.opacity/100*a.a*b.a),transform='translate(-50%,-50%) translate('+(a.x+b.x)+'%,'+(a.y+b.y)+'%) rotate('+g.rotation+'deg) scale('+a.s*b.s+')'
     if(node.lastOpacity!==opacity){el.style.opacity=opacity;node.lastOpacity=opacity}if(node.lastTransform!==transform){el.style.transform=transform;node.lastTransform=transform}
     if(l.kind==='particles'&&(Math.abs(time-node.lastParticles)>=15||edit)){node.lastParticles=time;const cv=el.firstElementChild as HTMLCanvasElement,ctx=cv.getContext('2d');if(ctx){ctx.clearRect(0,0,cv.width,cv.height);const t=Math.max(0,time-l.start)/1000*(l.particleSpeed??100)/100;for(let i=0;i<(l.particleCount??48);i++){const phase=(t*(.15+(i%7)*.025)+((i*61)%101)/101)%1,x=((i*137.51)%cv.width)+Math.sin(t*2+i)*14,y=cv.height*(1-phase),size=3+i%8,shape=l.particleShape??'mixed',kind=shape==='mixed'?['circle','square','star','diamond'][i%4]:shape;ctx.save();ctx.translate(x,y);ctx.rotate(t*.6+i);ctx.globalAlpha=Math.sin(phase*Math.PI)*.9;ctx.fillStyle=l.color;ctx.beginPath();if(kind==='circle')ctx.arc(0,0,size,0,Math.PI*2);else if(kind==='square')ctx.rect(-size,-size,size*2,size*2);else{const n=kind==='star'?10:4;for(let j=0;j<n;j++){const a=j*Math.PI*2/n,r=kind==='star'&&j%2?size*.45:size;const px=Math.cos(a)*r,py=Math.sin(a)*r;if(j)ctx.lineTo(px,py);else ctx.moveTo(px,py)}ctx.closePath()}ctx.fill();ctx.restore()}}}
@@ -69,5 +76,5 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
   }
  }
  const ready=Promise.all(readiness).then(()=>undefined);void ready.catch(()=>{})
- return {ready,paint,updateGeometry(next:Scene){for(const n of nodes){const l=next.layers.find(x=>x.id===n.layer.id);if(!l)continue;n.layer=l;Object.assign(n.el.style,{left:l.x+'%',top:l.y+'%',width:l.width+'%',height:l.height+'%'})}},setVolume(value:number){master=Math.max(0,Math.min(100,value))/100;for(const n of nodes)if(n.media)n.media.volume=master*n.layer.volume/100},dispose(){disposed=true;observer.disconnect();for(const n of nodes)if(n.media){n.playing=false;n.media.onerror=null;n.media.pause();n.media.removeAttribute('src');n.media.load()}root.replaceChildren()}}
+ return {ready,paint,updateGeometry(next:Scene){for(const n of nodes){const l=next.layers.find(x=>x.id===n.layer.id);if(!l)continue;n.layer=l;n.lastGeometry=undefined;n.lastCrop=undefined;Object.assign(n.el.style,{left:l.x+'%',top:l.y+'%',width:l.width+'%',height:l.height+'%'})}},setVolume(value:number){master=Math.max(0,Math.min(100,value))/100;for(const n of nodes)if(n.media)n.media.volume=master*n.layer.volume/100},dispose(){disposed=true;observer.disconnect();for(const n of nodes)if(n.media){n.playing=false;n.media.onerror=null;n.media.pause();n.media.removeAttribute('src');n.media.load()}root.replaceChildren()}}
 }

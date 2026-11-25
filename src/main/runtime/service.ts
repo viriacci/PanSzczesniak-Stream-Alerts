@@ -14,14 +14,14 @@ import {join} from 'node:path'
 import {statSync,existsSync} from 'node:fs'
 import {createBackup,stageRestore} from './backup'
 import {preferences,savePreferences} from './preferences'
-import {checkRelease,compareVersions} from './updates'
+import {checkRelease,compareVersions,installerAllowed} from './updates'
 import {cleanUpdateFiles} from './update-cleanup'
 import {downloadRelease} from './update-download'
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
 import {mkdtemp,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
-import {type Diagnostics,type RuntimePreferences,type UpdateInfo} from '../../shared/runtime'
+import {type Diagnostics,type RuntimePreferences,type UpdateInfo,type UpdateChannel} from '../../shared/runtime'
 import {schemaVersion} from '../database'
 export class RuntimeService{
  private measurement:Measurement
@@ -33,7 +33,7 @@ export class RuntimeService{
  private lastRendererFault=0
  private busy=false
  private stopped=false
- private update?:Promise<UpdateInfo>
+ private update?:{channel:UpdateChannel;promise:Promise<UpdateInfo>}
  private cached:UpdateInfo={state:'none',version:'',url:'',detail:'Nie sprawdzano aktualizacji.'}
  private checkedAt=0
  private downloading=false
@@ -58,7 +58,7 @@ export class RuntimeService{
  rendererFault(kind:unknown,stack:unknown){if(kind!=='error'&&kind!=='rejection'&&kind!=='react')throw Error('Invalid renderer fault');if(typeof stack!=='string'||stack.length>8192)throw Error('Invalid stack');if(Date.now()-this.lastRendererFault<1000)return;this.lastRendererFault=Date.now();this.crashes.write('renderer-'+kind,'',null,stack)}
  async crashExport(){this.guard();const data=JSON.stringify({version:app.getVersion(),diagnostics:this.diagnostics(),crashes:this.crashState()},null,2);const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-crashes.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath||this.stopped)return false;writeNew(this.outside(r.filePath),data);return true}
  state(){return preferences(this.db)}
- save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
+ save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0;this.update=undefined}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
  start(){void cleanUpdateFiles();let cleanupRetries=3;this.timer=setInterval(()=>{if(!this.downloading&&cleanupRetries>0){cleanupRetries--;void cleanUpdateFiles()}if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(failed=false){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown(failed);this.stopCollectors()}
  private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
@@ -91,18 +91,25 @@ export class RuntimeService{
   this.guard();this.busy=true
   try{const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-diagnostics.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath)return false;const target=this.outside(r.filePath);if(this.stopped)return false;writeNew(target,JSON.stringify(this.diagnostics(),null,2));return true}finally{this.busy=false}
  }
- async check(){if(this.stopped)return this.cached;if(this.update)return this.update
+ async check(){
+  if(this.stopped)return this.cached
   const channel=this.state().updates
-  const task=this.lookupRelease(app.getVersion(),channel);this.update=task
-  try{const value=await task;if(!this.stopped&&channel===this.state().updates){this.cached=value;this.checkedAt=Date.now()}return value}finally{if(this.update===task)this.update=undefined}
+  if(this.update?.channel===channel)return this.update.promise
+  const promise:Promise<UpdateInfo>=Promise.resolve().then(()=>this.lookupRelease(app.getVersion(),channel)).then(value=>{
+   if(!this.stopped&&this.update?.promise===promise&&channel===this.state().updates){this.cached=value;this.checkedAt=Date.now()}
+   return this.cached
+  }).finally(()=>{if(this.update?.promise===promise)this.update=undefined})
+  this.update={channel,promise};return promise
  }
  updateInfo(){return this.cached}
  private async updateSafe(){
+  if(this.stopped)throw Error('Aplikacja zamykana.')
   try{this.requireOffline()}catch{throw Error('Zakończ transmisję, nagrywanie i kolejkę alertów przed aktualizacją.')}
   if(process.platform!=='win32'||!app.isPackaged)throw Error('Instalator dostępny dla Windows x64.')
   const exe=join(process.env.SystemRoot??'C:\\Windows','System32','tasklist.exe')
   const {stdout}=await promisify(execFile)(exe,['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000})
   if(/"obs64\.exe"/i.test(stdout))throw Error('Zamknij OBS przed aktualizacją PSSA.')
+  if(this.stopped)throw Error('Aplikacja zamykana.')
   if(this.agent?.snapshot().online)throw Error('Zakończ niezależnego Agenta przed aktualizacją.')
  }
  private async trustedInstaller(file:string){
@@ -112,22 +119,28 @@ export class RuntimeService{
  }
  dockUpdateReminder(){try{const row=this.db.prepare("SELECT value FROM settings WHERE key='update.obs.reminder'").get();return typeof row?.value==='string'&&compareVersions(app.getVersion(),row.value)>=0}catch{return false}}
  clearDockUpdateReminder(){this.db.prepare("DELETE FROM settings WHERE key='update.obs.reminder'").run()}
- async downloadUpdate(alsoDock:unknown):Promise<'cancelled'|'manual'|'launched'>{
+ async downloadUpdate(alsoDock:unknown,version:unknown,sha256:unknown):Promise<'cancelled'|'manual'|'launched'>{
   if(typeof alsoDock!=='boolean'||this.downloading||this.stopped)throw Error('Aktualizacja niedostępna.')
   const info=this.cached;if(info.state!=='available'||!info.asset)throw Error('Wydanie nie zawiera instalatora ze zweryfikowaną sumą SHA256.')
+  if(typeof version!=='string'||typeof sha256!=='string'||version!==info.version||sha256!==info.asset.sha256)throw Error('Wydanie zmieniło się. Zamknij okno i sprawdź aktualizację ponownie.')
+  const channel=this.state().updates
+  const assertCurrent=()=>{if(this.stopped||this.state().updates!==channel||this.cached.version!==info.version||this.cached.asset?.sha256!==info.asset!.sha256)throw Error('Wydanie lub kanał aktualizacji zmienił się. Sprawdź ponownie.')}
   this.downloading=true;let dir='',keep=false
   try{
    await this.updateSafe()
    const choice=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Aktualizacja PSSA',message:'Pobrać PSSA '+info.version+'?',detail:'Zapisz rozpoczętą edycję. PSSA sprawdzi sumę SHA256 oraz podpis instalatora. OBS musi pozostać zamknięty.',buttons:['Anuluj','Pobierz'],defaultId:0,cancelId:0})
    if(choice.response!==1)return 'cancelled'
+   assertCurrent()
    dir=await mkdtemp(join(tmpdir(),'PSSA-update-'))
    const file=await downloadRelease(info.asset,dir)
    const trusted=await this.trustedInstaller(file)
-   if(trusted==='untrusted')throw Error('Nie można potwierdzić podpisu instalatora. Automatyczne uruchomienie zablokowane. Sprawdź wydanie na GitHubie.')
+   if(!installerAllowed(trusted,info.version))throw Error('Nie można potwierdzić podpisu instalatora. Automatyczne uruchomienie zablokowane. Sprawdź wydanie na GitHubie.')
+   assertCurrent()
    await this.updateSafe()
    const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:trusted==='trusted'?'Instalator zweryfikowany':'Niepodpisany instalator Beta',message:'Uruchomić instalator i zakończyć PSSA?',detail:trusted==='trusted'?'Podpis i suma SHA256 są zgodne. Instalator zachowa istniejący katalog programu.':'SHA256 pobranego pliku jest zgodne z oficjalnym wydaniem GitHub, ale instalator nie ma podpisu cyfrowego. Uruchom tylko jeśli ufasz wydawcy. Windows może poprosić o dodatkowe potwierdzenie.',buttons:['Anuluj',trusted==='trusted'?'Zainstaluj':'Uruchom niepodpisany instalator'],defaultId:0,cancelId:0})
    if(confirm.response!==1)return 'cancelled'
    await this.updateSafe()
+   assertCurrent()
    const result=await shell.openPath(file);if(result)throw Error('Nie można uruchomić instalatora: '+result)
    keep=true;if(alsoDock)this.db.prepare("INSERT INTO settings(key,value) VALUES ('update.obs.reminder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(info.version);setTimeout(()=>app.quit(),100);return 'launched'
   }finally{this.downloading=false;if(dir&&!keep)await rm(dir,{recursive:true,force:true}).catch(()=>{})}

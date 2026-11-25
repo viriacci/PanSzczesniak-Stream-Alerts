@@ -17,5 +17,6 @@ try{
  let queries=0;const prepare=db.prepare.bind(db);db.prepare=(sql)=>{queries++;return prepare(sql)}
  const measure=(name,n,fn)=>{queries=0;const cpu=process.cpuUsage(),start=performance.now();for(let i=0;i<n;i++)fn();const used=process.cpuUsage(cpu);return {name,iterations:n,wallMs:Math.round((performance.now()-start)*100)/100,cpuMs:(used.user+used.system)/1000,sqlPrepares:queries}}
  const results=[measure('idleTick',14400,()=>queue.tick()),measure('unchangedQueueSnapshot',1000,()=>queue.state()),measure('unchangedRules',500,()=>rules(db))]
+ if(typeof queue.telemetry==='function')results.push(measure('unchangedQueueTelemetry',1000,()=>queue.telemetry()))
  console.log(JSON.stringify({node:process.version,platform:process.platform,arch:process.arch,results},null,2))
 }finally{queue.stop();db.close()}

@@ -45,7 +45,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
   const handlers: [string,number,(...args:any[])=>unknown][] = [
    [IPC.obsDockStatus,0,()=>obsDockStatus()],
    [IPC.installObsDock,0,async()=>{const ok=await installObsDock(window);if(ok)runtime.clearDockUpdateReminder();return ok}],
-   [IPC.updateDownload,1,value=>runtime.downloadUpdate(value)],
+   [IPC.updateDownload,3,(value,version,sha256)=>runtime.downloadUpdate(value,version,sha256)],
    [IPC.updateDockReminder,0,()=>runtime.dockUpdateReminder()],
    [IPC.measurementState,0,()=>runtime.measurementState()],
    [IPC.measurementStart,1,gpu=>runtime.measurementStart(gpu)],

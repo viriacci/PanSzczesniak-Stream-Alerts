@@ -162,3 +162,22 @@ test('independent test waits offline and observes volume, mute, ACK and replay',
 })
 
 test('history deletion hides completed alert, preserves deduplication and rejects pending',()=>{const f=fixture();try{f.q.enqueue(f.event('keep'),f.rule);const id=f.q.state().pending[0]!.id;assert.throws(()=>f.q.command({type:'delete-history',id}));f.q.command({type:'skip',id});assert.equal(f.q.state().history[0]?.id,id);f.q.command({type:'delete-history',id});assert.equal(f.q.state().history.length,0);assert.equal(f.q.enqueue(f.event('keep'),f.rule),false);assert.equal(f.db.prepare('SELECT count(*) n FROM alert_queue').get()?.n,1)}finally{f.q.stop();f.db.close()}})
+
+test('unchanged queue telemetry reuses pending count and observers see completed transitions',()=>{
+ const f=fixture()
+ try{
+  f.q.enqueue(f.event('first'),f.rule);f.q.enqueue(f.event('second'),f.rule)
+  assert.equal(f.q.telemetry().queuePending,2)
+  const prepare=f.db.prepare.bind(f.db);let reads=0
+  f.db.prepare=((sql:string)=>{reads++;return prepare(sql)}) as typeof f.db.prepare
+  for(let i=0;i<1000;i++)assert.equal(f.q.telemetry().queuePending,2)
+  assert.equal(reads,0)
+  f.connect(true);f.q.tick();assert.equal(f.q.telemetry().queuePending,1)
+  const seen:{playing:boolean;pending:number;delay:number|null}[]=[]
+  f.q.onChange=()=>{const t=f.q.telemetry();seen.push({playing:t.queuePlaying,pending:t.queuePending,delay:f.q.nextDelay()})}
+  f.connect(false);f.q.tick()
+  assert.deepEqual(seen.at(-1),{playing:false,pending:2,delay:null})
+  f.connect(true);f.advance(500);f.ack()
+  assert.deepEqual(seen.at(-1),{playing:false,pending:1,delay:500})
+ }finally{f.q.onChange=()=>{};f.q.stop();f.db.close()}
+})

@@ -78,3 +78,32 @@ import {stampKeyframe,resizeCorner,resizeEdge} from '../src/shared/scene.ts'
 test('first keyframe at 2s preserves initial geometry and interpolates; corners anchor opposite or center',()=>{const l={...makeLayer('image','k',5000),width:10,height:10};const k=stampKeyframe(l,2000,{width:20,height:20});assert.equal(k.keyframes?.length,2);assert.equal(sampleLayer(k,0).width,10);assert.equal(sampleLayer(k,1000).width,15);assert.equal(sampleLayer(k,2000).width,20);const g=sampleLayer(l,0),r=resizeCorner(g,100,50,1000,500,1,1,true,false);assert.equal(r.width,20);assert.equal(r.height,20);assert.equal(r.x-r.width/2,g.x-g.width/2);assert.equal(r.y-r.height/2,g.y-g.height/2);const c=resizeCorner(g,50,25,1000,500,-1,-1,true,true);assert.equal(c.x,g.x);assert.equal(c.y,g.y)})
 
 test('edge drag resizes only its axis and anchors opposite edge; Ctrl keeps center',()=>{const g={x:50,y:50,width:20,height:20,rotation:0,opacity:100};const r=resizeEdge(g,100,30,1000,500,'right',false);assert.equal(r.width,30);assert.equal(r.height,20);assert.equal(r.x-r.width/2,40);assert.equal(r.y,50);const l=resizeEdge(g,-100,0,1000,500,'left',false);assert.equal(l.x+l.width/2,60);const top=resizeEdge(g,25,-50,1000,500,'top',false);assert.equal(top.height,30);assert.equal(top.width,20);assert.equal(top.y+top.height/2,60);const c=resizeEdge(g,100,0,1000,500,'right',true);assert.equal(c.width,40);assert.equal(c.x,50)})
+
+test('scene player does not rewrite static geometry every animation frame and invalidates on edit',()=>{
+ const savedDocument=Object.getOwnPropertyDescriptor(globalThis,'document'),savedResize=Object.getOwnPropertyDescriptor(globalThis,'ResizeObserver')
+ let writes=0
+ class ElementStub{
+  children:ElementStub[]=[];clientWidth=1920;clientHeight=1080
+  style=new Proxy({} as Record<string,string>,{set(obj,key,value){if(['left','top','width','height','clipPath'].includes(String(key)))writes++;Reflect.set(obj,key,value);return true}})
+  append(...nodes:ElementStub[]){this.children.push(...nodes)}
+  replaceChildren(){this.children=[]}
+ }
+ Object.defineProperty(globalThis,'document',{configurable:true,value:{createElement:()=>new ElementStub()}})
+ Object.defineProperty(globalThis,'ResizeObserver',{configurable:true,value:class{observe(){} disconnect(){}}})
+ try{
+  const scene=fixture(),root=new ElementStub()
+  const player=createScenePlayer(root as unknown as HTMLElement,scene,'test','',100,()=>{},sampleLayer)
+  player.paint(1);const afterFirst=writes
+  for(let t=2;t<250;t++)player.paint(t)
+  assert.equal(writes,afterFirst)
+  const moved={...scene,layers:[{...scene.layers[0]!,x:70,crop:{top:5,right:0,bottom:0,left:0}}]}
+  player.updateGeometry(moved);player.paint(260)
+  const node=root.children[0]!.children[0]!
+  assert.equal(node.style.left,'70%');assert.equal(node.style.clipPath,'inset(5% 0% 0% 0%)')
+  const afterEdit=writes;player.paint(270);assert.equal(writes,afterEdit)
+  player.dispose()
+ }finally{
+  if(savedDocument)Object.defineProperty(globalThis,'document',savedDocument);else Reflect.deleteProperty(globalThis,'document')
+  if(savedResize)Object.defineProperty(globalThis,'ResizeObserver',savedResize);else Reflect.deleteProperty(globalThis,'ResizeObserver')
+ }
+})

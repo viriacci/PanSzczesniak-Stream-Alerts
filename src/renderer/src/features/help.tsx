@@ -41,30 +41,44 @@ export function GuidedTour({page,onClose}:{page:TourPage;onClose:()=>void}){
  const hole=useRef<HTMLDivElement>(null), bubble=useRef<HTMLDivElement>(null)
  const missing=useRef<HTMLParagraphElement>(null)
  useEffect(()=>{
-  let frame=0,previous:HTMLElement|null=null
-  const update=()=>{
+  let frame=0,previous:HTMLElement|null=null,stopped=false
+  const main=document.querySelector<HTMLElement>('#main-content')
+  const schedule=()=>{if(!stopped&&!frame)frame=requestAnimationFrame(update)}
+  const resize=new ResizeObserver(schedule)
+  if(main)resize.observe(main)
+  if(bubble.current)resize.observe(bubble.current)
+  const mutation=new MutationObserver(schedule)
+  if(main)mutation.observe(main,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden']})
+  const style=(el:HTMLElement,values:Partial<CSSStyleDeclaration>)=>{
+   for(const [key,value] of Object.entries(values))if(el.style.getPropertyValue(key)!==value)el.style.setProperty(key,String(value))
+  }
+  function update(){
+   frame=0
    const primary=document.querySelector<HTMLElement>('[data-tour="'+step.target+'"]')
    const fallback=step.fallback?document.querySelector<HTMLElement>('[data-tour="'+step.fallback+'"]'):null
    const visible=(el:HTMLElement|null)=>!!el&&el.getBoundingClientRect().width>0&&el.getBoundingClientRect().height>0
    const target=(visible(primary)?primary:visible(fallback)?fallback:document.querySelector<HTMLElement>('[data-tour="page-header"]'))
-   if(target&&target!==previous){target.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});previous=target}
+   if(target!==previous){if(previous)resize.unobserve(previous);if(target){resize.observe(target);target.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'})}previous=target}
    const h=hole.current,b=bubble.current
    if(target&&h&&b){
-    const r=target.getBoundingClientRect(),main=document.querySelector<HTMLElement>('#main-content')?.getBoundingClientRect()
-    const left=Math.max(4,main?.left??0,r.left-5),top=Math.max(4,main?.top??0,r.top-5)
-    const right=Math.min(innerWidth-4,main?.right??innerWidth,r.right+5),bottom=Math.min(innerHeight-4,main?.bottom??innerHeight,r.bottom+5)
+    const r=target.getBoundingClientRect(),bounds=main?.getBoundingClientRect()
+    const left=Math.max(4,bounds?.left??0,r.left-5),top=Math.max(4,bounds?.top??0,r.top-5)
+    const right=Math.min(innerWidth-4,bounds?.right??innerWidth,r.right+5),bottom=Math.min(innerHeight-4,bounds?.bottom??innerHeight,r.bottom+5)
     const width=Math.max(0,right-left),height=Math.max(0,bottom-top)
-    Object.assign(h.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'})
-    if(missing.current)missing.current.hidden=target===primary
+    style(h,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'})
+    if(missing.current&&missing.current.hidden!==(target===primary))missing.current.hidden=target===primary
     const bw=b.offsetWidth,bh=b.offsetHeight
     const y=bottom+12+bh<=innerHeight-8?bottom+12:top-bh-12>=8?top-bh-12:innerHeight-bh-8
     const x=Math.max(8,Math.min(innerWidth-bw-8,left+(width-bw)/2))
-    Object.assign(b.style,{left:x+'px',top:Math.max(8,y)+'px'})
+    style(b,{left:x+'px',top:Math.max(8,y)+'px'})
    }
-   frame=requestAnimationFrame(update)
   }
-  update()
-  return ()=>cancelAnimationFrame(frame)
+  window.addEventListener('resize',schedule)
+  window.addEventListener('scroll',schedule,true)
+  main?.addEventListener('animationend',schedule,true)
+  main?.addEventListener('transitionend',schedule,true)
+  schedule()
+  return ()=>{stopped=true;cancelAnimationFrame(frame);resize.disconnect();mutation.disconnect();window.removeEventListener('resize',schedule);window.removeEventListener('scroll',schedule,true);main?.removeEventListener('animationend',schedule,true);main?.removeEventListener('transitionend',schedule,true)}
  },[step])
  return <dialog {...modal} className="pssa-tour" data-tour-page={page} aria-labelledby="tour-title">
   <div ref={hole} className="tour-hole" aria-hidden="true"/>

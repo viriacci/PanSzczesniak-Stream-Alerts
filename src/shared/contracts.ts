@@ -71,7 +71,7 @@ export interface SystemStatus {
 
 export interface PssaApi {
   obsDockStatus():Promise<'missing'|'update'|'current'|'unavailable'>
-  updateDownload(alsoDock:boolean):Promise<'cancelled'|'manual'|'launched'>
+  updateDownload(alsoDock:boolean,version:string,sha256:string):Promise<'cancelled'|'manual'|'launched'>
   updateDockReminder():Promise<boolean>
   installObsDock():Promise<boolean>
   measurementState():Promise<MeasurementState>

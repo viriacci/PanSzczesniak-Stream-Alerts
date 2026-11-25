@@ -81,7 +81,7 @@ export class AlertsService {
  async login(clientId:string,secret:string,device=false){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
   this.generation++;const g=this.generation;this.live.reset();this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce';this.deviceCode=''
-  try{if(device)await this.auth.deviceLogin(clientId,code=>{if(g===this.generation)this.deviceCode=code});else await this.auth.login(clientId,secret);this.deviceCode='';if(g!==this.generation||this.stopped)return;this.phase='connecting';await this.connect()}
+  try{if(device)await this.auth.deviceLogin(clientId,code=>{if(g===this.generation)this.deviceCode=code});else await this.auth.login(clientId,secret);if(g!==this.generation||this.stopped)return;this.deviceCode='';this.phase='connecting';await this.connect()}
   catch{if(g===this.generation&&!this.stopped){this.phase='error';this.deviceCode='';this.detail=device?'Logowanie nie powiodło się. Spróbuj ponownie.':'Logowanie nie powiodło się. Sprawdź dane i redirect URI.'}throw Error('Logowanie Twitch nie powiodło się')}
  }
  async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start();void this.live.poll();void this.sync().catch(()=>{})}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
