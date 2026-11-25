@@ -1,4 +1,4 @@
-# PSSA Control Dock — RC.10
+# PSSA Control Dock — RC.11
 Native Windows x64 OBS plugin, built from the pinned official OBS 31.1.1 plugin template. Plugin source GPL-2.0-or-later. The PSSA application remains a separate process.
 Install from PSSA Settings → Dodaj wtyczkę do OBS while OBS is closed. Windows UAC is required for ProgramData. The first build targets OBS 31–33 standard installation; portable mode and compatibility with every OBS release are not yet verified. Restart OBS, open Docks → PSSA Control Dock. Run PSSA once after installing/updating so it records the current executable path. Do not run OBS elevated if launching PSSA from the dock.
 The dock opens compact, with four buttons and expandable More. Starts background without renderer, controlled quit, restart, show window. More contains the authoritative global volume/mute, test, overlay reload, source addition to current program scene, and optional startup/shutdown settings (both off initially). Source uses the existing browser overlay and reuses matching or managed sources. New sources are 1920×1080 and scaled to canvas. No OBS WebSocket setup is required.
@@ -6,3 +6,5 @@ The local named pipe is random per launch with an authenticated 256-bit token in
 Acceptance: unit tests authenticate IPC and exercise actual local pipe. Windows CI compiles the DLL and packages it. Actual OBS UI/compatibility and audio routing require OBS runtime smoke testing; a successful compiler build is not evidence that those tests ran.
 
 The expanded area scrolls inside a small dock. CI also exercises real local control while the Electron renderer is destroyed in background mode.
+
+RC.11 discovers running OBS, uninstall/OBS registry keys, standard directories, and Steam libraries, before offering manual file selection. Version parsing uses file/product text and registry metadata, with a confirmation-only version selection if unknown. OBS 31–32 use legacy ProgramData layout, OBS 33 modern layout. No compatibility check bypass for known out-of-range versions.
