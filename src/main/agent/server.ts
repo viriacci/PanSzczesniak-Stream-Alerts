@@ -4,6 +4,11 @@ import {readFileSync,writeFileSync,mkdirSync,renameSync} from 'node:fs'
 import {join} from 'node:path'
 import {spawn,execFile,type ChildProcess} from 'node:child_process'
 export const AGENT_PORT=18767
+export function agentPort(dir:string){
+ try{const port=Number(readFileSync(join(dir,'agent.port'),'utf8'));if(Number.isInteger(port)&&port>=1024&&port<=65535)return port}catch{}
+ return AGENT_PORT
+}
+export function saveAgentPort(dir:string,port:number){const path=join(dir,'agent.port'),tmp=path+'.'+randomUUID();writeFileSync(tmp,String(port),{flag:'wx',mode:0o600});renameSync(tmp,path)}
 export function agentKey(dir:string){
  mkdirSync(dir,{recursive:true});const path=join(dir,'agent.key')
  try{writeFileSync(path,randomBytes(32).toString('hex'),{flag:'wx',mode:0o600})}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e}

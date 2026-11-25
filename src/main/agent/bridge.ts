@@ -1,6 +1,6 @@
 import {app} from 'electron'
 import {randomUUID} from 'node:crypto'
-import {agentKey,AGENT_PORT,launchProcess} from './server'
+import {agentKey,agentPort,launchProcess} from './server'
 import type {AgentAction,AgentState} from '../../shared/obs'
 export class AgentBridge{
  private key:string
@@ -19,7 +19,7 @@ export class AgentBridge{
  constructor(private directory:string,private refresh:()=>Promise<number>){this.key=agentKey(directory)}
  private args(){return app.isPackaged?['--pssa-agent']:[app.getAppPath(),'--pssa-agent']}
  private async api(path:string,body?:unknown){
-  const r=await fetch('http://127.0.0.1:'+AGENT_PORT+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+this.key,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(1500),redirect:'error'})
+  const r=await fetch('http://127.0.0.1:'+agentPort(this.directory)+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+this.key,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(1500),redirect:'error'})
   if(!r.ok)throw Error('Agent unavailable');return r.json()
  }
  private async poll(){
@@ -36,7 +36,7 @@ export class AgentBridge{
    }
    const s=typeof h.running==='boolean'?h:await this.api('/api/status');this.nextPoll=0
    if(this.stopped)return
-   this.state={...this.state,online:true,running:s.running===true,autoLaunch:s.autoLaunch===true,dockUrl:'http://127.0.0.1:'+AGENT_PORT+'/dock#'+this.key,detail:typeof s.detail==='string'?s.detail:''}
+   this.state={...this.state,online:true,running:s.running===true,autoLaunch:s.autoLaunch===true,dockUrl:'http://127.0.0.1:'+agentPort(this.directory)+'/dock#'+this.key,detail:typeof s.detail==='string'?s.detail:''}
   }catch{if(!this.stopped){this.nextPoll=Date.now()+15000;this.state={...this.state,online:false,running:false,detail:'Agent nieaktywny'}}}
   finally{this.busy=false}
  }

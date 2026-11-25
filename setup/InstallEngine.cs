@@ -15,10 +15,9 @@ internal static class InstallEngine
     internal static void Trace(string text){try{File.AppendAllText(Path.Combine(Path.GetTempPath(),"PSSA-setup-error.log"),DateTime.Now.ToString("s")+" "+text+Environment.NewLine);}catch{}}
     public static Installed? Detect()
     {
-        foreach(var machine in new[]{false,true})
         foreach(var view in new[]{RegistryView.Registry64,RegistryView.Registry32})
         {
-            using var root=RegistryKey.OpenBaseKey(machine?RegistryHive.LocalMachine:RegistryHive.CurrentUser,view);
+            using var root=RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,view);
             using var key=root.OpenSubKey(@"Software\"+GuidKey);
             using var uninstall=root.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\"+GuidKey);
             var dir=key?.GetValue("InstallLocation") as string ?? uninstall?.GetValue("InstallLocation") as string;
@@ -26,7 +25,7 @@ internal static class InstallEngine
             dir=Path.GetFullPath(dir.Trim('"')).TrimEnd('\\');
             var exe=Path.Combine(dir,"PSSA 2 Dev.exe");
             var un=new[]{"Uninstall PSSA.exe","Uninstall PSSA 2 Dev.exe"}.Select(n=>Path.Combine(dir,n)).FirstOrDefault(File.Exists);
-            if(File.Exists(exe)&&un!=null) return new(dir,un,machine,uninstall?.GetValue("DisplayVersion") as string??"nieznana");
+            if(File.Exists(exe)&&un!=null) return new(dir,un,false,uninstall?.GetValue("DisplayVersion") as string??"nieznana");
             Trace("Registered folder found, executable="+File.Exists(exe)+", uninstaller="+(un!=null));
         }
         return null;
@@ -39,6 +38,23 @@ internal static class InstallEngine
             throw new InvalidOperationException("Wybierz pełną ścieżkę na lokalnym dysku.");
         var dir=Path.GetFullPath(value).TrimEnd('\\');
         if(dir.Length<=3) throw new InvalidOperationException("Nie można instalować w katalogu głównym dysku.");
+        var profile=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var profiles=Path.GetDirectoryName(profile);
+        if(!string.IsNullOrEmpty(profiles)&&Inside(dir,profiles)&&!Inside(dir,profile))
+            throw new InvalidOperationException("Wybierz katalog własnego profilu Windows.");
+        foreach(var view in new[]{RegistryView.Registry64,RegistryView.Registry32}){
+            using var root=RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,view);
+            using var key=root.OpenSubKey(@"Software\"+GuidKey);
+            using var uninstall=root.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\"+GuidKey);
+            var shared=key?.GetValue("InstallLocation") as string??uninstall?.GetValue("InstallLocation") as string;
+            if(!string.IsNullOrWhiteSpace(shared)&&Path.IsPathFullyQualified(shared.Trim('"'))){
+                var registered=Path.GetFullPath(shared.Trim('"')).TrimEnd('\\');
+                if(Inside(dir,registered)||Inside(registered,dir))throw new InvalidOperationException("Wybierz katalog niezależny od instalacji dla wszystkich użytkowników.");
+            }
+        }
+        for(var parent=dir;!string.IsNullOrEmpty(parent);parent=Path.GetDirectoryName(parent)){
+            if(Directory.Exists(parent)&&File.GetAttributes(parent).HasFlag(FileAttributes.ReparsePoint))throw new InvalidOperationException("Wybierz katalog bez dowiązań i przekierowań.");
+        }
         if(old!=null){
             if(!string.Equals(dir,old.Folder.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Aktualizacja musi zachować istniejący katalog.");
             return dir;
@@ -48,15 +64,14 @@ internal static class InstallEngine
             throw new InvalidOperationException("Wybierz osobny katalog programu poza folderami systemowymi i danymi.");
         if(File.Exists(dir)||Directory.Exists(dir)&&Directory.EnumerateFileSystemEntries(dir).Any())
             throw new InvalidOperationException("Nowa instalacja wymaga pustego lub nieistniejącego katalogu.");
-        for(var p=dir;!string.IsNullOrEmpty(p);p=Path.GetDirectoryName(p)){
-            if(Directory.Exists(p)&&File.GetAttributes(p).HasFlag(FileAttributes.ReparsePoint))throw new InvalidOperationException("Wybierz katalog bez dowiązań i przekierowań.");
-        }
         return dir;
     }
     private static void CheckRunning()
     {
+        using var current=Process.GetCurrentProcess();
+        var session=current.SessionId;
         foreach(var p in Process.GetProcessesByName("PSSA 2 Dev"))
-        using(p) { if(!p.HasExited) throw new InvalidOperationException("Zakończ PSSA oraz niezależny Agent przed instalacją lub dezinstalacją."); }
+        using(p) { if(!p.HasExited&&p.SessionId==session) throw new InvalidOperationException("Zakończ PSSA oraz niezależny Agent przed instalacją lub dezinstalacją."); }
     }
     private static async Task Run(string exe,string args,bool machine)
     {
@@ -98,6 +113,7 @@ internal static class InstallEngine
     public static async Task Remove(Action<string>? status=null)
     {
         CheckRunning(); var old=Detect()??throw new InvalidOperationException("Nie znaleziono zainstalowanej aplikacji.");
+        ValidateFolder(old.Folder,old);
         status?.Invoke("Usuwanie programu i skrótów…");
         // Normal NSIS uninstaller copies itself and exits; wait for the registered program to disappear.
         await Run(old.Uninstaller,"/S /KEEP_APP_DATA "+(old.Machine?"/allusers":"/currentuser"),old.Machine);

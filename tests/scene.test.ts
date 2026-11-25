@@ -107,3 +107,15 @@ test('scene player does not rewrite static geometry every animation frame and in
   if(savedResize)Object.defineProperty(globalThis,'ResizeObserver',savedResize);else Reflect.deleteProperty(globalThis,'ResizeObserver')
  }
 })
+
+import {assignRuleMedia,ruleMedia} from '../src/shared/scene-legacy.ts'
+test('library assignment works with simple rules and existing scenes without losing other layers',()=>{
+ const audio='a'.repeat(64)+'.wav',image='b'.repeat(64)+'.png',plain=assignRuleMedia(defaultRule('raid'),'audio',audio)
+ assert.equal(ruleMedia(plain,'audio'),audio);assert.equal(sceneForRule(plain).layers.find(l=>l.kind==='audio')?.asset,audio)
+ const base={...defaultRule('raid'),scene:fixture()},withAudio=assignRuleMedia(base,'audio',audio),withImage=assignRuleMedia(withAudio,'image',image)
+ assert.equal(ruleMedia(withImage,'audio'),audio);assert.equal(ruleMedia(withImage,'image'),image)
+ assert.equal(withImage.scene?.duration,base.scene.duration);assert.deepEqual(parseScene(withImage.scene),withImage.scene)
+ const removed=assignRuleMedia(withImage,'audio','');assert.equal(ruleMedia(removed,'audio'),'');assert.equal(ruleMedia(removed,'image'),image)
+ const locked={...withImage,scene:{...withImage.scene!,layers:withImage.scene!.layers.map(l=>l.kind==='audio'?{...l,locked:true}:l)}}
+ assert.throws(()=>assignRuleMedia(locked,'audio',audio));assert.throws(()=>assignRuleMedia(plain,'audio',image))
+})

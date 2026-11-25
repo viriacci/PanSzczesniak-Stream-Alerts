@@ -23,7 +23,7 @@ async function until(fn,label,ms=35000){
  throw Error(label+' timeout')
 }
 async function ready(oldToken){
- return until(async()=>{const d=await read();if(!d||d.token===oldToken||d.exe.toLowerCase()!==exe.toLowerCase())return null;const reply=await send(d,'status');return reply.ok&&reply.state.version==='2.0.0'?d:null},'new instance')
+ return until(async()=>{const d=await read();if(!d||d.token===oldToken||d.exe.toLowerCase()!==exe.toLowerCase())return null;const reply=await send(d,'status');return reply.ok&&reply.state.version==='2.0.1'?d:null},'new instance')
 }
 function alive(pid){try{process.kill(pid,0);return true}catch{return false}}
 const old=await read()

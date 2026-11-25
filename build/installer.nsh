@@ -1,6 +1,26 @@
 !include "nsDialogs.nsh"
 !include "FileFunc.nsh"
 
+!macro customCheckAppRunning
+  Push $8
+  Push $9
+  System::Call 'kernel32::GetCurrentProcessId() i.r8'
+  System::Call 'kernel32::ProcessIdToSessionId(i r8,*i .r9)i.r8'
+  ${If} $8 != 0
+    nsExec::Exec `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "if (@(Get-Process -Name 'PSSA 2 Dev' -ErrorAction SilentlyContinue | Where-Object { $$_.SessionId -eq $9 }).Count -gt 0) { exit 2 }; exit 0"`
+    Pop $8
+  ${Else}
+    StrCpy $8 1
+  ${EndIf}
+  ${If} $8 != 0
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Zamknij PSSA i Agenta w bieżącej sesji Windows." /SD IDOK
+    SetErrorLevel 2
+    Quit
+  ${EndIf}
+  Pop $9
+  Pop $8
+!macroend
+
 !ifndef BUILD_UNINSTALLER
 Var pssaDesktop
 Var pssaStartMenu

@@ -22,9 +22,13 @@ export function createScenePlayer(root:HTMLElement,scene:Scene,text:string,media
    Object.assign(image.style,{width:'100%',height:'100%',objectFit:'contain'});el.append(image)
   }else if((layer.kind==='video'||layer.kind==='audio')&&layer.asset&&layer.visible){
    media=document.createElement(layer.kind==='video'?'video':'audio')
-   media.preload=layer.visible?'auto':'none';if(layer.visible)readiness.push(new Promise<void>((resolve,reject)=>{media!.addEventListener('loadeddata',()=>resolve(),{once:true});media!.addEventListener('error',()=>reject(Error('Media load failed')),{once:true})}));media.src=mediaBase+layer.asset;media.onerror=()=>{if(!disposed&&layer.visible)fail()};media.volume=master*layer.volume/100
+   media.preload='auto';media.muted=false
+   const element=media
+   readiness.push(new Promise<void>((resolve,reject)=>{const ready=()=>resolve();element.addEventListener('loadeddata',ready,{once:true});element.addEventListener('canplay',ready,{once:true});element.addEventListener('error',()=>reject(Error('Media load failed')),{once:true})}))
+   media.onerror=()=>{if(!disposed&&layer.visible)fail()};media.volume=master*layer.volume/100;media.src=mediaBase+layer.asset
    if(media instanceof HTMLVideoElement){media.playsInline=true;Object.assign(media.style,{width:'100%',height:'100%',objectFit:'contain'})}
-   el.append(media)
+   if(layer.kind==='audio'){Object.assign(media.style,{position:'absolute',width:'1px',height:'1px',opacity:'0',pointerEvents:'none'});root.append(media)}else el.append(media)
+   media.load()
   }else if(layer.kind==='particles'){
    const cv=document.createElement('canvas');cv.width=640;cv.height=360;Object.assign(cv.style,{width:'100%',height:'100%'});el.append(cv)
   }

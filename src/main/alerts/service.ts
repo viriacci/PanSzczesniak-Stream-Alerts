@@ -22,7 +22,7 @@ import { EventSub } from '../twitch/eventsub'
 import { AlertQueue } from './queue'
 import { Overlay } from '../overlay/server'
 import { rules,saveRule,saveRules,saveScene } from './store'
-import { copyMedia,imageExt,audioExt,videoExt } from './media'
+import { copyMedia,imageExt,audioExt,videoExt,resolveLibraryFile } from './media'
 import { importLegacy } from './import'
 import { testEvent,parseRewards,defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
 export class AlertsService {
@@ -54,7 +54,15 @@ export class AlertsService {
   const raw=this.db.prepare("SELECT value FROM settings WHERE key='overlay.key'").get()?.value
   const key=typeof raw==='string'&&/^[a-f0-9]{64}$/.test(raw)?raw:randomBytes(32).toString('hex')
   this.db.prepare("INSERT INTO settings(key,value) VALUES ('overlay.key',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key)
-  try{await this.overlay.start(key)}catch{this.detail='Port overlay 18766 zajęty'}
+  const savedPort=Number(this.db.prepare("SELECT value FROM settings WHERE key='overlay.port'").get()?.value??18766)
+  const port=Number.isInteger(savedPort)&&savedPort>=1024&&savedPort<=65535?savedPort:18766
+  try{
+   await this.overlay.start(key,port)
+  }catch(e){
+   if((e as NodeJS.ErrnoException).code==='EADDRINUSE')await this.overlay.start(key,0)
+   else throw e
+  }
+  this.db.prepare("INSERT INTO settings(key,value) VALUES ('overlay.port',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(new URL(this.overlay.url).port)
   if(auto){try{if(this.auth.load())void this.connect().catch(()=>{})}catch{this.phase='error';this.detail='Zapisana sesja wymaga ponownego logowania'}}
   this.live.start()
   this.wake()
@@ -111,7 +119,14 @@ export class AlertsService {
  }
  overlayUrl(){return this.overlay.url}
  libraryState(){return this.reads.run<LibraryState>({type:'library',media:this.media})}
- libraryAction(value:unknown){libraryAction(this.db,value)}
+ async libraryAction(value:unknown){
+  if(value&&typeof value==='object'&&(value as {type?:unknown}).type==='asset-reveal'){
+   const file=await resolveLibraryFile(this.media,(value as {id?:unknown}).id)
+   if(this.stopped)throw Error('App stopping')
+   shell.showItemInFolder(file);return
+  }
+  libraryAction(this.db,value)
+ }
  analyticsChannels(){return [...new Set([...channels(this.db),...(this.auth.identity?[this.auth.identity.userId]:[])])]}
  analyticsReport(value:unknown){return this.reads.run<AnalyticsReport>({type:'analytics',filter:value})}
  async analyticsImport(guard:()=>void=()=>{}){

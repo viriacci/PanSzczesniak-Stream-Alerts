@@ -5,3 +5,5 @@ Cicha instalacja /S; opcjonalnie /PSSA-NODESKTOP oraz /PSSA-NOSTART; /D=... jako
 
 ## RC.6 — prawdziwy bootstrapper
 WPF .NET 8 self-contained win-x64, pojedynczy EXE offline z wbudowanym pakietem NSIS i jego SHA256. Własne okno, złote animowane iskry na całym obwodzie, custom kontrolki, odrębne ekrany instalacji, aktualizacji, usuwania i wyniku. Iskry przez 4,5 s (ok. 30 FPS), respektują systemowe ograniczenie animacji. Silnik NSIS wywołany /S. Nowa instalacja dla bieżącego użytkownika, aktualizacja istniejącej maszynowej wymaga UAC. Ścieżka aktualizacji niezmienna. Nie zabija procesów PSSA/Agenta, prosi o ich zamknięcie. Nie kasuje danych. CI testuje wrapper CLI i zapisuje rzeczywisty render WPF. UI manualnie do odbioru. Brak podpisu kodu. NSIS osobny artefakt techniczny; użytkownik otrzymuje PSSA-Setup.
+
+Od 2.0.1 instalator zarządza rejestracją HKCU bieżącego użytkownika. Istniejąca instalacja ogólnosystemowa nie jest automatycznie aktualizowana ani usuwana; wybierz osobny katalog. Każdy profil ma własne dane w AppData.

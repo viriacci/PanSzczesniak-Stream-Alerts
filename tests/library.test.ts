@@ -11,7 +11,7 @@ import {pickVariant,parseVariants} from '../src/shared/variants.ts'
 import {activeProfile,activate,config,libraryAction,libraryState,rememberAsset,profileForCategory,references} from '../src/main/library/store.ts'
 import {saveRule,rules} from '../src/main/alerts/store.ts'
 import {AlertQueue,type Transport} from '../src/main/alerts/queue.ts'
-import {copyMedia} from '../src/main/alerts/media.ts'
+import {copyMedia,resolveLibraryFile} from '../src/main/alerts/media.ts'
 const scene:Scene={version:1,width:1920,height:1080,duration:5000,layers:[makeLayer('text','text',5000)]}
 const current=(db:ReturnType<typeof openDatabase>)=>rules(db).find(r=>r.key==='raid')!
 test('profiles preserve independent rule snapshots and category mapping across switches',()=>{
@@ -111,4 +111,14 @@ test('a stale editor cannot save into another active profile',()=>{
 test('built-in queue sound does not appear as a missing user library asset',async()=>{
  const {AlertQueue}=await import('../src/main/alerts/queue.ts');const {libraryState}=await import('../src/main/library/store.ts');const {openDatabase}=await import('../src/main/database/index.ts');const {mkdtemp,rm}=await import('node:fs/promises');const {join}=await import('node:path');const {tmpdir}=await import('node:os');const root=await mkdtemp(join(tmpdir(),'pssa-test-library-')),db=openDatabase(':memory:');const queue=new AlertQueue(db,{online:()=>false,send:()=>false,active:()=>false,cancel:()=>{},volume:()=>{}})
  try{queue.command({type:'test'});assert.equal(queue.state().pendingCount,1);assert.deepEqual((await libraryState(db,root)).assets,[])}finally{queue.stop();db.close();await rm(root,{recursive:true,force:true})}
+})
+
+test('library file reveal accepts only actual content-addressed files in the media directory',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'pssa-reveal-'))
+ try{const input=join(dir,'test.wav'),media=join(dir,'media');await writeFile(input,'sample');const id=await copyMedia(input,media,'audio')
+  assert.equal(await resolveLibraryFile(media,id),join(await (await import('node:fs/promises')).realpath(media),id))
+  await assert.rejects(()=>resolveLibraryFile(media,'../test.wav'))
+  await assert.rejects(()=>resolveLibraryFile(media,'f'.repeat(64)+'.wav'))
+  await assert.rejects(()=>resolveLibraryFile(media,'a'.repeat(64)+'.exe'))
+ }finally{await rm(dir,{recursive:true,force:true})}
 })
