@@ -1,0 +1,3 @@
+# Kanał Beta
+
+Każde wydanie beta/rc na develop/v2 jest publikowane jako publiczne GitHub pre-release dopiero po pełnym sukcesie weryfikacji Windows. Zewnętrzny instalator WPF i jego SHA256SUMS.txt są pobierane z artefaktu zweryfikowanej kompilacji. Publikacja w formie szkicu jest weryfikowana przed udostępnieniem, w tym digest SHA256 wymagany przez aktualizator PSSA. Wydania Stable nie są tworzone. Każda kolejna poprawka wymagająca dystrybucji musi zwiększyć numer beta/rc; wydania już opublikowane nie są nadpisywane. Opis zmian można umieścić w docs/releases/<version>.md. Jeśli publikacja zatrzyma się na szkicu, należy zweryfikować go i dokończyć publikację lub usunąć niekompletny szkic przed ponownym uruchomieniem.
