@@ -3,6 +3,7 @@ using System.Windows;
 namespace Pssa.Setup;
 public partial class App : Application
 {
+    protected override void OnExit(ExitEventArgs e){try{UpdateCleanup.Schedule();}catch{/* startup cleanup remains available */}base.OnExit(e);}
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);

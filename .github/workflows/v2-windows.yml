@@ -171,6 +171,20 @@ jobs:
           name: pssa-setup-preview
           path: dist/setup-preview.png
           if-no-files-found: error
+      - name: Verify updater self-cleanup after installer exit
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.19-x64.exe').Path
+          $folder = Join-Path $env:TEMP ('PSSA-update-' + [Guid]::NewGuid().ToString('N').Substring(0,6))
+          New-Item -ItemType Directory -Path $folder | Out-Null
+          $copy = Join-Path $folder (Split-Path $source -Leaf)
+          Copy-Item -LiteralPath $source -Destination $copy
+          $preview = Join-Path $env:RUNNER_TEMP 'pssa-cleanup-preview.png'
+          $p = Start-Process -FilePath $copy -ArgumentList "--preview `"$preview`"" -PassThru
+          if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0) { throw 'Cleanup preview failed' }
+          for ($i=0; $i -lt 40 -and (Test-Path $folder); $i++) { Start-Sleep -Seconds 1 }
+          if (Test-Path $folder) { throw 'Updater temporary folder was not removed' }
+          if (-not (Test-Path $source)) { throw 'Original installer was removed' }
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
