@@ -139,15 +139,32 @@ jobs:
       - name: Build custom WPF installer
         shell: pwsh
         run: .\scripts\publish-setup.ps1
+      - name: Render actual WPF preview
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.6-x64.exe').Path
+          $preview = Join-Path $PWD 'dist/setup-preview.png'
+          $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
+          if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pssa-setup-preview
+          path: dist/setup-preview.png
+          if-no-files-found: error
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
           $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.6-x64.exe').Path
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
           function Run-Setup($path, $arguments) {
+            Write-Host "Running $(Split-Path $path -Leaf) $arguments"
             $p = Start-Process -FilePath $path -ArgumentList $arguments -PassThru
             if (-not $p.WaitForExit(240000)) { Stop-Process -Id $p.Id -Force; throw 'Setup timeout' }
-            if ($p.ExitCode -ne 0) { throw "Setup exit $($p.ExitCode)" }
+            if ($p.ExitCode -ne 0) {
+              $log = Join-Path $env:TEMP 'PSSA-setup-error.log'
+              if (Test-Path $log) { Get-Content $log }
+              throw "Setup exit $($p.ExitCode)"
+            }
           }
           $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
           Run-Setup $old[0].FullName "/S /D=$dir"
@@ -162,9 +179,7 @@ jobs:
           if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk'))) { throw 'Custom desktop missing' }
           if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk'))) { throw 'Custom Start missing' }
           Run-Setup $exe '--uninstall'
-          $preview = Join-Path $PWD 'dist/setup-preview.png'
-          Run-Setup $exe "--preview `"$preview`""
-          if (-not (Test-Path $preview)) { throw 'WPF preview missing' }
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: PSSA-Setup-Windows
@@ -173,6 +188,12 @@ jobs:
             dist/SHA256SUMS.txt
             dist/setup-preview.png
           if-no-files-found: error
+      - name: Print setup diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:TEMP 'PSSA-setup-error.log'
+          if (Test-Path $log) { Get-Content $log }
       - name: Hash verified installer
         shell: pwsh
         run: |

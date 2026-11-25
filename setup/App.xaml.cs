@@ -21,7 +21,7 @@ public partial class App : Application
             }
             window.Show();
         }catch(Exception ex){
-            try{File.AppendAllText(Path.Combine(Path.GetTempPath(),"PSSA-setup-error.log"),DateTime.Now.ToString("s")+" "+ex.Message+Environment.NewLine);}catch{}
+            try{File.AppendAllText(Path.Combine(Path.GetTempPath(),"PSSA-setup-error.log"),DateTime.Now.ToString("s")+" "+ex.ToString()+Environment.NewLine);}catch{}
             if(e.Args.Length==0)MessageBox.Show(ex.Message,"PSSA Setup",MessageBoxButton.OK,MessageBoxImage.Error);
             Shutdown(1);
         }

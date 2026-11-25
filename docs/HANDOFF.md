@@ -6,3 +6,5 @@ RC.3 commit 603d713, run 45382575827 pełny PASS. RC.4: paleta ViviOnyx zgodna z
 RC.5: stylizowany NSIS MUI2, PSSA jako nazwa, generowane zasoby, niezależne checkboxy skrótów, dezinstalacja wykrytej instalacji, kompatybilność wewnętrznego exe i danych. docs/INSTALLER.md. CI oczekuje; nie publikować main/stable.
 
 RC.5 run 45517037799 PASS; użytkownik odrzucił wygląd stockowego NSIS. RC.6 WPF bootstrapper (setup/), silnik NSIS wyłącznie po cichu, custom UI i spark ring, osobny artefakt PSSA-Setup-Windows. CI oczekuje. main bez zmian.
+
+RC.6 first run 45518972169: WPF build succeeded, NSIS full tests succeeded, wrapper test exited 1; cause not yet proven. Added stage diagnostics, separate actual UI render gate, fallback registered location and explicit data-preserving uninstall. Do not release until wrapper succeeds.
