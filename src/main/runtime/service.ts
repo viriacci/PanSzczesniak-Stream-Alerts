@@ -15,6 +15,7 @@ import {statSync,existsSync} from 'node:fs'
 import {createBackup,stageRestore} from './backup'
 import {preferences,savePreferences} from './preferences'
 import {checkRelease,compareVersions} from './updates'
+import {cleanUpdateFiles} from './update-cleanup'
 import {downloadRelease} from './update-download'
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
@@ -58,7 +59,7 @@ export class RuntimeService{
  async crashExport(){this.guard();const data=JSON.stringify({version:app.getVersion(),diagnostics:this.diagnostics(),crashes:this.crashState()},null,2);const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-crashes.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath||this.stopped)return false;writeNew(this.outside(r.filePath),data);return true}
  state(){return preferences(this.db)}
  save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
- start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
+ start(){void cleanUpdateFiles();let cleanupRetries=3;this.timer=setInterval(()=>{if(!this.downloading&&cleanupRetries>0){cleanupRetries--;void cleanUpdateFiles()}if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(failed=false){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown(failed);this.stopCollectors()}
  private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
  private guard(){if(this.busy||this.stopped)throw Error('Runtime operation unavailable')}
