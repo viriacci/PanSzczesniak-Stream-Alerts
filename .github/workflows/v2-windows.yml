@@ -86,7 +86,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: PSSA-2-Dev-Windows
-          run-id: 45383643491
+          run-id: 45517037799
           github-token: ${{ github.token }}
           path: previous-beta
       - name: Verify clean NSIS installation
@@ -136,6 +136,43 @@ jobs:
           if ($uninstaller.Count -ne 1) { throw 'Uninstaller missing after upgrade' }
           Run-Installer $uninstaller[0].FullName '/S'
           if (-not (Test-Path $marker)) { throw 'Uninstall removed data after upgrade' }
+      - name: Build custom WPF installer
+        shell: pwsh
+        run: .\scripts\publish-setup.ps1
+      - name: Verify custom wrapper, shortcuts, upgrade and uninstall
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-rc.6-x64.exe').Path
+          $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
+          function Run-Setup($path, $arguments) {
+            $p = Start-Process -FilePath $path -ArgumentList $arguments -PassThru
+            if (-not $p.WaitForExit(240000)) { Stop-Process -Id $p.Id -Force; throw 'Setup timeout' }
+            if ($p.ExitCode -ne 0) { throw "Setup exit $($p.ExitCode)" }
+          }
+          $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
+          Run-Setup $old[0].FullName "/S /D=$dir"
+          Run-Setup $exe "--install --directory `"$dir`" --no-desktop --no-start"
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk')) { throw 'Custom desktop opt-out failed' }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk')) { throw 'Custom Start opt-out failed' }
+          Run-Setup (Join-Path $dir 'PSSA 2 Dev.exe') '--smoke-test'
+          Run-Setup $exe '--uninstall'
+          if (Test-Path (Join-Path $dir 'PSSA 2 Dev.exe')) { throw 'Custom uninstall failed' }
+          if (-not (Test-Path (Join-Path $env:APPDATA 'PSSA 2 Dev/ci-retention-marker.txt'))) { throw 'Custom uninstall removed data' }
+          Run-Setup $exe "--install --directory `"$dir`""
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk'))) { throw 'Custom desktop missing' }
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk'))) { throw 'Custom Start missing' }
+          Run-Setup $exe '--uninstall'
+          $preview = Join-Path $PWD 'dist/setup-preview.png'
+          Run-Setup $exe "--preview `"$preview`""
+          if (-not (Test-Path $preview)) { throw 'WPF preview missing' }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PSSA-Setup-Windows
+          path: |
+            dist/PSSA-Setup-2.0.0-rc.6-x64.exe
+            dist/SHA256SUMS.txt
+            dist/setup-preview.png
+          if-no-files-found: error
       - name: Hash verified installer
         shell: pwsh
         run: |
@@ -147,6 +184,6 @@ jobs:
         with:
           name: PSSA-2-Dev-Windows
           path: |
-            dist/*.exe
+            dist/PSSA-2.0.0-*-x64.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error

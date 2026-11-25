@@ -4,3 +4,5 @@ RC.2 afe100b3, run 45380348076 success, 83/83, audit 0, pełne Windows CI. Dwie 
 RC.3 commit 603d713, run 45382575827 pełny PASS. RC.4: paleta ViviOnyx zgodna z podanymi przez użytkownika HEX #141414, #843935, #ae9278; dostosowanie wykresów do motywu, test palety. CI RC.4 oczekuje.
 
 RC.5: stylizowany NSIS MUI2, PSSA jako nazwa, generowane zasoby, niezależne checkboxy skrótów, dezinstalacja wykrytej instalacji, kompatybilność wewnętrznego exe i danych. docs/INSTALLER.md. CI oczekuje; nie publikować main/stable.
+
+RC.5 run 45517037799 PASS; użytkownik odrzucił wygląd stockowego NSIS. RC.6 WPF bootstrapper (setup/), silnik NSIS wyłącznie po cichu, custom UI i spark ring, osobny artefakt PSSA-Setup-Windows. CI oczekuje. main bez zmian.

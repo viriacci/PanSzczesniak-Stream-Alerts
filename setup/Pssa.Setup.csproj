@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><AssemblyName>PSSA.Setup</AssemblyName>
+    <ApplicationIcon>../build/branding/pssa.ico</ApplicationIcon><Version>2.0.0</Version><FileVersion>2.0.0.6</FileVersion>
+    <Company>Pan Szczesniak</Company><Product>PSSA Setup</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(PayloadPath)" LogicalName="PSSA.Payload.exe" />
+    <EmbeddedResource Include="$(PayloadHashPath)" LogicalName="PSSA.Payload.sha256" />
+    <Resource Include="../build/branding/pssa.ico" Link="pssa.ico" />
+  </ItemGroup>
+</Project>

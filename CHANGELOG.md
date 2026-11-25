@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.0-rc.6
+- Osobny custom installer WPF, wbudowany silnik NSIS, animowane złote iskry wokół okna, aktualizacja i dezinstalacja.
+
 ## 2.0.0-rc.5
 - Stylizowany instalator PSSA, ikona, wybór skrótów i opcja dezinstalacji istniejącej instalacji.
 
