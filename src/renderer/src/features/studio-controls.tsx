@@ -6,7 +6,7 @@ function chip(token:string){const el=document.createElement('span');el.className
 function fragment(text:string){const f=document.createDocumentFragment();let last=0;for(const m of text.matchAll(/\{([a-z_]+)\}/g)){if(!Object.hasOwn(variableNames,m[1]!))continue;f.append(document.createTextNode(text.slice(last,m.index)));f.append(chip(m[1]!));last=m.index!+m[0].length}f.append(document.createTextNode(text.slice(last)));return f}
 function plain(node:Node):string{if(node.nodeType===Node.TEXT_NODE)return node.textContent??'';if(node instanceof HTMLElement){if(node.dataset.variable&&Object.hasOwn(variableNames,node.dataset.variable))return '{'+node.dataset.variable+'}';if(node.tagName==='BR')return '\n'}return [...node.childNodes].map(plain).join('')}
 export function TokenField({value,onChange,disabled}:{value:string;onChange:(s:string)=>void;disabled:boolean}){
- const ref=useRef<HTMLDivElement>(null),saved=useRef<Range>(),[menu,setMenu]=useState(false)
+ const ref=useRef<HTMLDivElement>(null),saved=useRef<Range|undefined>(undefined),[menu,setMenu]=useState(false)
  useEffect(()=>{const root=ref.current;if(root&&plain(root)!==value){root.replaceChildren(fragment(value));saved.current=undefined}},[value])
  const capture=()=>{const sel=window.getSelection(),root=ref.current;if(root&&sel?.rangeCount&&root.contains(sel.getRangeAt(0).commonAncestorContainer))saved.current=sel.getRangeAt(0).cloneRange()}
  const commit=()=>{const root=ref.current;if(!root)return;const next=plain(root);if(next.length<=500)onChange(next);else{root.replaceChildren(fragment(value));saved.current=undefined}}
