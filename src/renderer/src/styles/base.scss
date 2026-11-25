@@ -161,7 +161,7 @@ svg { flex:none; }
 
 .app{color:var(--text);background:var(--bg)}
 .app[data-theme="vivionyx"]{--bg:#141414;--chrome:#141414;--sidebar:#191919;--panel:#1e1e1e;--raised:#292626;--line:#3c3434;--line-soft:#302b2b;--brand-fill:#843935;--brand-detail:#ae9278;--gold:#d49c98;--gold-soft:#ca918d;--gold-bg:#352120;--text:#f2efed;--muted:#bab4b2;--radius:12px;--display:Georgia,serif}
-.app[data-theme="shiroe"]{--bg:#101820;--chrome:#131e28;--sidebar:#17232d;--panel:#1a2631;--raised:#233746;--line:#375366;--line-soft:#253946;--gold:#8ad4f5;--gold-soft:#9bc7e0;--gold-bg:#243b4e;--text:#eff8ff;--muted:#acbecd;--radius:4px;--display:"Segoe UI",sans-serif}
+.app[data-theme="shiroe"]{--bg:#201913;--chrome:#251c16;--sidebar:#2a2019;--panel:#33271f;--raised:#423228;--line:#6b5340;--line-soft:#4b392d;--gold:#dfc49c;--gold-soft:#c7a980;--gold-bg:#513d2b;--text:#f6ead8;--muted:#c8b59d;--success:#b9c69a;--warning:#efc284;--danger:#f0a9a4;--brand-fill:#513d2b;--brand-detail:#c7a980;--radius:7px;--display:"Palatino Linotype", "Book Antiqua", Georgia, serif;color:var(--text);background:var(--bg);accent-color:var(--gold)}
 .app:not([data-theme="pssa"]) .brand-symbol,.app:not([data-theme="pssa"]) .account-avatar{background:var(--gold-bg);border-color:var(--gold-soft)}
 .app:not([data-theme="pssa"]) .nav-link.active{border-color:var(--gold-soft)}
 .app:not([data-theme="pssa"]) .button--primary:hover:not(:disabled){background:var(--gold-soft);border-color:var(--gold-soft)}
@@ -173,8 +173,7 @@ svg { flex:none; }
 .app:not([data-theme="pssa"]) .runtime-welcome h2{color:var(--gold)}
 .app[data-theme="vivionyx"] .brand-symbol{border-radius:50% 50% 40% 40%}
 .app[data-theme="vivionyx"] .page-header h1{font-family:var(--display)}
-.app[data-theme="shiroe"] .brand-symbol{border-radius:2px;transform:skew(-6deg)}
-.app[data-theme="shiroe"] .panel{border-top:2px solid var(--line)}
+
 .theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .theme-choice{display:flex;flex-direction:column;gap:9px;text-align:left;padding:10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12px}
 .theme-choice[aria-pressed="true"]{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
@@ -186,7 +185,7 @@ svg { flex:none; }
 .measurement-selects{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}.measurement-selects label{display:grid;gap:5px;min-width:0;flex:1 1 200px;color:var(--muted);font-size:12px}.measurement-selects select{background:var(--bg);border:1px solid var(--line);padding:8px;color:var(--text);max-width:100%}
 .measurement-summary{margin:14px 0}.measurement-summary h3{font-size:17px;margin:5px 0}.measurement-summary p{font-size:12px;margin:8px 0;color:var(--muted)}.measurement-scroll{overflow:auto}.measurement-table{border-collapse:collapse;width:100%;font-size:11px;white-space:nowrap}.measurement-table th,.measurement-table td{text-align:right;padding:8px;border-bottom:1px solid var(--line)}.measurement-table th:first-child{text-align:left}.measurement-table td{font-family:var(--mono)}.measurement-table thead{color:var(--gold)}.crash-list{max-height:400px;overflow:auto;margin:12px 0}.crash-list details{padding:9px;border-bottom:1px solid var(--line);font-size:11px}.crash-list summary{cursor:pointer}.crash-list pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px var(--mono);color:var(--muted)}
 
-.app[data-theme="vivionyx"] .title-brand .brand-symbol:after{content:"";width:7px;height:7px;border-radius:50%;box-shadow:-2px 1px 0 0 var(--brand-detail);position:absolute;right:2px;top:1px}.app[data-theme="vivionyx"] .brand-symbol{position:relative}.app[data-theme="vivionyx"] .hero-emblem{border-color:var(--brand-fill)}.app[data-theme="shiroe"] .hero-emblem,.app[data-theme="shiroe"] .hero-emblem:before{border-radius:3px;transform:rotate(45deg)}.app[data-theme="shiroe"] .hero-emblem span{transform:rotate(-45deg)}.app:not([data-theme="pssa"]) .dialog{border-color:var(--line)}
+.app[data-theme="vivionyx"] .title-brand .brand-symbol:after{content:"";width:7px;height:7px;border-radius:50%;box-shadow:-2px 1px 0 0 var(--brand-detail);position:absolute;right:2px;top:1px}.app[data-theme="vivionyx"] .brand-symbol{position:relative}.app[data-theme="vivionyx"] .hero-emblem{border-color:var(--brand-fill)}.app:not([data-theme="pssa"]) .dialog{border-color:var(--line)}
 
 /* Creator palette: exact red for fills, derived lighter red only for readable text. */
 .app[data-theme="vivionyx"] .button--primary,
@@ -324,3 +323,33 @@ svg { flex:none; }
 .tour-bubble{position:fixed;width:min(360px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;padding:14px;border:1px solid var(--gold);border-radius:var(--radius);background:var(--panel);box-shadow:0 8px 35px #000a;box-sizing:border-box}
 .tour-bubble h2{font-size:17px;margin:6px 0}.tour-bubble p{font-size:13px;line-height:1.5;margin:6px 0}.tour-bubble .tour-counter{font-size:11px;color:var(--gold);margin:0}.tour-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:10px}
 @media(max-width:550px){.help-layout{grid-template-columns:minmax(110px,35%) minmax(0,1fr)}.help-layout nav,.help-body{padding:8px}.help-launch{right:8px;bottom:35px}}
+
+/* RC.22 — Shiroe: classic reading room. Scope all overrides to this skin. */
+.app[data-theme="shiroe"] *{scrollbar-color:#82664d transparent}
+.app[data-theme="shiroe"] ::selection{background:var(--gold);color:#201913}
+.app[data-theme="shiroe"] .title-brand{font-family:var(--display);letter-spacing:.045em}
+.app[data-theme="shiroe"] .page-header h1,.app[data-theme="shiroe"] .panel-heading h2,.app[data-theme="shiroe"] .settings-section>summary,.app[data-theme="shiroe"] .rule-dialog-header h2,.app[data-theme="shiroe"] .help-header h2,.app[data-theme="shiroe"] .tour-bubble h2,.app[data-theme="shiroe"] .inspector>header h2{font-family:var(--display);letter-spacing:0}
+.app[data-theme="shiroe"] .page-header h1{font-weight:600;color:var(--gold)}
+.app[data-theme="shiroe"] .panel-heading h2{color:var(--gold);font-weight:600}
+.app[data-theme="shiroe"] .nav-link{color:var(--muted)}
+.app[data-theme="shiroe"] .nav-link:hover{color:var(--text)}
+.app[data-theme="shiroe"] .nav-link.active{background:var(--gold-bg);color:var(--text);border-color:var(--gold-soft)}
+.app[data-theme="shiroe"] .panel,.app[data-theme="shiroe"] .metric{background:linear-gradient(135deg,#372a21,var(--panel) 72%);border-color:var(--line);box-shadow:inset 0 1px #dfc49c12}
+.app[data-theme="shiroe"] .button:hover:not(:disabled){background:#584335;border-color:var(--gold-soft);color:var(--text)}
+.app[data-theme="shiroe"] .button--primary,.app[data-theme="shiroe"] .button--primary:hover:not(:disabled){background:var(--gold);color:#2a2019;border-color:var(--gold)}
+.app[data-theme="shiroe"] .button--primary:hover:not(:disabled){background:#f0d8b5;border-color:#f0d8b5}
+.app[data-theme="shiroe"] .button:disabled{opacity:.55}
+.app[data-theme="shiroe"] .hero{background:radial-gradient(ellipse at 90% 50%,#62482f 0,transparent 68%),linear-gradient(135deg,#493526,#33271f 75%);border-color:var(--line)}
+.app[data-theme="shiroe"] .hero p,.app[data-theme="shiroe"] .title-caption{color:var(--muted)}
+.app[data-theme="shiroe"] .empty{background:#2a2019;border-color:var(--line)}
+.app[data-theme="shiroe"] .library-tile{background:var(--panel);border-color:var(--line)}
+.app[data-theme="shiroe"] .library-tile.selected{border-color:var(--gold)}
+.app[data-theme="shiroe"] .runtime-welcome,.app[data-theme="shiroe"] .toast{background:var(--panel);border-color:var(--line);color:var(--text)}
+.app[data-theme="shiroe"] .toast-error{border-color:var(--danger)}
+.app[data-theme="shiroe"] .studio-pro .studio-canvas-wrap{background:#211a15}
+.app[data-theme="shiroe"] .studio-pro .studio-crop-box.crop-active{border-color:var(--gold)}
+.app[data-theme="shiroe"] .studio-pro .studio-crop-box.crop-active .studio-crop-handle{background:var(--gold)}
+.app[data-theme="shiroe"] .studio-variable-chip{border-color:var(--gold-soft);background:var(--gold-bg);color:var(--text)}
+.app[data-theme="shiroe"] .studio-guides{background:linear-gradient(90deg,transparent calc(50% - .5px),#dfc49c99 50%,transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),#dfc49c99 50%,transparent calc(50% + .5px))}
+.theme-preview[data-preview="shiroe"]{background-image:radial-gradient(ellipse at 50% 28%,#6b534077,transparent 66%)}
+.theme-preview[data-preview="shiroe"] strong{font-family:"Palatino Linotype","Book Antiqua",Georgia,serif;font-size:16px;letter-spacing:.035em}
