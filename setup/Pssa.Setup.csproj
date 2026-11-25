@@ -11,5 +11,6 @@
     <EmbeddedResource Include="$(PayloadPath)" LogicalName="PSSA.Payload.exe" />
     <EmbeddedResource Include="$(PayloadHashPath)" LogicalName="PSSA.Payload.sha256" />
     <Resource Include="../build/branding/pssa-window.png" Link="pssa-window.png" />
+    <Resource Include="../src/renderer/src/assets/pssa-card.png" Link="pssa-card.png" />
   </ItemGroup>
 </Project>

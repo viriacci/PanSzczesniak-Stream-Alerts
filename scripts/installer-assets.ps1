@@ -11,21 +11,11 @@ function Canvas($w,$h) {
   $g.Clear((Color '#101012'))
   return @($b,$g)
 }
+$card=[Drawing.Image]::FromFile((Join-Path $PSScriptRoot '..\src\renderer\src\assets\pssa-card.png'))
 function Mark($g,$x,$y,$size) {
-  $state=$g.Save()
-  $g.TranslateTransform([single]$x,[single]$y)
-  $g.ScaleTransform([single]($size/100),[single]($size/100))
-  $gold=[Drawing.SolidBrush]::new((Color '#e3c048'))
-  $pen=[Drawing.Pen]::new((Color '#bda15a'),[single]1.5)
-  $g.DrawRectangle($pen,10,4,80,92)
-  # Angular P emblem inspired by the supplied playing-card logo.
-  $points=@([Drawing.PointF]::new(28,30),[Drawing.PointF]::new(76,30),[Drawing.PointF]::new(67,57),[Drawing.PointF]::new(46,57),[Drawing.PointF]::new(41,69),[Drawing.PointF]::new(29,69),[Drawing.PointF]::new(39,45),[Drawing.PointF]::new(58,45),[Drawing.PointF]::new(60,41),[Drawing.PointF]::new(24,41))
-  $g.FillPolygon($gold,[Drawing.PointF[]]$points)
-  $g.FillRectangle($gold,24,74,11,8)
-  $font=[Drawing.Font]::new('Georgia',10,[Drawing.FontStyle]::Bold,[Drawing.GraphicsUnit]::Pixel)
-  $g.DrawString('J',$font,$gold,14,7)
-  $g.DrawString('J',$font,$gold,77,82)
-  $font.Dispose();$gold.Dispose();$pen.Dispose();$g.Restore($state)
+  $w=[single]($size*$card.Width/$card.Height)
+  $g.InterpolationMode=[Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $g.DrawImage($card,[Drawing.RectangleF]::new([single]($x+($size-$w)/2),[single]$y,$w,[single]$size))
 }
 function Label($g,$text,$size,$hex,$x,$y,$w) {
   $font=[Drawing.Font]::new('Segoe UI',[single]$size,[Drawing.FontStyle]::Bold,[Drawing.GraphicsUnit]::Pixel)
@@ -69,4 +59,4 @@ try{
     $offset+=$image.bytes.Length
   }
   foreach($image in $images){$writer.Write([byte[]]$image.bytes)}
-} finally {$writer.Dispose()}
+} finally {$writer.Dispose();$card.Dispose()}
