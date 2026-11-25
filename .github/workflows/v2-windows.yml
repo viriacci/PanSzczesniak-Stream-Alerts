@@ -80,6 +80,12 @@ jobs:
         shell: pwsh
         run: .\scripts\build-obs-dock.ps1
       - run: npx electron-builder --win nsis --x64 --publish never
+      - name: Verify native dock is packaged
+        shell: pwsh
+        run: |
+          $dll = 'dist/win-unpacked/resources/obs-dock/pssa-control-dock.dll'
+          if (-not (Test-Path $dll)) { throw 'Native dock missing from package' }
+          if ((Get-FileHash $dll).Hash -ne (Get-FileHash 'build/obs-dock/pssa-control-dock.dll').Hash) { throw 'Native dock mismatch' }
       - name: Smoke test packaged executable
         shell: pwsh
         run: |

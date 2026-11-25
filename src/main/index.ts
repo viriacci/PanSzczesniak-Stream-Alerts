@@ -1,4 +1,5 @@
-import {DockControl} from './obs/dock-control'
+import {createConnection} from 'node:net'
+import {DockControl,type DockDescriptor} from './obs/dock-control'
 import {CrashLog} from './runtime/crashes'
 import {launchNodeAgent} from './agent/launch'
 import {BRAND} from '../shared/brand'
@@ -152,13 +153,14 @@ async function start(): Promise<void> {
   }
   runtime=new RuntimeService(activeDb,directory,()=>window,activeAlerts,activeObs,agent,restoreStatus,applyMode)
   if(!smoke)runtime.start()
-  if(!smoke){
+  let dockDescriptor:DockDescriptor|undefined
+  {
    dockControl=new DockControl(directory,process.execPath,{
     state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl}},
     volume:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,volume:value}})},
     mute:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,muted:value}})},
     test:()=>{activeAlerts.queueCommand({type:'test'})},reload:()=>{activeAlerts.reloadOverlay()},show:()=>reveal(),quit:()=>{setTimeout(()=>app.quit(),100)}
-   });try{await dockControl.start()}catch{dockControl.stop();log('dock-control-unavailable')}
+   });try{dockDescriptor=await dockControl.start()}catch(e){dockControl.stop();if(smoke)throw e;log('dock-control-unavailable')}
   }
   if(!smoke&&(process.argv.includes('--pssa-background')||runtime.state().mode==='background'&&tray)){backgrounded=true;log('ready');return}
   await showWindow(!smoke)
@@ -271,6 +273,11 @@ async function start(): Promise<void> {
     if(!measurement||measurement.samples!==1)throw Error('Measurement start smoke failed')
     const oldId=activeWindow.id
     hibernate();if(window||!activeWindow.isDestroyed())throw Error('Background did not release window')
+    if(!dockDescriptor)throw Error('Dock descriptor unavailable');
+    const descriptor=dockDescriptor;
+    const control=(command:string,value?:unknown)=>new Promise<any>((resolve,reject)=>{const address=process.platform==='win32'?'\\\\.\\pipe\\'+descriptor.pipe:descriptor.pipe;const s=createConnection(address);let response='';s.setTimeout(3000,()=>{s.destroy();reject(Error('Dock smoke timeout'))});s.on('error',reject);s.on('connect',()=>s.write(JSON.stringify({token:descriptor.token,command,value})+'\n'));s.on('data',b=>response+=b.toString());s.on('end',()=>{try{resolve(JSON.parse(response))}catch(e){reject(e)}})});
+    if(!(await control('volume',35)).ok||activeAlerts.state().queue.settings.volume!==35||window)throw Error('Dock volume in background failed');
+    if(!(await control('mute',true)).state?.muted||!(await control('mute',false)).ok||!(await control('volume',100)).ok)throw Error('Dock mute smoke failed');
     await showWindow(false)
     const reopened:BrowserWindow|undefined=BrowserWindow.getAllWindows().find(w=>w.id!==oldId)
     if(!reopened||!(await reopened.webContents.executeJavaScript('window.pssa.getStatus().then(s=>s.database===\"ready\")')))throw Error('Background resume failed')

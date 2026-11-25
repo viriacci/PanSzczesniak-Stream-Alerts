@@ -28,6 +28,8 @@ export async function installObsDock(window:BrowserWindow):Promise<boolean>{
    "$modern=Join-Path $root 'pssa-control-dock.dll'",
    "if($v -ge 33){$target=$modern;$old=$legacy}else{$target=$legacy;$old=$modern}",
    "New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null",
+   "New-Item -ItemType Directory -Path (Join-Path $root 'data') -Force | Out-Null",
+   "$license=Join-Path (Split-Path $dll) 'COPYING'; if(Test-Path -LiteralPath $license){Copy-Item -LiteralPath $license -Destination (Join-Path $root 'COPYING') -Force}",
    "Copy-Item -LiteralPath $dll -Destination $target -Force",
    "if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $target).Hash){exit 14}",
    "if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force}",

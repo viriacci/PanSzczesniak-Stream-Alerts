@@ -2,6 +2,10 @@
 #include <obs-module.h>
 #include <obs-frontend-api.h>
 #include <QWidget>
+#include <QScrollArea>
+#include <QSizePolicy>
+#include <graphics/vec2.h>
+#include <cstring>
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QLabel>
@@ -54,7 +58,7 @@ static bool processAlive(int pid){
  HANDLE p=OpenProcess(SYNCHRONIZE,FALSE,static_cast<DWORD>(pid));if(!p)return GetLastError()==ERROR_ACCESS_DENIED;
  const bool alive=WaitForSingleObject(p,0)==WAIT_TIMEOUT;CloseHandle(p);return alive;
 }
-static bool isBrowser(obs_source_t *source){return source&&strcmp(obs_source_get_id(source),"browser_source")==0;}
+static bool isBrowser(obs_source_t *source){return source&&std::strcmp(obs_source_get_id(source),"browser_source")==0;}
 static bool managed(obs_source_t *source){
  if(!isBrowser(source))return false;
  auto *s=obs_source_get_settings(source);const bool result=obs_data_get_bool(s,"pssa_control_dock");obs_data_release(s);return result;
@@ -69,6 +73,7 @@ class Dock final:public QWidget{
  QPushButton *startButton{},*stopButton{},*restartButton{},*showButton{},*addButton{},*refreshButton{},*testButton{};
  QToolButton *more{};
  QWidget *extra{};
+ QScrollArea *extraScroll{};
  QSlider *volume{};
  QCheckBox *mute{},*autoStart{},*autoClose{};
  QTimer timer,volumeTimer;
@@ -93,11 +98,11 @@ class Dock final:public QWidget{
   if(source)obs_source_release(source);
  }
  void apply(const QJsonObject &data){
-  online=true;starting=false;closing=false;overlay=data.value("overlayUrl").toString();
+  online=true;starting=false;overlay=data.value("overlayUrl").toString();
   const int v=data.value("volume").toInt(100);
   if(!volume->isSliderDown()&&!volumeTimer.isActive()){QSignalBlocker b(volume);volume->setValue(v);volumeLabel->setText(QString::number(v)+"%");}
   {QSignalBlocker b(mute);mute->setChecked(data.value("muted").toBool());}
-  report(trp("Uruchomiony"));
+  if(!closing&&!restarting)report(trp("Uruchomiony"));
   details->setText(trp("Twitch: ")+data.value("twitch").toString()+trp("  |  Kolejka: ")+QString::number(data.value("pending").toInt()));
   controls();
  }
@@ -120,7 +125,7 @@ class Dock final:public QWidget{
   starting=true;deadline=QDateTime::currentMSecsSinceEpoch()+15000;report(trp("Uruchamianie…"));controls();
  }
  void send(const QString &cmd,const QJsonValue &value=QJsonValue()){
-  if(active){if(cmd=="status")return;active->abort();active->deleteLater();active.clear();}
+  if(active){if(cmd=="status")return;auto old=active;active.clear();old->abort();old->deleteLater();}
   const auto d=descriptor();if(!validDescriptor(d)){offline();return;}
   auto *s=new QLocalSocket(this);active=s;response.clear();
   auto finish=[this,s,cmd](bool success){
@@ -145,7 +150,7 @@ class Dock final:public QWidget{
  }
  void stop(bool restart){
   if(!online)return;
-  restartPid=descriptor().value("pid").toInt();restarting=restart;closing=true;
+  volumeTimer.stop();restartPid=descriptor().value("pid").toInt();restarting=restart;closing=true;
   deadline=QDateTime::currentMSecsSinceEpoch()+15000;
   report(restart?trp("Restartowanie…"):trp("Zamykanie…"));controls();send("quit");
  }
@@ -169,7 +174,7 @@ class Dock final:public QWidget{
   }else if(managed(source)&&!urlMatches(source,url)){auto *s=obs_data_create();obs_data_set_string(s,"url",url.constData());obs_source_update(source,s);obs_data_release(s);}
   if(!source){obs_source_release(sceneSource);report(trp("Nie można utworzyć źródła przeglądarkowego"));return;}
   auto *item=obs_scene_add(scene,source);
-  if(item){obs_video_info info{};if(obs_get_video_info(&info)){vec2 scale;vec2_set(&scale,static_cast<float>(info.base_width)/1920.0f,static_cast<float>(info.base_height)/1080.0f);obs_sceneitem_set_scale(item,&scale);}obs_frontend_save();}
+  if(item){obs_video_info info{};if(obs_get_video_info(&info)){vec2 scale;const auto w=obs_source_get_width(source),h=obs_source_get_height(source);vec2_set(&scale,static_cast<float>(info.base_width)/static_cast<float>(w?w:1920),static_cast<float>(info.base_height)/static_cast<float>(h?h:1080));obs_sceneitem_set_scale(item,&scale);}obs_frontend_save();}
   obs_source_release(source);obs_source_release(sceneSource);report(item?trp("Dodano źródło PSSA"):trp("Nie udało się dodać źródła"));
  }
 public:
@@ -191,8 +196,8 @@ public:
   details=new QLabel(extra);details->setWordWrap(true);x->addWidget(details);
   autoStart=new QCheckBox(trp("Uruchamiaj PSSA z OBS"),extra);autoClose=new QCheckBox(trp("Zamykaj PSSA razem z OBS"),extra);
   autoStart->setChecked(settings.value("autoStart",false).toBool());autoClose->setChecked(settings.value("autoClose",false).toBool());x->addWidget(autoStart);x->addWidget(autoClose);
-  extra->hide();layout->addWidget(extra);layout->addStretch();
-  connect(more,&QToolButton::toggled,this,[this](bool b){extra->setVisible(b);more->setText(b?trp("Mniej"):trp("Więcej"));more->setArrowType(b?Qt::UpArrow:Qt::DownArrow);});
+  extraScroll=new QScrollArea(this);extraScroll->setWidgetResizable(true);extraScroll->setFrameShape(QFrame::NoFrame);extraScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);extraScroll->setWidget(extra);extraScroll->setMinimumHeight(80);extraScroll->hide();layout->addWidget(extraScroll,1);
+  connect(more,&QToolButton::toggled,this,[this](bool b){extraScroll->setVisible(b);more->setText(b?trp("Mniej"):trp("Więcej"));more->setArrowType(b?Qt::UpArrow:Qt::DownArrow);});
   connect(startButton,&QPushButton::clicked,this,[this](){launch();});connect(stopButton,&QPushButton::clicked,this,[this](){stop(false);});connect(restartButton,&QPushButton::clicked,this,[this](){stop(true);});connect(showButton,&QPushButton::clicked,this,[this](){send("show");});
   connect(addButton,&QPushButton::clicked,this,[this](){addSource();});connect(refreshButton,&QPushButton::clicked,this,[this](){send("reload");});connect(testButton,&QPushButton::clicked,this,[this](){send("test");});
   volumeTimer.setSingleShot(true);volumeTimer.setInterval(160);connect(volume,&QSlider::valueChanged,this,[this](int v){volumeLabel->setText(QString::number(v)+"%");volumeTimer.start();});connect(&volumeTimer,&QTimer::timeout,this,[this](){send("volume",volume->value());});
@@ -204,7 +209,7 @@ public:
  void obsExit(){
   timer.stop();if(!autoClose->isChecked())return;
   const auto d=descriptor();if(!validDescriptor(d))return;
-  QLocalSocket s;s.connectToServer(d.value("pipe").toString());if(s.waitForConnected(200)){s.write(request(d,"quit"));s.flush();s.waitForBytesWritten(200);}
+  QLocalSocket s;s.connectToServer(d.value("pipe").toString());if(s.waitForConnected(200)){s.write(request(d,"quit"));s.flush();if(s.bytesToWrite()>0)s.waitForBytesWritten(200);if(!s.bytesAvailable())s.waitForReadyRead(200);}
  }
 };
 static QPointer<Dock> widget;
