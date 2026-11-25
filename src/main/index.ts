@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import type { DatabaseSync } from 'node:sqlite'
 import { readWindowState, writeWindowState } from './window-state'
-import { openDatabase } from './database'
+import {SCHEMA_VERSION,  openDatabase } from './database'
 import { registerIpc } from './ipc'
 import { createLogger } from './logger'
 
@@ -262,10 +262,19 @@ async function start(): Promise<void> {
     activeWindow.setSize(originalSize[0]!,originalSize[1]!);
     if(!(await activeWindow.webContents.executeJavaScript('new Promise(r=>setTimeout(()=>r([...document.querySelectorAll(".content,.queue-page,.queue-page .panel")].every(e=>e.scrollWidth<=e.clientWidth+1)),150))')))throw Error('Large queue overflow');
     console.log('PSSA smoke: IPC and database');
-    const passed = await activeWindow.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 5 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 5)'
-    )
-    if (passed !== true) throw new Error('Smoke test failed')
+    const checks=await activeWindow.webContents.executeJavaScript(`(async()=>{
+      const status=await window.pssa.getStatus(), expected=${SCHEMA_VERSION};
+      const checks={database:status.database==="ready",schema:status.schemaVersion===expected};
+      checks.compact=await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact===true;
+      checks.layout=(await window.pssa.setLayout({...await window.pssa.getLayout(),page:"settings",sidebarWidth:280})).page==="settings"&&(await window.pssa.getLayout()).sidebarWidth===280;
+      const alerts=await window.pssa.alertState();
+      checks.rules=alerts.rules.length>=8;checks.overlay=alerts.twitch.overlayUrl.startsWith("http://127.0.0.1:18766/");checks.pending=alerts.queue.pendingCount===1;
+      checks.obs=(await window.pssa.obsState()).phase==="offline";checks.live=(await window.pssa.liveState()).phase==="disconnected";checks.channels=(await window.pssa.analyticsChannels()).length===0;checks.assets=(await window.pssa.libraryState()).assets.length===0;
+      checks.analytics=(await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions===0;
+      checks.runtime=(await window.pssa.runtimeState()).mode==="studio";checks.diagnostics=(await window.pssa.diagnostics()).schema===expected;
+      return checks
+    })()`);
+    if(!checks||Object.values(checks).some(v=>v!==true))throw Error('IPC/database smoke failed: '+JSON.stringify(checks))
     // Load the real served overlay in a separate isolated Chromium window and wait for ACK.
     const preview=new BrowserWindow({show:false,width:640,height:360,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
     preview.webContents.setWindowOpenHandler(()=>({action:'deny'}))
