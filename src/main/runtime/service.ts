@@ -37,7 +37,7 @@ export class RuntimeService{
  private checkedAt=0
  private downloading=false
  private timer?:ReturnType<typeof setInterval>
- constructor(private db:DatabaseSync,private directory:string,private window:()=>BrowserWindow|undefined,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void){
+ constructor(private db:DatabaseSync,private directory:string,private window:()=>BrowserWindow|undefined,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void,private lookupRelease=checkRelease){
   this.crashes=new CrashLog(directory,app.getVersion(),'main');this.agentCrashes=new CrashLog(directory,app.getVersion(),'agent')
   const sample=makeSampler(()=>app.getAppMetrics())
   this.measurement=new Measurement(join(directory,'measurements'),()=>({version:app.getVersion(),cores:cpus().length,ramMB:Math.round(totalmem()/1048576),platform:process.platform,arch:process.arch,gpuEnabled:this.gpuEnabled}),(late,reset):Sample=>{
@@ -92,7 +92,7 @@ export class RuntimeService{
  }
  async check(){if(this.stopped)return this.cached;if(this.update)return this.update
   const channel=this.state().updates
-  const task=checkRelease(app.getVersion(),channel);this.update=task
+  const task=this.lookupRelease(app.getVersion(),channel);this.update=task
   try{const value=await task;if(!this.stopped&&channel===this.state().updates){this.cached=value;this.checkedAt=Date.now()}return value}finally{if(this.update===task)this.update=undefined}
  }
  updateInfo(){return this.cached}

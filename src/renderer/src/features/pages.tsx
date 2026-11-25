@@ -3,7 +3,7 @@ import type {Navigation} from '../../../shared/layout'
 import {themes,themeIds} from '../../../shared/themes'
 import {memo} from 'react'
 import {RuntimeSettings,DiagnosticsPage} from './runtime'
-import type {RuntimePreferences} from '../../../shared/runtime'
+import type {RuntimePreferences,UpdateInfo} from '../../../shared/runtime'
 import {AnalyticsPage} from './analytics'
 import {LibraryPage,ProfilesPage} from './library'
 import {StudioPage} from './studio'
@@ -20,8 +20,8 @@ import type { NavItem } from '../navigation'
 import { Button, Empty, Panel, Status, SettingsSection } from '../components/ui'
 import { Icon, type IconName } from '../components/icons'
 const MemoAnalytics=memo(AnalyticsPage),MemoLibrary=memo(LibraryPage),MemoStudio=memo(StudioPage),MemoQueue=memo(QueuePage),MemoDiagnostics=memo(DiagnosticsPage)
-type Props={runtime?:RuntimePreferences;saveRuntime:(p:RuntimePreferences)=>Promise<RuntimePreferences>;live?:LiveState;obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onLayout:(v:Partial<LayoutPreferences>)=>void;onNavigation:(v:Navigation)=>void;editingMenu:boolean;onEditMenu:()=>void;onIntegrations:()=>void}
-export function PageContent({runtime,saveRuntime,live,obs,agent,alertState,item,status,layout,busy,onCompact,onReset,onLayout,onNavigation,editingMenu,onEditMenu,onIntegrations}:Props) {
+type Props={update?:UpdateInfo;checkUpdate:()=>Promise<UpdateInfo>;openUpdate:()=>void;runtime?:RuntimePreferences;saveRuntime:(p:RuntimePreferences)=>Promise<RuntimePreferences>;live?:LiveState;obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onLayout:(v:Partial<LayoutPreferences>)=>void;onNavigation:(v:Navigation)=>void;editingMenu:boolean;onEditMenu:()=>void;onIntegrations:()=>void}
+export function PageContent({update,checkUpdate,openUpdate,runtime,saveRuntime,live,obs,agent,alertState,item,status,layout,busy,onCompact,onReset,onLayout,onNavigation,editingMenu,onEditMenu,onIntegrations}:Props) {
  if(item.id==='dashboard')return <><LiveCenter state={live} obs={obs} pending={alertState?.queue.pendingCount??null} onIntegrations={onIntegrations}/><Panel title="Ostatnia aktywność">{alertState?.queue.history.length?alertState.queue.history.slice(0,4).map(x=><div className="setting-row" key={x.id}><span>{x.text}</span><small className="muted">{x.status}</small></div>):<Empty title="Brak zarejestrowanych zdarzeń">Ostatnie zakończone alerty pojawią się tutaj.</Empty>}</Panel></>
  if(item.id==='analytics')return <MemoAnalytics/>
  if(item.id==='library')return <MemoLibrary base={alertState?.twitch.overlayUrl??''} lowPower={runtime?.mode==='streaming'}/>
@@ -34,7 +34,7 @@ export function PageContent({runtime,saveRuntime,live,obs,agent,alertState,item,
    <div className="setting-row"><div><h3>Inspektor</h3><p>Prawy panel kontekstowy.</p></div><Button role="switch" aria-checked={layout.inspectorOpen} disabled={busy} onClick={()=>onLayout({inspectorOpen:!layout.inspectorOpen})}>{layout.inspectorOpen?'Włączony':'Wyłączony'}</Button></div>
    <div className="setting-row"><div><h3>Rozmiar paneli</h3><p>Menu: {layout.sidebarWidth}px · Inspektor: {layout.inspectorWidth}px</p></div><Button disabled={busy} onClick={onReset}>Przywróć układ</Button></div>
   </SettingsSection>
-  {runtime&&<RuntimeSettings runtime={runtime} save={saveRuntime}/>}
+  {runtime&&<RuntimeSettings runtime={runtime} save={saveRuntime} update={update} checkUpdate={checkUpdate} openUpdate={openUpdate}/>}
   {runtime&&<SettingsSection title="Skórki aplikacji"><div className="theme-grid">{themeIds.map(id=>{const t=themes[id];return <button type="button" className="theme-choice" key={id} aria-pressed={runtime.theme===id} disabled={busy} onClick={()=>void saveRuntime({...runtime,theme:id}).catch(()=>window.alert('Nie udało się zapisać skórki.'))}><div className="theme-preview" data-preview={id} style={{background:t.colors[0],color:id==='vivionyx'?'#f2efed':t.colors[2],borderColor:id==='vivionyx'?t.colors[1]:t.colors[2]}}><span className="theme-mark">{t.symbol}</span><strong>{t.name}</strong><small>{t.subtitle}</small><div className="theme-swatches">{t.colors.map(c=><i key={c} style={{background:c}}/>)}</div></div><span>{t.description}</span><strong>{runtime.theme===id?'Aktywna':'Wybierz'}</strong></button>})}</div></SettingsSection>}
   <SettingsSection title="Logowanie zaawansowane"><AdvancedTwitchLogin state={alertState}/></SettingsSection>
  </>

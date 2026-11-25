@@ -1,11 +1,12 @@
-import {useEffect,useRef,useState} from 'react'
+import {useCallback,useEffect,useRef,useState} from 'react'
 import type {UpdateInfo} from '../../../shared/runtime'
 import {Button} from '../components/ui'
 import {Icon} from '../components/icons'
 export function useUpdate(ready:boolean){
  const [info,setInfo]=useState<UpdateInfo>(),[remind,setRemind]=useState(false)
  useEffect(()=>{if(!ready)return;let active=true;const refresh=()=>{void window.pssa.updateInfo().then(v=>{if(active)setInfo(v)}).catch(()=>{});void window.pssa.updateDockReminder().then(v=>{if(active)setRemind(v)}).catch(()=>{})};refresh();const t=setInterval(refresh,15000);return()=>{active=false;clearInterval(t)}},[ready])
- return {info,remind}
+ const check=useCallback(async()=>{const v=await window.pssa.updateCheck();setInfo(v);return v},[])
+ return {info,remind,check}
 }
 export function UpdatePopup({info,current,blocked,onClose}:{info:UpdateInfo;current:string;blocked:boolean;onClose:()=>void}){
  const ref=useRef<HTMLDialogElement>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[alsoDock,setAlsoDock]=useState(true)

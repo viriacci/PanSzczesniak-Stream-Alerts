@@ -152,7 +152,7 @@ async function start(): Promise<void> {
     tray.on('double-click',()=>reveal())
    }catch{tray=undefined}
   }
-  runtime=new RuntimeService(activeDb,directory,()=>window,activeAlerts,activeObs,agent,restoreStatus,applyMode)
+  runtime=new RuntimeService(activeDb,directory,()=>window,activeAlerts,activeObs,agent,restoreStatus,applyMode,smoke?async()=>({state:'available',version:'2.0.0-rc.999',url:'https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0-rc.999',notes:'Test aktualizacji',asset:{name:'PSSA-Setup-2.0.0-rc.999-x64.exe',url:'https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/download/v2.0.0-rc.999/PSSA-Setup-2.0.0-rc.999-x64.exe',sha256:'a'.repeat(64),size:2048},detail:'Dostępna aktualizacja PSSA.'}):undefined)
   if(!smoke)runtime.start()
   let dockExitScheduled=false
   const dockExit=(restart:boolean)=>{if(dockExitScheduled||cleaned)return;dockExitScheduled=true;setTimeout(()=>{if(cleaned)return;if(restart){if(smoke)return;app.relaunch({args:[...(app.isPackaged?[]:[app.getAppPath()]),'--pssa-background']})}app.quit()},150)}
@@ -202,6 +202,11 @@ async function start(): Promise<void> {
       if(sections.length!==8||sections.some(s=>s.open)||!sections[0].textContent.includes('Ukryj zakładki'))throw Error('Settings not collapsed');
       sections[0].querySelector('summary').click();if(!sections[0].open)throw Error('Settings disclosure failed');
       if(!sections.some(s=>s.querySelector('summary span').textContent==='Logowanie zaawansowane'))throw Error('Advanced login missing');
+      const updates=sections.find(s=>s.querySelector('summary span').textContent==='Aktualizacje');if(!updates)throw Error('Update settings missing');updates.querySelector('summary').click();
+      updates.querySelectorAll('button')[0].click();
+      const updateButton=await until(()=>[...updates.querySelectorAll('button')].find(b=>b.textContent==='Aktualizuj PSSA'&&!b.disabled));
+      if(!document.querySelector('.update-banner'))throw Error('Manual check did not update global banner');
+      updateButton.click();const popup=await until(()=>document.querySelector('.update-dialog[open]'));if(!popup.textContent.includes('2.0.0-rc.999')||!popup.textContent.includes('Test aktualizacji')||![...popup.querySelectorAll('button')].some(b=>b.textContent==='Pobierz i zainstaluj'))throw Error('Update popup incomplete');popup.querySelector('[aria-label="Zamknij"]').click();await until(()=>!document.querySelector('.update-dialog[open]'));
       document.querySelector('[data-nav-id="integrations"]').click();
       await until(()=>document.querySelector('.page-header h1')?.textContent==='Konfiguracja');
       return !document.querySelector('input[type="password"][autocomplete="off"][required]');
