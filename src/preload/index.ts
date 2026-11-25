@@ -33,6 +33,7 @@ const api: PssaApi = {
   queueCommand:command=>ipcRenderer.invoke(IPC.queueCommand,command),
   alertPoll:revision=>ipcRenderer.invoke(IPC.alertPoll,revision),
   alertState:()=>ipcRenderer.invoke(IPC.alertState),
+  twitchDeviceLogin:()=>ipcRenderer.invoke(IPC.twitchDeviceLogin),
   twitchLogin:(id,secret)=>ipcRenderer.invoke(IPC.twitchLogin,id,secret),
   twitchLogout:()=>ipcRenderer.invoke(IPC.twitchLogout),
   twitchConnect:()=>ipcRenderer.invoke(IPC.twitchConnect),

@@ -7,7 +7,7 @@ export interface AlertEvent { id:string; kind:AlertKind; user:string; rewardId?:
 export interface AlertRule { key:string; enabled:boolean; title:string; image:string; audio:string; duration:number; template:string; layout?:AlertLayout; scene?:Scene; variants?:AlertVariant[]; priority:number; cooldown:number; volume:number; minCount:number }
 export interface Border {border_width:number;border_color:string;border_style:string}
 export interface AlertLayout { image:{x:number;y:number;width:number;height:number}&Border; caption:{x:number;y:number;width:number;height:number;font_size:number;font_color:string;bg_color:string;bg_opacity:number;font_family:string}&Border; anim_in:string;anim_out:string;anim_duration_ms:number }
-export interface TwitchState { phase:'disconnected'|'authorizing'|'connecting'|'connected'|'retrying'|'error'; login:string; detail:string; overlayUrl:string; clients:number }
+export interface TwitchState { phase:'disconnected'|'authorizing'|'connecting'|'connected'|'retrying'|'error'; login:string; detail:string; overlayUrl:string; clients:number; publicLogin?:boolean; deviceCode?:string }
 export interface Reward {id:string;title:string;cost:number}
 export interface AlertState { profileId?:string; twitch:TwitchState; rules:AlertRule[]; rewards:Reward[]; queue:QueueState }
 export const templates:Record<AlertKind,string>={redemption:'{user} odbiera {reward}',raid:'{user} najeżdża z {viewers} widzami!',follow:'{user} zaczyna obserwować!',sub:'{user} subskrybuje!',prime_sub:'{user} subskrybuje z Prime!',resub:'{user} odnawia subskrypcję ({months} mies.)!',gift:'{user} podarował subskrypcję!',mass_gift:'{user} podarował {count} subskrypcji!',bits:'{user} przekazuje {bits} Bits!'}

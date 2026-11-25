@@ -17,13 +17,20 @@ export function TwitchPage({state}:{state?:AlertState}){
  function login(e:FormEvent){e.preventDefault();const value=secret;setSecret('');void run(()=>window.pssa.twitchLogin(id.trim(),value),'Autoryzacja zakończona.')}
  return <>
   <Panel title="Twitch" action={<Status tone={t?.phase==='connected'?'ready':t?.phase==='error'?'warning':'neutral'}>{t?.phase??'Inicjalizacja'}</Status>}>
-   <p>{t?.login?'Kanał: '+t.login:'Podłącz własną aplikację Twitch Developer Console.'}</p><p>{t?.detail}</p>
-   <form className="alert-form" onSubmit={login}><label>Client ID<input required autoComplete="off" value={id} onChange={e=>setId(e.target.value)}/></label><label>Client Secret<input type="password" required autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)}/></label><p className="muted">OAuth Redirect URL: http://localhost:3000. Tokeny i secret szyfrowane lokalnie.</p><div className="alert-actions"><Button type="submit" variant="primary" disabled={busy||t?.phase==='authorizing'}>Połącz z Twitch</Button><Button disabled={busy||!t?.login} onClick={()=>void run(()=>window.pssa.twitchConnect(),'Rozpoczęto ponowne połączenie.')}>Połącz ponownie</Button><Button disabled={!t?.login&&t?.phase!=='authorizing'} onClick={()=>void run(()=>window.pssa.twitchLogout(),'Wylogowano.')}>Wyloguj / anuluj</Button></div></form>
+   <p>{t?.login?'Kanał: '+t.login:'Zaloguj się na Twitch, aby odbierać zdarzenia i nagrody kanału.'}</p><p>{t?.detail}</p>
+   <div className="alert-actions"><Button variant="primary" disabled={busy||!t?.publicLogin||t.phase==='authorizing'} onClick={()=>void run(()=>window.pssa.twitchDeviceLogin(),'Autoryzacja zakończona.')}>Zaloguj się przez Twitch</Button><Button disabled={busy||!t?.login} onClick={()=>void run(()=>window.pssa.twitchConnect(),'Rozpoczęto ponowne połączenie.')}>Połącz ponownie</Button><Button disabled={!t?.login&&t?.phase!=='authorizing'} onClick={()=>void window.pssa.twitchLogout().catch(()=>setMessage('Nie udało się anulować.'))}>Wyloguj / anuluj</Button></div>
+   {t?.deviceCode&&<p>Kod autoryzacji: <strong>{t.deviceCode}</strong>. Zatwierdź go w przeglądarce.</p>}
+   {t&&!t.publicLogin&&<p className="muted">Logowanie uproszczone oczekuje na rejestrację aplikacji PSSA. Tymczasowo możesz skorzystać z własnej aplikacji Twitch.</p>}
+   <details className="advanced-integrations"><summary>Logowanie zaawansowane (własna aplikacja)</summary>
+   <form className="alert-form" onSubmit={login}><label>Client ID<input required autoComplete="off" value={id} onChange={e=>setId(e.target.value)}/></label><label>Client Secret<input type="password" required autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)}/></label><p className="muted">OAuth Redirect URL: http://localhost:3000. Tokeny i secret szyfrowane lokalnie.</p><div className="alert-actions"><Button type="submit" variant="primary" disabled={busy||t?.phase==='authorizing'}>Połącz z Twitch</Button></div></form></details>
   </Panel>
-  <Panel title="Nakładka OBS" detail="Źródło przeglądarkowe 1920 × 1080; bez połączenia z Twitch też działa."><label className="alert-form">Adres lokalny<input readOnly value={t?.overlayUrl??''} onFocus={e=>e.target.select()}/></label><p>Podłączone źródła: {t?.clients??0}. Tylko jedno źródło odtwarza dany alert. Nie udostępniaj adresu publicznie. Sterowanie OBS znajduje się poniżej.</p></Panel>
-  <Panel title="Migracja PSSA 1.x"><p>Importuj config.json ze starego programu. Przypisania o identycznych kluczach zostaną zastąpione; stara instalacja pozostanie nietknięta. Tokeny nie będą importowane.</p><Button disabled={busy} onClick={()=>void run(async()=>{const data=await window.pssa.importLegacy();setMessage(data?'Import: '+data.count+' reguł. '+data.warnings.join('; '):'Import anulowany.');return data},'')}>Importuj konfigurację</Button></Panel>
+  <Panel title="Nakładka OBS" detail="Dodaj jako źródło przeglądarkowe 1920x1080"><label className="alert-form">Adres lokalny<input readOnly value={t?.overlayUrl??''} onFocus={e=>e.target.select()}/></label></Panel>
   {message&&<p role="status">{message}</p>}
  </>
+}
+export function MigrationPanel(){
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState('')
+ return <Panel title="Migracja PSSA 1.x"><p>Import konfiguracji starej wersji. Istniejące przypisania o tych samych kluczach zostaną zastąpione. Tokeny nie są importowane.</p><Button disabled={busy} onClick={()=>{setBusy(true);void window.pssa.importLegacy().then(r=>setMessage(r?'Import: '+r.count+' reguł. '+r.warnings.join('; '):'Anulowano.')).catch(()=>setMessage('Nie udało się zaimportować konfiguracji.')).finally(()=>setBusy(false))}}>Importuj konfigurację</Button>{message&&<p role="status">{message}</p>}</Panel>
 }
 function RuleEditor({initial,onClose,profile}:{initial:AlertRule;onClose:()=>void;profile:string}){
  const [rule,setRule]=useState(initial),[busy,setBusy]=useState(false),[message,setMessage]=useState('')

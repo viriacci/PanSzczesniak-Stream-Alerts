@@ -1,3 +1,4 @@
+import {parseNavigation,moveNode,findNode,deleteGroup} from '../src/shared/layout.ts'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { defaultLayout, bounds, clampWidth, parseLayout } from '../src/shared/layout.ts'
@@ -32,4 +33,19 @@ test('window state rejects disconnected displays and invalid sizes',()=>{
  assert.equal(sanitizeWindowState({...state,bounds:{...state.bounds,width:1}},displays).bounds.width,1180)
  const db=openDatabase(':memory:')
  try {writeWindowState(db,state);assert.deepEqual(readWindowState(db,displays),state)} finally {db.close()}
+})
+
+test('old layout hides inspector; navigation supports nested moving and preserves all pages',()=>{
+ const {navigation,...old}=defaultLayout
+ assert.equal(parseLayout({...old,inspectorOpen:true}).inspectorOpen,false)
+ const group={kind:'group' as const,id:'custom',name:'Custom',collapsed:false,children:[]}
+ const nav=parseNavigation({...navigation,nodes:[...navigation.nodes,group]})
+ const moved=moveNode(nav,'studio','custom','inside')
+ assert.equal(findNode(moved.nodes,'custom')?.kind,'group')
+ assert.deepEqual((findNode(moved.nodes,'custom') as any).children,[{kind:'page',id:'studio'}])
+ const nested=moveNode(moved,'custom','assets','inside')
+ assert.deepEqual(moveNode(nested,'assets','custom','inside'),nested)
+ assert.equal(findNode(deleteGroup(nested,'custom').nodes,'studio')?.kind,'page')
+ assert.throws(()=>parseNavigation({...navigation,nodes:[]}))
+ assert.throws(()=>parseNavigation({...navigation,hidden:['studio','studio']}))
 })

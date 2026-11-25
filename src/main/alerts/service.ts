@@ -1,3 +1,4 @@
+import {publicClientId} from '../twitch/public-client'
 import {ReadJobs} from '../runtime/read-jobs'
 import type {AnalyticsReport} from '../../shared/analytics'
 import type {LibraryState} from '../../shared/library'
@@ -34,6 +35,7 @@ export class AlertsService {
  private wakeQueued=false
  private phase:TwitchState['phase']='disconnected'
  private detail=''
+ private deviceCode=''
  private rewards:Reward[]=[]
  private media:string
  private directory:string
@@ -68,21 +70,22 @@ export class AlertsService {
   })
  }
  telemetry(){return {...this.queue.telemetry(),overlayClients:this.overlay.clients,twitchPhase:this.phase}}
- state():AlertState{return {profileId:activeProfile(this.db),twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
+ state():AlertState{return {profileId:activeProfile(this.db),twitch:{phase:this.phase,login:this.auth.identity?.login??'',detail:this.detail,overlayUrl:this.overlay.url,clients:this.overlay.clients,publicLogin:!!publicClientId,deviceCode:this.deviceCode},rules:rules(this.db),rewards:this.rewards,queue:this.queue.state()}}
  poll(since:unknown){
   if(typeof since!=='number'||!Number.isSafeInteger(since)||since< -1)throw Error('Invalid snapshot revision')
   const next=this.state(),last=this.lastSnapshot
   if(!last||next.profileId!==last.profileId||next.rules!==last.rules||next.rewards!==last.rewards||next.queue!==last.queue||JSON.stringify(next.twitch)!==JSON.stringify(last.twitch)){this.lastSnapshot=next;this.snapshotVersion++}
   return {revision:this.snapshotVersion,state:since===this.snapshotVersion?null:this.lastSnapshot!}
  }
- async login(clientId:string,secret:string){
+ async deviceLogin(){if(!publicClientId)throw Error('Publiczny Client ID PSSA nie został skonfigurowany');return this.login(publicClientId,'',true)}
+ async login(clientId:string,secret:string,device=false){
   if(this.phase==='authorizing')throw Error('Autoryzacja już trwa')
-  this.generation++;const g=this.generation;this.live.reset();this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce'
-  try{await this.auth.login(clientId,secret);if(g!==this.generation||this.stopped)return;this.phase='connecting';await this.connect()}
-  catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Logowanie nie powiodło się. Sprawdź dane i redirect URI.'}throw Error('Logowanie Twitch nie powiodło się')}
+  this.generation++;const g=this.generation;this.live.reset();this.events.stop();this.rewards=[];this.phase='authorizing';this.detail='Dokończ logowanie w przeglądarce';this.deviceCode=''
+  try{if(device)await this.auth.deviceLogin(clientId,code=>{if(g===this.generation)this.deviceCode=code});else await this.auth.login(clientId,secret);this.deviceCode='';if(g!==this.generation||this.stopped)return;this.phase='connecting';await this.connect()}
+  catch{if(g===this.generation&&!this.stopped){this.phase='error';this.deviceCode='';this.detail=device?'Logowanie nie powiodło się. Spróbuj ponownie.':'Logowanie nie powiodło się. Sprawdź dane i redirect URI.'}throw Error('Logowanie Twitch nie powiodło się')}
  }
  async connect(){if(this.phase==='authorizing')throw Error('Autoryzacja trwa');this.events.stop();const g=++this.generation;this.phase='connecting';this.detail='Sprawdzanie sesji';try{await this.auth.ensure();if(this.stopped||g!==this.generation)return;this.events.start();void this.live.poll()}catch{if(g===this.generation&&!this.stopped){this.phase='error';this.detail='Nie można zweryfikować sesji Twitch'}throw Error('Nie można połączyć z Twitch')}}
- logout(){this.generation++;this.live.reset();this.events.stop();this.auth.logout();this.rewards=[];this.phase='disconnected';this.detail=''}
+ logout(){this.deviceCode='';this.generation++;this.live.reset();this.events.stop();this.auth.logout();this.rewards=[];this.phase='disconnected';this.detail=''}
  async sync(){const id=this.auth.identity?.userId;if(!id)throw Error('Zaloguj Twitch');const g=this.generation
   const data=await this.auth.helix('channel_points/custom_rewards?broadcaster_id='+encodeURIComponent(id))
   if(this.stopped||g!==this.generation)throw Error('Sesja zmieniona')

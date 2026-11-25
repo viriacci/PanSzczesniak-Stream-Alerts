@@ -1,10 +1,11 @@
+import {deviceTokens} from './device.ts'
 import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { DatabaseSync } from 'node:sqlite'
 export const scopes=['moderator:read:followers','bits:read','channel:read:redemptions','user:read:chat']
 export const broadcastScope='channel:manage:broadcast'
 const redirect='http://localhost:3000'
-export interface Credentials {clientId:string;secret:string;access:string;refresh:string;userId:string;login:string;grantedScopes?:string[]}
+export interface Credentials {clientId:string;secret:string;access:string;refresh:string;userId:string;login:string;grantedScopes?:string[];publicClient?:boolean}
 export interface AuthDependencies {
  storage:{isEncryptionAvailable():boolean;encryptString(value:string):Buffer;decryptString(value:Buffer):string}
  openExternal(url:string):Promise<void>
@@ -26,7 +27,7 @@ export class Auth {
   if(typeof raw!=='string')return false
   if(!this.deps.storage.isEncryptionAvailable())throw Error('Bezpieczny magazyn niedostępny')
   const data=JSON.parse(this.deps.storage.decryptString(Buffer.from(raw,'base64'))) as Credentials
-  if(!data||!['clientId','secret','access','refresh','userId','login'].every(key=>typeof data[key as keyof Credentials]==='string'&&String(data[key as keyof Credentials]).length>0))throw Error('Nieprawidłowe dane logowania')
+  if(!data||!['clientId','access','refresh','userId','login'].every(key=>typeof data[key as keyof Credentials]==='string'&&String(data[key as keyof Credentials]).length>0)||typeof data.secret!=='string'||(!data.secret&&data.publicClient!==true))throw Error('Nieprawidłowe dane logowania')
   this.credentials=data;return true
  }
  private persist(data:Credentials){
@@ -86,6 +87,15 @@ export class Auth {
   if(!identity)throw Error('Autoryzacja przerwana')
   this.persist({clientId,secret,...t,...identity})
  }
+ async deviceLogin(clientId:string,onCode:(code:string)=>void){
+  if(!this.deps.storage.isEncryptionAvailable())throw Error('Bezpieczny magazyn niedostępny')
+  this.logout();const g=this.generation,controller=new AbortController()
+  this.cancel=()=>controller.abort()
+  try{const t=await deviceTokens(clientId,[...scopes,broadcastScope],this.deps,controller.signal,onCode);this.assertGeneration(g)
+   const identity=await this.validate(t.access,clientId);this.assertGeneration(g);if(!identity)throw Error('Autoryzacja przerwana')
+   this.persist({clientId,secret:'',publicClient:true,...t,...identity})
+  }finally{if(g===this.generation)this.cancel=undefined}
+ }
  async ensure(){
   const c=this.credentials,g=this.generation;if(!c)throw Error('Zaloguj Twitch')
   const v=await this.validate(c.access,c.clientId);this.assertGeneration(g)
@@ -98,7 +108,7 @@ export class Auth {
   this.assertGeneration(g)
   if(this.refreshTask)return this.refreshTask
   const c=this.credentials;if(!c)throw Error('Zaloguj Twitch')
-  const task=(async()=>{const t=await this.token({client_id:c.clientId,client_secret:c.secret,refresh_token:c.refresh,grant_type:'refresh_token'});this.assertGeneration(g);const v=await this.validate(t.access,c.clientId);this.assertGeneration(g);if(!v||v.userId!==c.userId)throw Error('Sesja przerwana');this.persist({...c,...t,...v})})()
+  const task=(async()=>{const t=await this.token({client_id:c.clientId,...(c.publicClient?{}:{client_secret:c.secret}),refresh_token:c.refresh,grant_type:'refresh_token'});this.assertGeneration(g);const v=await this.validate(t.access,c.clientId);this.assertGeneration(g);if(!v||v.userId!==c.userId)throw Error('Sesja przerwana');this.persist({...c,...t,...v})})()
   this.refreshTask=task
   try{await task}finally{if(this.refreshTask===task)this.refreshTask=undefined}
  }

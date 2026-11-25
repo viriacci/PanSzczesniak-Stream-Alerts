@@ -72,6 +72,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.agentState,0,()=>agent?.snapshot()??{online:false,running:false,dockUrl:'',autoLaunch:false,startup:false,detail:'Agent unavailable'}],
    [IPC.agentAction,1,command=>{if(!agent||!['enable','startup-on','startup-off','auto-on','auto-off'].includes(command))throw Error('Invalid agent command');return agent.action(command)}],
    [IPC.queueCommand,1,command=>alerts.queueCommand(command)],
+   [IPC.twitchDeviceLogin,0,()=>alerts.deviceLogin()],
    [IPC.twitchLogin,2,(id,secret)=>{if(typeof id!=='string'||typeof secret!=='string')throw Error('Invalid credentials');return alerts.login(id,secret)}],
    [IPC.twitchLogout,0,()=>alerts.logout()],
    [IPC.twitchConnect,0,()=>alerts.connect()],

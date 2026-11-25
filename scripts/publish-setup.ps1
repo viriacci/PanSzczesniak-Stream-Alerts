@@ -8,6 +8,7 @@ dotnet publish (Join-Path $root 'setup\Pssa.Setup.csproj') -c Release -r win-x64
 if($LASTEXITCODE -ne 0){throw 'Custom setup build failed'}
 $exe=Join-Path $root 'dist\custom\PSSA.Setup.exe'
 if(!(Test-Path $exe)){throw 'Custom setup missing'}
-$final=Join-Path $root 'dist\PSSA-Setup-2.0.0-rc.6-x64.exe'
+$version=(Get-Content (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
+$final=Join-Path $root "dist\PSSA-Setup-$version-x64.exe"
 Copy-Item -LiteralPath $exe -Destination $final
 (Get-FileHash -LiteralPath $final -Algorithm SHA256).Hash.ToLowerInvariant()+"  "+(Split-Path $final -Leaf) | Set-Content -Encoding ascii (Join-Path $root 'dist\SHA256SUMS.txt')
