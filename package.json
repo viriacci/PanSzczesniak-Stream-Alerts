@@ -1,7 +1,7 @@
 {
   "name": "pssa-v2",
-  "productName": "PSSA 2 Dev",
-  "version": "2.0.0-rc.4",
+  "productName": "PSSA",
+  "version": "2.0.0-rc.5",
   "private": true,
   "description": "Local Twitch streaming control center",
   "author": "PanSzczesniak",
@@ -16,7 +16,7 @@
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "smoke": "electron . --smoke-test",
-    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never"
+    "dist:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/installer-assets.ps1 && npm run build && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "react": "19.2.0",

@@ -1,4 +1,7 @@
 # Changelog
+## 2.0.0-rc.5
+- Stylizowany instalator PSSA, ikona, wybór skrótów i opcja dezinstalacji istniejącej instalacji.
+
 ## 2.0.0-rc.4
 - ViviOnyx: paleta #141414 / #843935 / #ae9278, kontrast tekstu, dopasowanie biblioteki i edytora oraz wykresów do motywu.
 

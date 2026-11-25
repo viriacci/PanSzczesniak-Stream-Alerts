@@ -71,6 +71,9 @@ jobs:
           path: out/**/*.map
           if-no-files-found: error
       - run: npm run smoke
+      - name: Generate installer branding
+        shell: powershell
+        run: .\scripts\installer-assets.ps1
       - run: npx electron-builder --win nsis --x64 --publish never
       - name: Smoke test packaged executable
         shell: pwsh
@@ -83,19 +86,21 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: PSSA-2-Dev-Windows
-          run-id: 45382575827
+          run-id: 45383643491
           github-token: ${{ github.token }}
           path: previous-beta
       - name: Verify clean NSIS installation
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2-Dev-*.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-*.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one setup executable' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           if (Test-Path $dir) { throw 'Install path already exists' }
-          $p = Start-Process -FilePath $setup[0].FullName -ArgumentList "/S /D=$dir" -PassThru
+          $p = Start-Process -FilePath $setup[0].FullName -ArgumentList "/S /PSSA-NODESKTOP /PSSA-NOSTART /D=$dir" -PassThru
           if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw 'Installer timeout' }
           if ($p.ExitCode -ne 0) { throw "Installer exit $($p.ExitCode)" }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk')) { throw 'Desktop opt-out failed' }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk')) { throw 'Start menu opt-out failed' }
           $exe = Join-Path $dir 'PSSA 2 Dev.exe'
           if (-not (Test-Path $exe)) { throw 'Installed executable missing' }
           $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
@@ -105,7 +110,7 @@ jobs:
         shell: pwsh
         run: |
           $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
-          $new = @(Get-ChildItem dist -Filter 'PSSA-2-Dev-*.exe' -File)
+          $new = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-*.exe' -File)
           if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Installer missing' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
@@ -123,6 +128,8 @@ jobs:
           if (-not (Test-Path $marker)) { throw 'Uninstall removed app data' }
           Run-Installer $old[0].FullName "/S /D=$dir"
           Run-Installer $new[0].FullName "/S /D=$dir"
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk'))) { throw 'Desktop shortcut missing' }
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk'))) { throw 'Start menu shortcut missing' }
           if ((Get-Content -LiteralPath $marker -Raw).Trim() -ne 'preserve') { throw 'Upgrade removed app data' }
           Run-Installer (Join-Path $dir 'PSSA 2 Dev.exe') '--smoke-test'
           $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
@@ -132,7 +139,7 @@ jobs:
       - name: Hash verified installer
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2-Dev-*.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-*.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one installer' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup[0].FullName).Hash.ToLowerInvariant()
           "$hash  $($setup[0].Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
