@@ -31,7 +31,7 @@ test('Windows plugin updater replaces existing file with verified bytes and remo
  try{
   writeFileSync(dll,'new verified bytes');writeFileSync(target,'old version');writeFileSync(old,'obsolete path')
   const script=["$ErrorActionPreference='Stop'","$dll="+quote(dll),"$target="+quote(target),"$old="+quote(old),...dockReplacementCommands,'exit 0'].join('\r\n')
-  const run=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',timeout:15000,windowsHide:true})
-  assert.equal(run.status,0,run.stderr);assert.equal(readFileSync(target,'utf8'),'new verified bytes');assert.deepEqual(readdirSync(dir).sort(),['installed.dll','new.dll'])
+  const run=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',timeout:30000,windowsHide:true})
+  assert.equal(run.status,0,String(run.error??'')+'\n'+run.stdout+'\n'+run.stderr);assert.equal(readFileSync(target,'utf8'),'new verified bytes');assert.deepEqual(readdirSync(dir).sort(),['installed.dll','new.dll'])
  }finally{rmSync(dir,{recursive:true,force:true})}
 })

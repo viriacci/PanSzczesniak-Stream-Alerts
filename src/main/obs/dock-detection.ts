@@ -33,13 +33,14 @@ export function compareDockHashes(bundled:string|null,installed:readonly string[
 }
 
 export const dockReplacementCommands=[
-   "try {",
-   "$stage=$target+'.'+[Guid]::NewGuid().ToString('N')+'.tmp'",
-   "$backup=$target+'.'+[Guid]::NewGuid().ToString('N')+'.bak'",
-   "try { Copy-Item -LiteralPath $dll -Destination $stage -Force; if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $stage).Hash){exit 14} } catch { exit 15 }",
-   "try { if(Test-Path -LiteralPath $target){[IO.File]::Replace($stage,$target,$backup,$true)}else{[IO.File]::Move($stage,$target)} } catch { exit 16 }",
-   "if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $target).Hash){if(Test-Path -LiteralPath $backup){[IO.File]::Replace($backup,$target,$stage,$true)};exit 14}",
-   "if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}",
-   "} finally { if($stage -and (Test-Path -LiteralPath $stage)){Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue} }",
-   "try { if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force} } catch { exit 17 }",
+ "function Get-DockHash([string]$path) { $sha=[Security.Cryptography.SHA256]::Create(); try { $stream=[IO.File]::OpenRead($path); try { [BitConverter]::ToString($sha.ComputeHash($stream)) } finally { $stream.Dispose() } } finally { $sha.Dispose() } }",
+ "$stage=$target+'.'+[Guid]::NewGuid().ToString('N')+'.tmp'",
+ "$backup=$target+'.'+[Guid]::NewGuid().ToString('N')+'.bak'",
+ "try {",
+ "try { [IO.File]::Copy($dll,$stage,$false); $expected=Get-DockHash $dll; if($expected -ne (Get-DockHash $stage)){exit 14} } catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 15 }",
+ "try { if([IO.File]::Exists($target)){[IO.File]::Replace($stage,$target,$backup,$true)}else{[IO.File]::Move($stage,$target)} } catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 16 }",
+ "try { if($expected -ne (Get-DockHash $target)){throw 'DLL checksum mismatch'} } catch { [Console]::Error.WriteLine($_.Exception.ToString()); if([IO.File]::Exists($backup)){[IO.File]::Replace($backup,$target,$stage,$true)};exit 14 }",
+ "if([IO.File]::Exists($backup)){[IO.File]::Delete($backup)}",
+ "} finally { if([IO.File]::Exists($stage)){[IO.File]::Delete($stage)} }",
+ "try { if([IO.File]::Exists($old)){[IO.File]::Delete($old)} } catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 17 }",
 ] as const
