@@ -10,6 +10,7 @@ export type LibraryAction=
  |{type:'profile-activate'|'profile-delete';id:string}
  |{type:'profile-edit';id:string;name:string;categoryId:string}
  |{type:'template-create';key:string;name:string}
+ |{type:'template-save-draft';name:string;scene:Scene}
  |{type:'template-apply';id:string;key:string}
  |{type:'template-delete';id:string}
  |{type:'variant-save';key:string;id?:string;name:string;templateId:string;weight:number;minCount:number;maxCount:number|null;minMonths:number;categoryId:string}

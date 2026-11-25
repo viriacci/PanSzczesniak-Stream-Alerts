@@ -69,6 +69,8 @@ export function libraryAction(db:DatabaseSync,value:unknown){
  }else if(x.type==='profile-delete'){
   if(x.id===c.active||x.id==='default'||!c.profiles.some(p=>p.id===x.id))throw Error('Cannot delete profile')
   c.profiles=c.profiles.filter(p=>p.id!==x.id)
+ }else if(x.type==='template-save-draft'){
+  if(c.templates.length>=100)throw Error('Template limit');c.templates.push({id:randomUUID(),name:label(x.name),scene:parseScene(x.scene)})
  }else if(x.type==='template-create'){
   if(c.templates.length>=100||typeof x.key!=='string'||!validKey(x.key))throw Error('Invalid template')
   const r=rules(db).find(r=>r.key===x.key);if(!r)throw Error('Alert not found')

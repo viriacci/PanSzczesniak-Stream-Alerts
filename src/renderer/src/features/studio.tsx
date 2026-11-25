@@ -1,7 +1,7 @@
 import type {Asset} from '../../../shared/library'
 import {useEffect,useRef,useState,type PointerEvent as ReactPointerEvent} from 'react'
-import {defaultRule,renderText,type AlertRule,type AlertState,type AlertEvent} from '../../../shared/alerts'
-import {animations,layerKinds,makeLayer,parseScene,resizeDuration,snap,type Scene,type Layer,type LayerKind} from '../../../shared/scene'
+import {defaultRule,renderText,testEvent,type AlertRule,type AlertState} from '../../../shared/alerts'
+import {animations,layerKinds,makeLayer,parseScene,resizeDuration,snap,sampleLayer,type Scene,type Layer,type LayerKind} from '../../../shared/scene'
 import {sceneForRule} from '../../../shared/scene-legacy'
 import {createScenePlayer} from '../../../shared/scene-player'
 import {Button,Panel,Empty} from '../components/ui'
@@ -22,7 +22,7 @@ function StudioEditor({rule,base,profile}:{rule:AlertRule;base:string;profile:st
  const past=useRef<Scene[]>([]),future=useRef<Scene[]>([]),current=useRef(scene),root=useRef<HTMLDivElement>(null),canvas=useRef<HTMLDivElement>(null),player=useRef<ReturnType<typeof createScenePlayer>|null>(null),clock=useRef(0)
  const drag=useRef<{pointer:number;before:Scene;layer:Layer;px:number;py:number;w:number;h:number;resize:boolean}|null>(null)
  const layer=scene.layers.find(l=>l.id===selected)
- const event:AlertEvent={id:'preview',kind:rule.key.startsWith('reward:')?'redemption':rule.key as AlertEvent['kind'],user:'Test PSSA',reward:rule.title,count:25,months:3}
+ const event=testEvent(rule,'preview')
  const text=renderText(rule.template,event)
  const assign=(next:Scene)=>{current.current=next;keepDraft(draftKey,next);setScene(next);setDirty(true)}
  const remember=(before:Scene)=>{past.current=[...past.current.slice(-49),before];future.current=[]}
@@ -36,7 +36,7 @@ function StudioEditor({rule,base,profile}:{rule:AlertRule;base:string;profile:st
  function duplicate(){if(!layer||scene.layers.length>=32)return;const next={...layer,id:uid(),name:(layer.name+' kopia').slice(0,100),locked:false};change({...scene,layers:[...scene.layers,next]});setSelected(next.id)}
  function remove(){if(!layer||layer.locked)return;change({...scene,layers:scene.layers.filter(x=>x.id!==layer.id)});setSelected('')}
  useEffect(()=>{const el=root.current;if(!el)return
-  try{const p=createScenePlayer(el,scene,text,base?base+'media/':'',rule.volume,()=>{setNotice('Nie udało się załadować multimediów.');setPlaying(false)});player.current=p;p.paint(Math.min(time,scene.duration-1),false,editMode);return()=>{player.current=null;p.dispose()}}catch{setNotice('Błąd podglądu.')}
+  try{const p=createScenePlayer(el,scene,text,base?base+'media/':'',rule.volume,()=>{setNotice('Nie udało się załadować multimediów.');setPlaying(false)},sampleLayer);player.current=p;p.paint(Math.min(time,scene.duration-1),false,editMode);return()=>{player.current=null;p.dispose()}}catch{setNotice('Błąd podglądu.')}
  },[signature,text,base,rule.volume])
  useEffect(()=>{player.current?.updateGeometry(scene)},[scene])
  useEffect(()=>{if(!playing){player.current?.paint(Math.min(time,scene.duration-1),false,editMode);return}

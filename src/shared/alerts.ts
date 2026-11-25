@@ -46,3 +46,5 @@ export function renderText(template:string,event:AlertEvent):string {
  const vars:Record<string,string>={user:event.user,reward:event.reward??'',viewers:String(event.count??0),bits:String(event.count??0),count:String(event.count??0),months:String(event.months??0)}
  return template.replace(/\{([a-z_]+)\}/g,(token,key:string)=>Object.hasOwn(vars,key)?vars[key]!:token)
 }
+
+export function testEvent(rule:AlertRule,id:string):AlertEvent{return {id,kind:rule.key.startsWith('reward:')?'redemption':rule.key as AlertKind,user:'Test PSSA',reward:rule.title,count:25,months:3}}

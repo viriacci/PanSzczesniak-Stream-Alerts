@@ -67,3 +67,7 @@ test('rules cache invalidates after update and does not retain rolled back profi
  try{const a=rules(db);assert.equal(a,rules(db));db.exec('BEGIN IMMEDIATE');saveRule(db,{...defaultRule('raid'),volume:27});assert.equal(rules(db).find(x=>x.key==='raid')?.volume,27);db.exec('ROLLBACK');assert.equal(rules(db).find(x=>x.key==='raid')?.volume,100)}
  finally{db.close()}
 })
+
+import {sampleLayer,scaleMedia,fitMediaSize,retimeLayer} from '../src/shared/scene.ts'
+import {testEvent,renderText} from '../src/shared/alerts.ts'
+test('keyframes interpolate, move with timeline, retain image ratio, and validate crop',()=>{const l={...fixture().layers[0]!,crop:{top:10,right:5,bottom:0,left:0},keyframes:[{...sampleLayer(fixture().layers[0]!,0),time:0,easing:'linear' as const},{...sampleLayer(fixture().layers[0]!,0),x:90,time:1000,easing:'linear' as const}]};assert.equal(sampleLayer(l,500).x,70);assert.deepEqual(parseScene({...fixture(),layers:[l]}).layers[0],l);assert.equal(retimeLayer(l,500,5000,500).keyframes?.[0]?.time,500);assert.throws(()=>parseScene({...fixture(),layers:[{...l,crop:{top:0,bottom:0,left:60,right:60}}]}));const m=fitMediaSize(800,600,1920,1080),r=scaleMedia(m.width,m.height,10,2,true);assert.ok(Math.abs(r.width/r.height-m.width/m.height)<1e-9);const raid=defaultRule('raid');assert.match(renderText(raid.template,testEvent(raid,'test')),/25/);assert.equal(sceneForRule(raid).layers[0]?.backgroundOpacity,0)})
