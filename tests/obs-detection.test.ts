@@ -19,3 +19,19 @@ test('OBS candidates are deduplicated and invalid executable names rejected',()=
 test('installed dock status uses bundled DLL hash, detects old or duplicate versions',()=>{
  assert.equal(compareDockHashes('new',[]),'missing');assert.equal(compareDockHashes('new',['old']),'update');assert.equal(compareDockHashes('new',['new']),'current');assert.equal(compareDockHashes('new',['new','old']),'update');assert.equal(compareDockHashes(null,[]),'unavailable')
 })
+
+import {dockReplacementCommands} from '../src/main/obs/dock-detection.ts'
+import {spawnSync} from 'node:child_process'
+import {mkdtempSync,writeFileSync,readFileSync,rmSync,readdirSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+test('Windows plugin updater replaces existing file with verified bytes and removes obsolete copy',{skip:process.platform!=='win32'},()=>{
+ const dir=mkdtempSync(join(tmpdir(),'pssa-dll-test-')),dll=join(dir,'new.dll'),target=join(dir,'installed.dll'),old=join(dir,'legacy.dll')
+ const quote=(v:string)=>"'"+v.replaceAll("'","''")+"'"
+ try{
+  writeFileSync(dll,'new verified bytes');writeFileSync(target,'old version');writeFileSync(old,'obsolete path')
+  const script=["$ErrorActionPreference='Stop'","$dll="+quote(dll),"$target="+quote(target),"$old="+quote(old),...dockReplacementCommands,'exit 0'].join('\r\n')
+  const run=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',timeout:15000,windowsHide:true})
+  assert.equal(run.status,0,run.stderr);assert.equal(readFileSync(target,'utf8'),'new verified bytes');assert.deepEqual(readdirSync(dir).sort(),['installed.dll','new.dll'])
+ }finally{rmSync(dir,{recursive:true,force:true})}
+})

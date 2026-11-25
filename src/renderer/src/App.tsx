@@ -80,7 +80,7 @@ export function App() {
  useEffect(()=>{if(!ready||layout.page!=='settings')return;let active=true;void window.pssa.obsDockStatus().then(s=>{if(active)setDockStatus(s)}).catch(()=>{});return()=>{active=false}},[ready,layout.page])
  const installDock=async()=>{setDockBusy(true);try{if(await window.pssa.installObsDock()){setDockStatus(await window.pssa.obsDockStatus());setNotice({text:'Wtyczka OBS gotowa. Uruchom OBS ponownie.',error:false})}}catch(e){setNotice({text:e instanceof Error?e.message.replace(/^Error invoking remote method '[^']+': Error: /,''):'Nie udało się zainstalować wtyczki OBS.',error:true})}finally{setDockBusy(false)}}
  const reset=()=>{patch({...defaultLayout,page:'settings'});setConfirm(false)}
- const updateAvailable=updateInfo?.state==='available'&&!(dismissedUpdate?.version===updateInfo.version&&dismissedUpdate.until>Date.now())
+ const updateAvailable=updateInfo?.state==='available'&&(layout.page==='settings'||!(dismissedUpdate?.version===updateInfo.version&&dismissedUpdate.until>Date.now()))
  const updateBlocked=live?.phase==='live'||live?.phase==='unknown'||!!obs?.metrics?.streaming||!!obs?.metrics?.recording
  const item=allPages.find(p=>p.id===layout.page)??allPages[0]!
  const collapsed=layout.collapsed

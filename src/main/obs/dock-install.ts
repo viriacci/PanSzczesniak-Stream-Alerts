@@ -5,7 +5,7 @@ import {join} from 'node:path'
 import {existsSync} from 'node:fs'
 import {readFile} from 'node:fs/promises'
 import {createHash} from 'node:crypto'
-import {compareDockHashes,dockLayout,obsVersion,parseCandidates,type DockInstallStatus,type ObsCandidate} from './dock-detection'
+import {dockReplacementCommands,compareDockHashes,dockLayout,obsVersion,parseCandidates,type DockInstallStatus,type ObsCandidate} from './dock-detection'
 const exec=promisify(execFile)
 const quoted=(s:string)=>"'"+s.replaceAll("'","''")+"'"
 const powerShell=()=>join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe')
@@ -129,15 +129,7 @@ export async function installObsDock(window:BrowserWindow):Promise<boolean>{
    "New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null",
    "New-Item -ItemType Directory -Path (Join-Path $root 'data') -Force | Out-Null",
    "$license=Join-Path (Split-Path $dll) 'COPYING'; if(Test-Path -LiteralPath $license){Copy-Item -LiteralPath $license -Destination (Join-Path $root 'COPYING') -Force}",
-   "try {",
-   "$stage=$target+'.'+[Guid]::NewGuid().ToString('N')+'.tmp'",
-   "$backup=$target+'.'+[Guid]::NewGuid().ToString('N')+'.bak'",
-   "try { Copy-Item -LiteralPath $dll -Destination $stage -Force; if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $stage).Hash){exit 14} } catch { exit 15 }",
-   "try { if(Test-Path -LiteralPath $target){[IO.File]::Replace($stage,$target,$backup,$true)}else{[IO.File]::Move($stage,$target)} } catch { exit 16 }",
-   "if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $target).Hash){if(Test-Path -LiteralPath $backup){[IO.File]::Replace($backup,$target,$stage,$true)};exit 14}",
-   "if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}",
-   "} finally { if($stage -and (Test-Path -LiteralPath $stage)){Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue} }",
-   "try { if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force} } catch { exit 17 }",
+   ...dockReplacementCommands,
    "exit 0"
   ].join('\r\n')
   const encoded=Buffer.from(script,'utf16le').toString('base64')

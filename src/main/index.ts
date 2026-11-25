@@ -224,6 +224,26 @@ async function start(): Promise<void> {
     })()`);
     if(queueSmoke!==true)throw Error('Queue renderer smoke failed');
     activeAlerts.queueCommand({type:'skip',id:longAlert.id});
+    activeAlerts.save({...oldRaid,key:'reward:smoke-reward',title:'Nagroda testowa '.repeat(10)},'default')
+    const cardSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));const until=async fn=>{for(let i=0;i<100;i++){const v=fn();if(v)return v;await sleep(50)}throw Error('Card UI timeout')};
+      for(const page of ['alerts','rewards']){
+       document.querySelector('[data-nav-id="'+page+'"]').click();
+       const tile=await until(()=>document.querySelector('.rule-tile'));
+       if(!tile.querySelector('.rule-tile-art'))throw Error('Tile icon missing');
+       tile.click();
+       const d=await until(()=>document.querySelector('.rule-dialog[open]'));
+       const body=d.querySelector('.rule-dialog-body'),footer=d.querySelector('.rule-dialog-footer'),r=d.getBoundingClientRect(),fr=footer.getBoundingClientRect();
+       if(r.left<0||r.top<0||r.right>innerWidth+1||r.bottom>innerHeight+1||fr.bottom>r.bottom+1||fr.top<r.top||body.clientHeight<40||body.scrollWidth>body.clientWidth+1)throw Error('Editor exceeds window');
+       if(!footer.querySelector('button[type=submit]'))throw Error('Editor save missing');
+       body.scrollTop=body.scrollHeight;
+       if(body.scrollHeight>body.clientHeight+5&&body.scrollTop===0)throw Error('Editor does not scroll');
+       d.querySelector('[aria-label="Zamknij edycję"]').click();await until(()=>!document.querySelector('.rule-dialog[open]'));
+      }
+      document.querySelector('[data-nav-id="queue"]').click();return true
+    })()`);
+    if(cardSmoke!==true)throw Error('Alert/reward card renderer smoke failed');
+
     activeWindow.setSize(originalSize[0]!,originalSize[1]!);
     if(!(await activeWindow.webContents.executeJavaScript('new Promise(r=>setTimeout(()=>r([...document.querySelectorAll(".content,.queue-page,.queue-page .panel")].every(e=>e.scrollWidth<=e.clientWidth+1)),150))')))throw Error('Large queue overflow');
     const passed = await activeWindow.webContents.executeJavaScript(

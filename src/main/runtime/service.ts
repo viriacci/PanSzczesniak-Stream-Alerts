@@ -57,7 +57,7 @@ export class RuntimeService{
  rendererFault(kind:unknown,stack:unknown){if(kind!=='error'&&kind!=='rejection'&&kind!=='react')throw Error('Invalid renderer fault');if(typeof stack!=='string'||stack.length>8192)throw Error('Invalid stack');if(Date.now()-this.lastRendererFault<1000)return;this.lastRendererFault=Date.now();this.crashes.write('renderer-'+kind,'',null,stack)}
  async crashExport(){this.guard();const data=JSON.stringify({version:app.getVersion(),diagnostics:this.diagnostics(),crashes:this.crashState()},null,2);const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-crashes.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath||this.stopped)return false;writeNew(this.outside(r.filePath),data);return true}
  state(){return preferences(this.db)}
- save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);return this.state()}
+ save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
  start(){this.timer=setInterval(()=>{if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(failed=false){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown(failed);this.stopCollectors()}
  private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
@@ -97,7 +97,7 @@ export class RuntimeService{
  }
  updateInfo(){return this.cached}
  private async updateSafe(){
-  this.requireOffline()
+  try{this.requireOffline()}catch{throw Error('Zakończ transmisję, nagrywanie i kolejkę alertów przed aktualizacją.')}
   if(process.platform!=='win32'||!app.isPackaged)throw Error('Instalator dostępny dla Windows x64.')
   const exe=join(process.env.SystemRoot??'C:\\Windows','System32','tasklist.exe')
   const {stdout}=await promisify(execFile)(exe,['/FI','IMAGENAME eq obs64.exe','/FO','CSV','/NH'],{windowsHide:true,timeout:5000})
@@ -123,7 +123,7 @@ export class RuntimeService{
    const file=await downloadRelease(info.asset,dir)
    const trusted=await this.trustedInstaller(file)
    if(alsoDock)this.db.prepare("INSERT INTO settings(key,value) VALUES ('update.obs.reminder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(info.version)
-   if(!trusted){keep=true;shell.showItemInFolder(file);return 'manual'}
+   if(!trusted){await this.updateSafe();keep=true;shell.showItemInFolder(file);return 'manual'}
    await this.updateSafe()
    const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Instalator zweryfikowany',message:'Uruchomić instalator i zakończyć PSSA?',detail:'Podpis i suma SHA256 są zgodne. Instalator zachowa istniejący katalog programu.',buttons:['Anuluj','Zainstaluj'],defaultId:0,cancelId:0})
    if(confirm.response!==1){keep=true;shell.showItemInFolder(file);return 'manual'}

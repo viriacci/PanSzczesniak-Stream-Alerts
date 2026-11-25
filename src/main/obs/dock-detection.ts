@@ -31,3 +31,15 @@ export function compareDockHashes(bundled:string|null,installed:readonly string[
  if(!installed.length)return 'missing'
  return installed.length===1&&installed[0]===bundled?'current':'update'
 }
+
+export const dockReplacementCommands=[
+   "try {",
+   "$stage=$target+'.'+[Guid]::NewGuid().ToString('N')+'.tmp'",
+   "$backup=$target+'.'+[Guid]::NewGuid().ToString('N')+'.bak'",
+   "try { Copy-Item -LiteralPath $dll -Destination $stage -Force; if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $stage).Hash){exit 14} } catch { exit 15 }",
+   "try { if(Test-Path -LiteralPath $target){[IO.File]::Replace($stage,$target,$backup,$true)}else{[IO.File]::Move($stage,$target)} } catch { exit 16 }",
+   "if((Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $target).Hash){if(Test-Path -LiteralPath $backup){[IO.File]::Replace($backup,$target,$stage,$true)};exit 14}",
+   "if(Test-Path -LiteralPath $backup){Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue}",
+   "} finally { if($stage -and (Test-Path -LiteralPath $stage)){Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue} }",
+   "try { if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Force} } catch { exit 17 }",
+] as const
