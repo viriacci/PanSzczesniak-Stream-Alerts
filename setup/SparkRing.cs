@@ -43,7 +43,7 @@ public sealed class SparkRing : FrameworkElement
             dc.DrawEllipse(colors[index],null,q,radius,radius*.8);
             if(i%11==0) dc.DrawEllipse(colors[Math.Max(0,index-4)],null,q,radius*2.5,radius*2.5);
         }
-        
+
         int count=(int)(progress*180);
         for(int i=0;i<count;i++){g.GetPointAtFractionLength(i/180.0,out Point p,out _);dc.DrawEllipse(colors[2+i%3],null,p,.65,.65);}
     }
