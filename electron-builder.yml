@@ -6,6 +6,12 @@ files:
   - out/**/*
   - '!out/**/*.map'
   - package.json
+extraResources:
+  - from: build/obs-dock
+    to: obs-dock
+    filter:
+      - pssa-control-dock.dll
+      - COPYING
 asar: true
 asarUnpack:
   - out/main/**/*

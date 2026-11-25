@@ -10,6 +10,7 @@ import type { AlertState, AlertRule, Reward } from './alerts'
 import type { LayoutPreferences } from './layout'
 
 export const IPC = {
+  installObsDock:'pssa:obs:install-dock',
   measurementState:'pssa:measurement:state',
   measurementStart:'pssa:measurement:start',
   measurementStop:'pssa:measurement:stop',
@@ -65,6 +66,7 @@ export interface SystemStatus {
 }
 
 export interface PssaApi {
+  installObsDock():Promise<boolean>
   measurementState():Promise<MeasurementState>
   measurementStart(gpu:boolean):Promise<MeasurementState>
   measurementStop():Promise<MeasurementState>

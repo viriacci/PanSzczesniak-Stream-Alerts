@@ -1,3 +1,4 @@
+import {installObsDock} from './obs/dock-install'
 import type {RuntimeService} from './runtime/service'
 import type { ObsService } from './obs/service'
 import type { AgentBridge } from './agent/bridge'
@@ -41,6 +42,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
     return setLayout(db, args[0])
   })
   const handlers: [string,number,(...args:any[])=>unknown][] = [
+   [IPC.installObsDock,0,()=>installObsDock(window)],
    [IPC.measurementState,0,()=>runtime.measurementState()],
    [IPC.measurementStart,1,gpu=>runtime.measurementStart(gpu)],
    [IPC.measurementStop,0,()=>runtime.measurementStop()],
@@ -83,7 +85,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.importLegacy,0,()=>alerts.import()],
    [IPC.testAlert,1,key=>{if(typeof key!=='string'||!validKey(key))throw Error('Invalid alert');return alerts.test(key)}]
   ]
-  const dialogs=new Set<string>([IPC.measurementStart,IPC.measurementExport,IPC.crashExport,IPC.backupCreate,IPC.backupRestore,IPC.diagnosticsExport,IPC.analyticsImport,IPC.analyticsExport,IPC.chooseMedia,IPC.importLegacy])
+  const dialogs=new Set<string>([IPC.installObsDock,IPC.measurementStart,IPC.measurementExport,IPC.crashExport,IPC.backupCreate,IPC.backupRestore,IPC.diagnosticsExport,IPC.analyticsImport,IPC.analyticsExport,IPC.chooseMedia,IPC.importLegacy])
   let dialogOpen=false
   for(const [channel,count,handler] of handlers)ipcMain.handle(channel,async(event,...args:unknown[])=>{authorize(event);if(args.length!==count)throw Error('Invalid arguments');if(!dialogs.has(channel))return handler(...args);if(dialogOpen)throw Error('Another file operation is active');dialogOpen=true;try{return await handler(...args)}finally{dialogOpen=false}})
   return () => {

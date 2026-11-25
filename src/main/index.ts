@@ -1,3 +1,4 @@
+import {DockControl} from './obs/dock-control'
 import {CrashLog} from './runtime/crashes'
 import {launchNodeAgent} from './agent/launch'
 import {BRAND} from '../shared/brand'
@@ -43,10 +44,12 @@ let reveal:()=>void=()=>{}
 let alerts:AlertsService|undefined
 let obs:ObsService|undefined
 let agent:AgentBridge|undefined
+let dockControl:DockControl|undefined
 
 function cleanup(failed=false): void {
   if (cleaned) return
   cleaned = true
+  try{dockControl?.stop()}catch{console.warn('PSSA: dock cleanup failed')}
   try{disposeIpc?.()}catch{console.warn('PSSA: IPC cleanup failed')}
   try{runtime?.stop(failed);tray?.destroy()}catch{console.warn('PSSA: runtime cleanup failed')}
   try{agent?.stop()}catch{console.warn('PSSA: agent bridge cleanup failed')}
@@ -149,7 +152,15 @@ async function start(): Promise<void> {
   }
   runtime=new RuntimeService(activeDb,directory,()=>window,activeAlerts,activeObs,agent,restoreStatus,applyMode)
   if(!smoke)runtime.start()
-  if(!smoke&&runtime.state().mode==='background'&&tray){backgrounded=true;log('ready');return}
+  if(!smoke){
+   dockControl=new DockControl(directory,process.execPath,{
+    state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl}},
+    volume:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,volume:value}})},
+    mute:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,muted:value}})},
+    test:()=>{activeAlerts.queueCommand({type:'test'})},reload:()=>{activeAlerts.reloadOverlay()},show:()=>reveal(),quit:()=>{setTimeout(()=>app.quit(),100)}
+   });try{await dockControl.start()}catch{dockControl.stop();log('dock-control-unavailable')}
+  }
+  if(!smoke&&(process.argv.includes('--pssa-background')||runtime.state().mode==='background'&&tray)){backgrounded=true;log('ready');return}
   await showWindow(!smoke)
   const activeWindow=window
   if(!activeWindow)throw Error('Renderer unavailable')
@@ -284,8 +295,8 @@ if(agentMode){
   app.on('render-process-gone',(_e,_contents,details)=>{if(details.reason!=='clean-exit')crashes.write('render-process-gone',details.reason,details.exitCode)})
   app.on('child-process-gone',(_e,details)=>{if(details.reason!=='clean-exit')crashes.write('child-process-gone',details.reason,details.exitCode)})
   try{const dumps=join(directory,'crash-dumps');mkdirSync(dumps,{recursive:true});app.setPath('crashDumps',dumps);crashReporter.start({uploadToServer:false,companyName:'Pan Szczesniak',productName:'PSSA'})}catch{crashes.write('crash-reporter-unavailable')}
-  app.on('second-instance', () => {
-    if(!cleaned)reveal()
+  app.on('second-instance', (_event,argv) => {
+    if(!cleaned&&!argv.includes('--pssa-background'))reveal()
   })
   app.on('window-all-closed', () => {if(!backgrounded)app.quit()})
   app.on('before-quit', () => {
