@@ -42,7 +42,8 @@ foreach($key in @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
   if($r.UninstallString -match '^\s*"?(.+?\.exe)"?(?:\s|$)'){Add-OBS (Split-Path $Matches[1]) 'Rejestr instalacji' $r.DisplayVersion}
  }
 }
-foreach($base in @($env:ProgramFiles,${env:ProgramFiles(x86)},$env:LOCALAPPDATA)){
+$pf86=[Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+foreach($base in @($env:ProgramFiles,$pf86,$env:LOCALAPPDATA)){
  if($base){Add-OBS (Join-Path $base 'obs-studio') 'Katalog domyślny';Add-OBS (Join-Path $base 'Programs\obs-studio') 'Katalog domyślny'}
 }
 $steamRoots=@()
@@ -50,7 +51,7 @@ foreach($key in @('HKCU:\Software\Valve\Steam','HKLM:\SOFTWARE\WOW6432Node\Valve
  $r=Get-ItemProperty -LiteralPath $key
  $steamRoots+=@($r.SteamPath,$r.InstallPath)
 }
-if(${env:ProgramFiles(x86)}){$steamRoots+=Join-Path ${env:ProgramFiles(x86)} 'Steam'}
+if($pf86){$steamRoots+=Join-Path $pf86 'Steam'}
 foreach($steam in @($steamRoots|Where-Object {$_}|Select-Object -Unique)){
  $libraries=@($steam)
  $vdf=Join-Path $steam 'steamapps\libraryfolders.vdf'
