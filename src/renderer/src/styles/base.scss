@@ -230,3 +230,5 @@ svg { flex:none; }
  .queue-page .button{padding:5px 8px;min-height:28px}
  .queue-page .alert-actions{gap:5px}
 }
+
+@media(max-height:600px){.content:has(.queue-page){padding:8px}.content:has(.queue-page) .page-header{margin-bottom:8px}.content:has(.queue-page) .page-header .eyebrow,.content:has(.queue-page) .page-header p:not(.eyebrow){display:none}.content:has(.queue-page) .page-header h1{font-size:20px;margin:2px 0}}

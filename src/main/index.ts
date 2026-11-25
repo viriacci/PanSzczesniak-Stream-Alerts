@@ -203,7 +203,9 @@ async function start(): Promise<void> {
       const button=[...document.querySelectorAll('.queue-page button')].find(e=>e.textContent==='Dodaj testowy alert');button.click();await until(()=>[...document.querySelectorAll('.queue-page .queue-row')].some(e=>e.textContent.includes('Testowy alert')));
       if(!document.querySelector('.queue-page [role=status]')?.textContent.includes('oczekują'))throw Error('Offline queue message missing');
       const fits=()=>[...document.querySelectorAll('.content,.queue-page,.queue-page .panel')].every(e=>e.scrollWidth<=e.clientWidth+1);
-      if(!fits())throw Error('Small queue overflow');return true;
+      if(!fits())throw Error('Small queue overflow');
+      document.querySelector('[data-nav-id="activity"]').click();await until(()=>document.querySelector('.page-header h1')?.textContent==='Aktywność');if(titles().length!==1||titles()[0]!=='Historia alertów'||[...document.querySelectorAll('.queue-page button')].some(e=>e.textContent==='Dodaj testowy alert'))throw Error('Activity must remain history-only');
+      document.querySelector('[data-nav-id="queue"]').click();await until(()=>titles().length===4);return true;
     })()`);
     if(queueSmoke!==true)throw Error('Queue renderer smoke failed');
     activeAlerts.queueCommand({type:'skip',id:longAlert.id});

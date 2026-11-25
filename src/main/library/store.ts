@@ -1,3 +1,4 @@
+import {testToneName} from '../alerts/test-tone.ts'
 import {parseVariants} from '../../shared/variants.ts'
 import {randomUUID} from 'node:crypto'
 import type {DatabaseSync} from 'node:sqlite'
@@ -42,7 +43,7 @@ export function references(db:DatabaseSync,c=config(db)){
  for(const p of c.profiles)if(p.id!==c.active)for(const r of p.rules)add(refsForRule(r))
  for(const t of c.templates)add(t.scene.layers.map(l=>l.asset))
  // Retain references in queued and historical immutable playback snapshots.
- for(const row of db.prepare('SELECT DISTINCT rule_json FROM alert_queue').iterate())add(refsForRule(parseRule(JSON.parse(String(row.rule_json)))))
+ for(const row of db.prepare('SELECT DISTINCT rule_json FROM alert_queue').iterate()){const rule=parseRule(JSON.parse(String(row.rule_json)));add(refsForRule(rule).filter(id=>rule.key!=='reward:pssa-queue-test'||id!==testToneName))}
  return refs
 }
 export function profileForCategory(db:DatabaseSync,id:string){if(!id)return null;const c=config(db);return c.profiles.find(p=>p.categoryId===id)?.id??null}

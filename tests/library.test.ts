@@ -107,3 +107,8 @@ test('a stale editor cannot save into another active profile',()=>{
   assert.doesNotThrow(()=>assertActiveProfile(db,id))
  }finally{db.close()}
 })
+
+test('built-in queue sound does not appear as a missing user library asset',async()=>{
+ const {AlertQueue}=await import('../src/main/alerts/queue.ts');const {libraryState}=await import('../src/main/library/store.ts');const {openDatabase}=await import('../src/main/database/index.ts');const {mkdtemp,rm}=await import('node:fs/promises');const {join}=await import('node:path');const {tmpdir}=await import('node:os');const root=await mkdtemp(join(tmpdir(),'pssa-test-library-')),db=openDatabase(':memory:');const queue=new AlertQueue(db,{online:()=>false,send:()=>false,active:()=>false,cancel:()=>{},volume:()=>{}})
+ try{queue.command({type:'test'});assert.equal(queue.state().pendingCount,1);assert.deepEqual((await libraryState(db,root)).assets,[])}finally{queue.stop();db.close();await rm(root,{recursive:true,force:true})}
+})
