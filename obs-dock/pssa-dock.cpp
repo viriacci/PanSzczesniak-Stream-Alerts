@@ -35,7 +35,7 @@ MODULE_EXPORT const char *obs_module_description(void) { return "PSSA Control Do
 static constexpr const char *dockId = "pssa-control-dock";
 static QString trp(const char *s){return QString::fromUtf8(s);}
 static QJsonObject descriptor(){
- QFile f(QDir(QString::fromLocal8Bit(qgetenv("APPDATA"))).filePath("PSSA 2 Dev/obs-dock.json"));
+ QFile f(QDir(qEnvironmentVariable("APPDATA")).filePath("PSSA 2 Dev/obs-dock.json"));
  if(!f.open(QIODevice::ReadOnly)||f.size()>8192)return {};
  return QJsonDocument::fromJson(f.readAll()).object();
 }
@@ -67,9 +67,12 @@ static bool urlMatches(obs_source_t *source,const QByteArray &url){
  if(!isBrowser(source))return false;
  auto *s=obs_source_get_settings(source);const bool result=url==obs_data_get_string(s,"url");obs_data_release(s);return result;
 }
+static obs_source_t *targetScene(){
+ return obs_frontend_preview_program_mode_active()?obs_frontend_get_current_preview_scene():obs_frontend_get_current_scene();
+}
 class Dock final:public QWidget{
  QSettings settings{QSettings::IniFormat,QSettings::UserScope,"PSSA","ControlDock"};
- QLabel *status{},*sceneLabel{},*volumeLabel{},*details{};
+ QLabel *status{},*sceneLabel{},*sceneCaption{},*volumeLabel{},*details{},*operationLabel{};
  QPushButton *startButton{},*stopButton{},*restartButton{},*showButton{},*addButton{},*refreshButton{},*testButton{};
  QToolButton *more{};
  QWidget *extra{};
@@ -79,50 +82,57 @@ class Dock final:public QWidget{
  QTimer timer,volumeTimer;
  QPointer<QLocalSocket> active;
  QByteArray response;
- bool online=false,starting=false,restarting=false,closing=false,autoAttempted=false;
+ enum class Phase{Idle,Starting,Restarting,Stopping};
+ Phase phase=Phase::Idle;
+ bool online=false,autoAttempted=false;
  qint64 deadline=0;
- int restartPid=0;
+ QString previousToken;
+ int stoppingPid=0;
  QString overlay;
  void report(const QString &text){status->setText(text);}
+ void result(const QString &text){operationLabel->setText(text);operationLabel->setVisible(!text.isEmpty());}
  void controls(){
-  startButton->setEnabled(!online&&!starting&&!restarting&&!closing);
-  stopButton->setEnabled(online&&!closing&&!restarting);
-  restartButton->setEnabled(online&&!closing&&!restarting);
-  showButton->setEnabled(online&&!closing);
-  volume->setEnabled(online&&!closing);mute->setEnabled(online&&!closing);
-  addButton->setEnabled(online&&!overlay.isEmpty());refreshButton->setEnabled(online);testButton->setEnabled(online);
+  const bool idle=phase==Phase::Idle,ready=online&&idle;
+  startButton->setEnabled(!online&&idle);stopButton->setEnabled(ready);restartButton->setEnabled(ready);showButton->setEnabled(ready);
+  volume->setEnabled(ready);mute->setEnabled(ready);addButton->setEnabled(ready&&!overlay.isEmpty());refreshButton->setEnabled(ready);testButton->setEnabled(ready);
  }
  void updateScene(){
-  auto *source=obs_frontend_get_current_scene();
+  auto *source=targetScene();
+  sceneCaption->setText(obs_frontend_preview_program_mode_active()?trp("Wybrana scena (podgląd)"):trp("Aktywna scena"));
   sceneLabel->setText(source?trp(obs_source_get_name(source)):trp("Brak sceny"));
   if(source)obs_source_release(source);
  }
- void apply(const QJsonObject &data){
-  online=true;starting=false;overlay=data.value("overlayUrl").toString();
+ void apply(const QJsonObject &data,const QString &token){
+  online=true;overlay=data.value("overlayUrl").toString();
+  if(phase==Phase::Starting||phase==Phase::Restarting){
+   if(token==previousToken&&phase==Phase::Restarting){controls();return;}
+   phase=Phase::Idle;result(trp("PSSA gotowa"));
+  }
   const int v=data.value("volume").toInt(100);
   if(!volume->isSliderDown()&&!volumeTimer.isActive()){QSignalBlocker b(volume);volume->setValue(v);volumeLabel->setText(QString::number(v)+"%");}
   {QSignalBlocker b(mute);mute->setChecked(data.value("muted").toBool());}
-  if(!closing&&!restarting)report(trp("Uruchomiony"));
+  if(phase==Phase::Idle)report(trp("Uruchomiony"));
   details->setText(trp("Twitch: ")+data.value("twitch").toString()+trp("  |  Kolejka: ")+QString::number(data.value("pending").toInt()));
   controls();
  }
  void offline(){
   online=false;overlay.clear();
-  if(restarting){
-   if(!processAlive(restartPid)){restarting=false;launch();return;}
-   if(QDateTime::currentMSecsSinceEpoch()>deadline){restarting=false;report(trp("Restart: PSSA nie zakończyła pracy"));controls();return;}
-  }
-  if(starting&&QDateTime::currentMSecsSinceEpoch()>deadline){starting=false;report(trp("Nie uzyskano połączenia z PSSA"));}
-  else if(!starting&&!restarting){closing=false;report(trp("Wyłączony"));}
+  if(phase==Phase::Stopping&&!processAlive(stoppingPid)){phase=Phase::Idle;result(trp("PSSA zamknięta"));}
+  if(phase==Phase::Idle)report(trp("Wyłączony"));
   controls();
  }
+ void checkDeadline(){
+  if(phase==Phase::Idle||QDateTime::currentMSecsSinceEpoch()<=deadline)return;
+  result(phase==Phase::Stopping?trp("Nie potwierdzono zamknięcia PSSA."):trp("Nie uzyskano połączenia z nową instancją PSSA. Spróbuj ponownie lub otwórz aplikację ręcznie."));
+  phase=Phase::Idle;report(online?trp("Uruchomiony"):trp("Wyłączony"));controls();
+ }
  void launch(){
+  if(phase!=Phase::Idle)return;
   const auto d=descriptor();const QString exe=d.value("exe").toString();QFileInfo info(exe);
-  if(elevated()){report(trp("Uruchom OBS bez uprawnień administratora, aby startować PSSA"));controls();return;}
-  if(!info.isAbsolute()||!info.isFile()||info.fileName().compare("PSSA 2 Dev.exe",Qt::CaseInsensitive)!=0){report(trp("Uruchom PSSA ręcznie po instalacji"));controls();return;}
-  if(processAlive(d.value("pid").toInt())){report(trp("PSSA uruchamia się lub nie odpowiada"));return;}
-  if(!QProcess::startDetached(exe,QStringList{"--pssa-background"},info.absolutePath())){report(trp("Nie udało się uruchomić PSSA"));return;}
-  starting=true;deadline=QDateTime::currentMSecsSinceEpoch()+15000;report(trp("Uruchamianie…"));controls();
+  if(elevated()){result(trp("Uruchom OBS bez uprawnień administratora, aby startować PSSA"));return;}
+  if(!info.isAbsolute()||!info.isFile()||info.fileName().compare("PSSA 2 Dev.exe",Qt::CaseInsensitive)!=0){result(trp("Uruchom PSSA ręcznie po instalacji"));return;}
+  if(!QProcess::startDetached(exe,QStringList{"--pssa-background"},info.absolutePath())){result(trp("Nie udało się uruchomić PSSA"));return;}
+  previousToken=d.value("token").toString();phase=Phase::Starting;deadline=QDateTime::currentMSecsSinceEpoch()+45000;report(trp("Uruchamianie…"));result(QString());controls();
  }
  void send(const QString &cmd,const QJsonValue &value=QJsonValue()){
   if(active){if(cmd=="status")return;auto old=active;active.clear();old->abort();old->deleteLater();}
@@ -131,16 +141,16 @@ class Dock final:public QWidget{
   auto finish=[this,s,cmd](bool success){
    if(active!=s)return;
    active.clear();s->abort();s->deleteLater();
-   if(!success){if(cmd=="status")offline();else{if(cmd=="quit"){restarting=false;closing=false;}report(trp("Polecenie nie powiodło się"));controls();}}
+   if(!success){if(cmd=="status")offline();else if(cmd=="quit"||cmd=="restart"){result(trp("Brak potwierdzenia polecenia. Sprawdzanie stanu PSSA…"));}else{result(trp("Polecenie nie powiodło się"));controls();}}
   };
   connect(s,&QLocalSocket::connected,this,[s,d,cmd,value](){s->write(request(d,cmd,value));s->flush();});
-  connect(s,&QLocalSocket::readyRead,this,[this,s,cmd,finish](){
+  connect(s,&QLocalSocket::readyRead,this,[this,s,d,cmd,finish](){
    if(active!=s)return;
    response+=s->readAll();if(response.size()>16384){finish(false);return;}
    if(!response.contains('\n'))return;
    const auto result=QJsonDocument::fromJson(response.left(response.indexOf('\n'))).object();
    if(!result.value("ok").toBool()){finish(false);return;}
-   if(cmd!="quit")apply(result.value("state").toObject());
+   if(cmd!="quit"&&cmd!="restart")apply(result.value("state").toObject(),d.value("token").toString());
    finish(true);
   });
   connect(s,&QLocalSocket::errorOccurred,this,[finish](QLocalSocket::LocalSocketError){finish(false);});
@@ -149,20 +159,20 @@ class Dock final:public QWidget{
   s->connectToServer(d.value("pipe").toString());
  }
  void stop(bool restart){
-  if(!online)return;
-  volumeTimer.stop();restartPid=descriptor().value("pid").toInt();restarting=restart;closing=true;
-  deadline=QDateTime::currentMSecsSinceEpoch()+15000;
-  report(restart?trp("Restartowanie…"):trp("Zamykanie…"));controls();send("quit");
+  if(!online||phase!=Phase::Idle)return;
+  volumeTimer.stop();const auto d=descriptor();previousToken=d.value("token").toString();stoppingPid=d.value("pid").toInt();
+  phase=restart?Phase::Restarting:Phase::Stopping;deadline=QDateTime::currentMSecsSinceEpoch()+45000;
+  result(QString());report(restart?trp("Restartowanie…"):trp("Zamykanie…"));controls();send(restart?"restart":"quit");
  }
  void addSource(){
-  if(!online||!QRegularExpression("^http://127\\.0\\.0\\.1:18766/[a-f0-9]{64}/$").match(overlay).hasMatch()){report(trp("Brak poprawnego adresu nakładki"));return;}
-  auto *sceneSource=obs_frontend_get_current_scene();if(!sceneSource){report(trp("Brak aktywnej sceny"));return;}
-  auto *scene=obs_scene_from_source(sceneSource);if(!scene){obs_source_release(sceneSource);return;}
+  if(!online||!QRegularExpression("^http://127\\.0\\.0\\.1:18766/[a-f0-9]{64}/$").match(overlay).hasMatch()){result(trp("Brak poprawnego adresu nakładki"));return;}
+  auto *sceneSource=targetScene();if(!sceneSource){result(trp("Brak aktywnej sceny"));return;}
+  const QString sceneName=trp(obs_source_get_name(sceneSource));auto *scene=obs_scene_from_source(sceneSource);if(!scene){obs_source_release(sceneSource);return;}
   const QByteArray url=overlay.toUtf8();
   struct Search {QByteArray url;obs_source_t *source=nullptr;};
   Search current{url};
   obs_scene_enum_items(scene,[](obs_scene_t*,obs_sceneitem_t *item,void *data){auto &x=*static_cast<Search*>(data);auto *s=obs_sceneitem_get_source(item);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);return false;}return true;},&current);
-  if(current.source){if(managed(current.source)&&!urlMatches(current.source,url)){auto *s=obs_data_create();obs_data_set_string(s,"url",url.constData());obs_source_update(current.source,s);obs_data_release(s);}obs_source_release(current.source);obs_source_release(sceneSource);report(trp("Źródło PSSA już jest w scenie"));return;}
+  if(current.source){if(managed(current.source)&&!urlMatches(current.source,url)){auto *s=obs_data_create();obs_data_set_string(s,"url",url.constData());obs_source_update(current.source,s);obs_data_release(s);}obs_source_release(current.source);obs_source_release(sceneSource);result(trp("Źródło PSSA już jest w scenie: ")+sceneName);return;}
   Search global{url};
   obs_enum_sources([](void *data,obs_source_t *s){auto &x=*static_cast<Search*>(data);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);return false;}return true;},&global);
   auto *source=global.source;
@@ -172,10 +182,10 @@ class Dock final:public QWidget{
    QByteArray name="PSSA - Alerty";int i=2;while(auto *existing=obs_get_source_by_name(name.constData())){obs_source_release(existing);name="PSSA - Alerty "+QByteArray::number(i++);}
    source=obs_source_create("browser_source",name.constData(),s,nullptr);obs_data_release(s);
   }else if(managed(source)&&!urlMatches(source,url)){auto *s=obs_data_create();obs_data_set_string(s,"url",url.constData());obs_source_update(source,s);obs_data_release(s);}
-  if(!source){obs_source_release(sceneSource);report(trp("Nie można utworzyć źródła przeglądarkowego"));return;}
+  if(!source){obs_source_release(sceneSource);result(trp("Nie można utworzyć źródła przeglądarkowego"));return;}
   auto *item=obs_scene_add(scene,source);
   if(item){obs_video_info info{};if(obs_get_video_info(&info)){vec2 scale;const auto w=obs_source_get_width(source),h=obs_source_get_height(source);vec2_set(&scale,static_cast<float>(info.base_width)/static_cast<float>(w?w:1920),static_cast<float>(info.base_height)/static_cast<float>(h?h:1080));obs_sceneitem_set_scale(item,&scale);}obs_frontend_save();}
-  obs_source_release(source);obs_source_release(sceneSource);report(item?trp("Dodano źródło PSSA"):trp("Nie udało się dodać źródła"));
+  obs_source_release(source);obs_source_release(sceneSource);result(item?trp("Dodano źródło PSSA do: ")+sceneName:trp("Nie udało się dodać źródła"));
  }
 public:
  Dock(){
@@ -190,10 +200,11 @@ public:
   volumeLabel=new QLabel("100%",extra);x->addWidget(new QLabel(trp("Głośność alertów"),extra));x->addWidget(volumeLabel);
   volume=new QSlider(Qt::Horizontal,extra);volume->setRange(0,100);volume->setValue(100);x->addWidget(volume);
   mute=new QCheckBox(trp("Wycisz alerty"),extra);x->addWidget(mute);
-  x->addWidget(new QLabel(trp("Aktywna scena (program)"),extra));sceneLabel=new QLabel(extra);sceneLabel->setWordWrap(true);x->addWidget(sceneLabel);
+  sceneCaption=new QLabel(trp("Aktywna scena"),extra);x->addWidget(sceneCaption);sceneLabel=new QLabel(extra);sceneLabel->setWordWrap(true);x->addWidget(sceneLabel);
   addButton=new QPushButton(trp("Dodaj źródło PSSA"),extra);refreshButton=new QPushButton(trp("Odśwież nakładkę"),extra);testButton=new QPushButton(trp("Dodaj testowy alert"),extra);
   x->addWidget(addButton);x->addWidget(refreshButton);x->addWidget(testButton);
   details=new QLabel(extra);details->setWordWrap(true);x->addWidget(details);
+  operationLabel=new QLabel(this);operationLabel->setWordWrap(true);operationLabel->hide();layout->insertWidget(2,operationLabel);
   autoStart=new QCheckBox(trp("Uruchamiaj PSSA z OBS"),extra);autoClose=new QCheckBox(trp("Zamykaj PSSA razem z OBS"),extra);
   autoStart->setChecked(settings.value("autoStart",false).toBool());autoClose->setChecked(settings.value("autoClose",false).toBool());x->addWidget(autoStart);x->addWidget(autoClose);
   extraScroll=new QScrollArea(this);extraScroll->setWidgetResizable(true);extraScroll->setFrameShape(QFrame::NoFrame);extraScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);extraScroll->setWidget(extra);extraScroll->setMinimumHeight(80);extraScroll->hide();layout->addWidget(extraScroll,1);
@@ -203,8 +214,8 @@ public:
   volumeTimer.setSingleShot(true);volumeTimer.setInterval(160);connect(volume,&QSlider::valueChanged,this,[this](int v){volumeLabel->setText(QString::number(v)+"%");volumeTimer.start();});connect(&volumeTimer,&QTimer::timeout,this,[this](){send("volume",volume->value());});
   connect(mute,&QCheckBox::toggled,this,[this](bool v){send("mute",v);});
   connect(autoStart,&QCheckBox::toggled,this,[this](bool v){settings.setValue("autoStart",v);settings.sync();});connect(autoClose,&QCheckBox::toggled,this,[this](bool v){settings.setValue("autoClose",v);settings.sync();});
-  timer.setInterval(1500);connect(&timer,&QTimer::timeout,this,[this](){updateScene();if(!closing||!active)send("status");if(!autoAttempted){autoAttempted=true;if(autoStart->isChecked()&&!processAlive(descriptor().value("pid").toInt()))launch();}});
-  controls();timer.start();send("status");
+  timer.setInterval(1500);connect(&timer,&QTimer::timeout,this,[this](){updateScene();checkDeadline();send("status");if(!autoAttempted){autoAttempted=true;if(autoStart->isChecked()&&!online&&!processAlive(descriptor().value("pid").toInt()))launch();}});
+  controls();updateScene();timer.start();send("status");
  }
  void obsExit(){
   timer.stop();if(!autoClose->isChecked())return;

@@ -4,7 +4,7 @@ import {writeFileSync,renameSync,rmSync} from 'node:fs'
 import {join} from 'node:path'
 
 export interface DockState {version:string;volume:number;muted:boolean;pending:number;twitch:string;overlayUrl:string}
-export interface DockHandlers {state:()=>DockState;volume:(value:number)=>void;mute:(value:boolean)=>void;test:()=>void;reload:()=>void;show:()=>void;quit:()=>void}
+export interface DockHandlers {state:()=>DockState;volume:(value:number)=>void;mute:(value:boolean)=>void;test:()=>void;reload:()=>void;show:()=>void;quit:()=>void;restart:()=>void}
 export interface DockDescriptor {exe:string;pipe:string;token:string;pid:number}
 export function dispatchDock(value:unknown,token:string,handlers:DockHandlers):DockState{
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid request')
@@ -18,6 +18,7 @@ export function dispatchDock(value:unknown,token:string,handlers:DockHandlers):D
   case 'reload':handlers.reload();break
   case 'show':handlers.show();break
   case 'quit':handlers.quit();break
+  case 'restart':handlers.restart();break
   default:throw Error('Invalid command')
  }
  return handlers.state()
@@ -52,7 +53,7 @@ export class DockControl{
   server.on('error',()=>this.stop())
   const descriptor={exe:this.exe,pipe:process.platform==='win32'?name:this.address,token,pid:process.pid}
   const path=join(this.dir,'obs-dock.json'),tmp=path+'.'+randomBytes(8).toString('hex')
-  try{writeFileSync(tmp,JSON.stringify(descriptor),{mode:0o600,flag:'wx'});renameSync(tmp,path)}catch(e){rmSync(tmp,{force:true});this.stop();throw e}
+  try{writeFileSync(tmp,JSON.stringify(descriptor),{mode:0o600,flag:'wx'});for(let attempt=0;;attempt++){try{renameSync(tmp,path);break}catch(e){if(attempt>=9)throw e;await new Promise(resolve=>setTimeout(resolve,100))}}}catch(e){rmSync(tmp,{force:true});this.stop();throw e}
   return descriptor
  }
  stop(){for(const socket of this.sockets)socket.destroy();this.sockets.clear();this.server?.close();this.server=undefined}

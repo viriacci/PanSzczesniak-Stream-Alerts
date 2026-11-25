@@ -153,13 +153,15 @@ async function start(): Promise<void> {
   }
   runtime=new RuntimeService(activeDb,directory,()=>window,activeAlerts,activeObs,agent,restoreStatus,applyMode)
   if(!smoke)runtime.start()
+  let dockExitScheduled=false
+  const dockExit=(restart:boolean)=>{if(dockExitScheduled||cleaned)return;dockExitScheduled=true;setTimeout(()=>{if(cleaned)return;if(restart){if(smoke)return;app.relaunch({args:[...(app.isPackaged?[]:[app.getAppPath()]),'--pssa-background']})}app.quit()},150)}
   let dockDescriptor:DockDescriptor|undefined
   {
    dockControl=new DockControl(directory,process.execPath,{
     state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl}},
     volume:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,volume:value}})},
     mute:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,muted:value}})},
-    test:()=>{activeAlerts.queueCommand({type:'test'})},reload:()=>{activeAlerts.reloadOverlay()},show:()=>reveal(),quit:()=>{setTimeout(()=>app.quit(),100)}
+    test:()=>{activeAlerts.queueCommand({type:'test'})},reload:()=>{activeAlerts.reloadOverlay()},show:()=>reveal(),quit:()=>dockExit(false),restart:()=>dockExit(true)
    });try{dockDescriptor=await dockControl.start()}catch(e){dockControl.stop();if(smoke)throw e;log('dock-control-unavailable')}
   }
   if(!smoke&&(process.argv.includes('--pssa-background')||runtime.state().mode==='background'&&tray)){backgrounded=true;log('ready');return}
