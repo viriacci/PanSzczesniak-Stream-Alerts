@@ -72,7 +72,13 @@ jobs:
           name: pssa-debug-source-maps
           path: out/**/*.map
           if-no-files-found: error
-      - run: npm run smoke
+      - name: Run Electron UI smoke with failure diagnostics
+        shell: pwsh
+        run: |
+          npm run smoke
+          $code = $LASTEXITCODE
+          if ($code -ne 0 -and (Test-Path 'pssa-smoke-failure.txt')) { Get-Content 'pssa-smoke-failure.txt' }
+          exit $code
       - name: Generate installer branding
         shell: powershell
         run: .\scripts\installer-assets.ps1

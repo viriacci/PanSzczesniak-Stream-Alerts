@@ -60,6 +60,7 @@ function cleanup(failed=false): void {
   log('shutdown')
 }
 function fail(error?:unknown): void {
+  if(smoke){console.error('PSSA SMOKE FAILURE:',error instanceof Error?error.stack:String(error));try{writeFileSync(join(process.cwd(),'pssa-smoke-failure.txt'),error instanceof Error?error.stack??error.message:String(error))}catch{}}
   crashes.write('startup-failed','',null,error instanceof Error?error.stack:undefined)
   log('startup-failed')
   if (!smoke) dialog.showErrorBox(BRAND, 'Nie udało się uruchomić aplikacji. Sprawdź application.log w katalogu danych.')
@@ -179,6 +180,7 @@ async function start(): Promise<void> {
     if(revisionCheck!==true)throw Error('Alert snapshot revision smoke failed')
     if(!(await activeWindow.webContents.executeJavaScript('window.pssa.alertState().then(s=>s.twitch.publicLogin===true)')))throw Error('Public Twitch client missing in build')
     // Exercise React handlers in Chromium, not just the underlying moveNode helper.
+    console.log('PSSA smoke: navigation');
     const navSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       const until=async fn=>{for(let i=0;i<100;i++){const result=await fn();if(result)return result;await sleep(50)}throw Error('Navigation UI timeout')};
@@ -210,6 +212,7 @@ async function start(): Promise<void> {
     try{activeAlerts.save({...oldRaid,title:'DługiAlert'.repeat(18),template:'DługiTekst'.repeat(45)},'default');if(activeAlerts.test('raid')!==1)throw Error('Long queue fixture failed')}finally{activeAlerts.save(oldRaid,'default')}
     const longAlert=activeAlerts.state().queue.pending.find(x=>x.key==='raid');if(!longAlert)throw Error('Long queue fixture missing');
     activeWindow.setSize(710,440);
+    console.log('PSSA smoke: compact queue');
     const queueSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));const until=async fn=>{for(let i=0;i<100;i++){if(await fn())return;await sleep(50)}throw Error('Queue UI timeout')};
       document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page .queue-row')?.textContent.includes('DługiAlert'));
@@ -225,27 +228,32 @@ async function start(): Promise<void> {
     if(queueSmoke!==true)throw Error('Queue renderer smoke failed');
     activeAlerts.queueCommand({type:'skip',id:longAlert.id});
     activeAlerts.save({...oldRaid,key:'reward:smoke-reward',title:'Nagroda testowa '.repeat(10)},'default')
+    console.log('PSSA smoke: compact alert and reward editors');
     const cardSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
-      const sleep=ms=>new Promise(r=>setTimeout(r,ms));const until=async fn=>{for(let i=0;i<100;i++){const v=fn();if(v)return v;await sleep(50)}throw Error('Card UI timeout')};
-      for(const page of ['alerts','rewards']){
-       document.querySelector('[data-nav-id="'+page+'"]').click();
-       const tile=await until(()=>document.querySelector('.rule-tile'));
-       if(!tile.querySelector('.rule-tile-art'))throw Error('Tile icon missing');
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const until=async(fn,label)=>{for(let i=0;i<150;i++){const v=fn();if(v)return v;await sleep(50)}throw Error('Card UI timeout: '+label)};
+      for(const [page,heading] of [['alerts','Alerty'],['rewards','Nagrody']]){
+       const nav=document.querySelector('[data-nav-id="'+page+'"]');if(!nav)throw Error('Missing navigation: '+page);nav.click();
+       const tile=await until(()=>document.querySelector('.rule-grid[data-page="'+page+'"] .rule-tile'),page+' tiles');
+       if(!tile.querySelector('.rule-tile-art'))throw Error('Tile icon missing: '+page);
        tile.click();
-       const d=await until(()=>document.querySelector('.rule-dialog[open]'));
+       const d=await until(()=>document.querySelector('.rule-dialog[open]'),page+' editor');
+       await sleep(200);
        const body=d.querySelector('.rule-dialog-body'),footer=d.querySelector('.rule-dialog-footer'),r=d.getBoundingClientRect(),fr=footer.getBoundingClientRect();
-       if(r.left<0||r.top<0||r.right>innerWidth+1||r.bottom>innerHeight+1||fr.bottom>r.bottom+1||fr.top<r.top||body.clientHeight<40||body.scrollWidth>body.clientWidth+1)throw Error('Editor exceeds window');
-       if(!footer.querySelector('button[type=submit]'))throw Error('Editor save missing');
+       const sizes=JSON.stringify({page,viewport:[innerWidth,innerHeight],dialog:[r.x,r.y,r.width,r.height],footer:[fr.x,fr.y,fr.width,fr.height],body:[body.clientWidth,body.clientHeight,body.scrollWidth,body.scrollHeight]});
+       if(r.left<0||r.top<0||r.right>innerWidth+1||r.bottom>innerHeight+1||fr.bottom>r.bottom+1||fr.top<r.top||body.clientHeight<40||body.scrollWidth>body.clientWidth+1)throw Error('Editor exceeds window: '+sizes);
+       if(!footer.querySelector('button[type=submit]'))throw Error('Editor save missing: '+page);
        body.scrollTop=body.scrollHeight;
-       if(body.scrollHeight>body.clientHeight+5&&body.scrollTop===0)throw Error('Editor does not scroll');
-       d.querySelector('[aria-label="Zamknij edycję"]').click();await until(()=>!document.querySelector('.rule-dialog[open]'));
+       if(body.scrollHeight>body.clientHeight+5&&body.scrollTop===0)throw Error('Editor does not scroll: '+sizes);
+       d.querySelector('[aria-label="Zamknij edycję"]').click();await until(()=>!document.querySelector('.rule-dialog[open]'),page+' editor close');
       }
-      document.querySelector('[data-nav-id="queue"]').click();return true
+      document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page'), 'return to queue');return true
     })()`);
     if(cardSmoke!==true)throw Error('Alert/reward card renderer smoke failed');
 
     activeWindow.setSize(originalSize[0]!,originalSize[1]!);
     if(!(await activeWindow.webContents.executeJavaScript('new Promise(r=>setTimeout(()=>r([...document.querySelectorAll(".content,.queue-page,.queue-page .panel")].every(e=>e.scrollWidth<=e.clientWidth+1)),150))')))throw Error('Large queue overflow');
+    console.log('PSSA smoke: IPC and database');
     const passed = await activeWindow.webContents.executeJavaScript(
       'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 5 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 5)'
     )
