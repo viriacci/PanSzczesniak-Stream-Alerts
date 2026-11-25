@@ -191,18 +191,22 @@ async function start(): Promise<void> {
     })()`);
     if(navSmoke!==true)throw Error('Navigation renderer smoke failed');
     const originalSize=activeWindow.getSize();
+    const oldRaid=activeAlerts.state().rules.find(r=>r.key==='raid');if(!oldRaid)throw Error('Raid rule missing');
+    try{activeAlerts.save({...oldRaid,title:'DługiAlert'.repeat(18),template:'DługiTekst'.repeat(45)},'default');if(activeAlerts.test('raid')!==1)throw Error('Long queue fixture failed')}finally{activeAlerts.save(oldRaid,'default')}
+    const longAlert=activeAlerts.state().queue.pending.find(x=>x.key==='raid');if(!longAlert)throw Error('Long queue fixture missing');
     activeWindow.setSize(710,440);
     const queueSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));const until=async fn=>{for(let i=0;i<100;i++){if(await fn())return;await sleep(50)}throw Error('Queue UI timeout')};
-      document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page .panel'));
+      document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page .queue-row')?.textContent.includes('DługiAlert'));
       const titles=()=>[...document.querySelectorAll('.queue-page .panel-heading h2')].map(e=>e.textContent);
       if(titles()[0]!=='Aktualnie odtwarzany'||!titles()[1].startsWith('Oczekujące')||titles()[2]!=='Historia alertów'||titles()[3]!=='Działanie alertów')throw Error('Queue panel order');
-      const button=[...document.querySelectorAll('.queue-page button')].find(e=>e.textContent==='Dodaj testowy alert');button.click();await until(()=>document.querySelector('.queue-page .queue-row')?.textContent.includes('Testowy alert'));
+      const button=[...document.querySelectorAll('.queue-page button')].find(e=>e.textContent==='Dodaj testowy alert');button.click();await until(()=>[...document.querySelectorAll('.queue-page .queue-row')].some(e=>e.textContent.includes('Testowy alert')));
       if(!document.querySelector('.queue-page [role=status]')?.textContent.includes('oczekują'))throw Error('Offline queue message missing');
       const fits=()=>[...document.querySelectorAll('.content,.queue-page,.queue-page .panel')].every(e=>e.scrollWidth<=e.clientWidth+1);
       if(!fits())throw Error('Small queue overflow');return true;
     })()`);
     if(queueSmoke!==true)throw Error('Queue renderer smoke failed');
+    activeAlerts.queueCommand({type:'skip',id:longAlert.id});
     activeWindow.setSize(originalSize[0]!,originalSize[1]!);
     if(!(await activeWindow.webContents.executeJavaScript('new Promise(r=>setTimeout(()=>r([...document.querySelectorAll(".content,.queue-page,.queue-page .panel")].every(e=>e.scrollWidth<=e.clientWidth+1)),150))')))throw Error('Large queue overflow');
     const passed = await activeWindow.webContents.executeJavaScript(
@@ -216,15 +220,16 @@ async function start(): Promise<void> {
     try{
       await preview.loadURL(activeAlerts.state().twitch.overlayUrl)
       const deadline=Date.now()+20000
-      let done=false,seen=false
+      let done=false,seen=false,audioPlayed=false
       while(Date.now()<deadline){
         const history=activeAlerts.state().queue.history
         if(history.some(x=>x.source==='test'&&x.status==='failed'))throw Error('Overlay smoke failed')
         if(history.some(x=>x.source==='test'&&x.status==='done')){done=true;break}
         if(await preview.webContents.executeJavaScript('document.getElementById("stage")?.textContent?.includes("Test PSSA") === true'))seen=true
+        if(await preview.webContents.executeJavaScript('(()=>{const a=document.querySelector("#stage audio");return !!a&&a.readyState>=2&&!a.paused&&a.currentTime>0&&Math.abs(a.duration-.75)<.05&&a.volume===1})()'))audioPlayed=true
         await new Promise(resolve=>setTimeout(resolve,100))
       }
-      if(!done||!seen)throw Error('Overlay smoke missing render or ACK')
+      if(!done||!seen||!audioPlayed)throw Error('Overlay smoke missing render, audio playback or ACK')
       // Deterministic PNG in isolated smoke directory.
       const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGN8fMCDgRTARJLqUQ2jGoaUBgAQ3wILGYFI4wAAAABJRU5ErkJggg==','base64')
       const asset=createHash('sha256').update(png).digest('hex')+'.png'
