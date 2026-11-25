@@ -50,7 +50,7 @@ export function App() {
    current.current=next;setLayout(next)
    if(save)queue.current=queue.current.catch(()=>{}).then(()=>window.pssa.setLayout(next)).catch(()=>{setNotice({text:'Nie udało się zapisać układu.',error:true})})
  },[ready])
- const navigate=useCallback((page:PageId)=>{patch({page});content.current?.scrollTo({top:0});content.current?.focus()},[patch])
+ const navigate=useCallback((page:PageId)=>{patch({page});if(page!=='settings')setEditing(false);content.current?.scrollTo({top:0});content.current?.focus()},[patch])
  useEffect(()=>{
    const onKey=(event:KeyboardEvent)=>{
      if(!event.ctrlKey||event.altKey||event.shiftKey||event.metaKey||event.repeat||confirm)return
@@ -83,7 +83,7 @@ export function App() {
    <aside className={`sidebar ${collapsed?'collapsed':''}`} aria-label="Nawigacja główna">
     <div className="sidebar-top"><Button variant="ghost" title="Zwiń / rozwiń menu (Ctrl+B)" aria-label="Zwiń / rozwiń menu" aria-expanded={!collapsed} disabled={!ready} onClick={()=>patch({collapsed:!collapsed})}><Icon name="sidebar"/></Button>{!collapsed&&<label className="nav-search"><Icon name="search" size={15}/><input aria-label="Szukaj modułu" placeholder="Szukaj modułu" value={query} onChange={e=>setQuery(e.target.value)}/></label>}</div>
     <SidebarNav navigation={layout.navigation} onChange={navChange} collapsed={collapsed} query={query} active={item.id} ready={ready} navigate={navigate} editing={editing}/>
-    <div className="sidebar-bottom"><Button variant="ghost" aria-label="Ustawienia" title="Ustawienia" onClick={()=>navigate('settings')}><Icon name="settings"/></Button><span className="account-avatar">{theme.symbol}</span>{!collapsed&&<div><strong>{twitch?.login||'Profil lokalny'}</strong><small>{twitch?.phase==='connected'?'Twitch połączony':'Twitch niepołączony'}</small></div>}</div>
+    <div className="sidebar-bottom"><Button variant="ghost" aria-label="Ustawienia" aria-pressed={item.id==='settings'} title="Ustawienia" onClick={()=>navigate('settings')}><Icon name="settings"/></Button><span className="account-avatar">{theme.symbol}</span>{!collapsed&&<div><strong>{twitch?.login||'Profil lokalny'}</strong><small>{twitch?.phase==='connected'?'Twitch połączony':'Twitch niepołączony'}</small></div>}</div>
    </aside>
    {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className="content" tabIndex={-1} ref={content} id="main-content">

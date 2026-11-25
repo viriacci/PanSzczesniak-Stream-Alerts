@@ -25,3 +25,5 @@ export function ConfirmDialog({ title, children, onClose, onConfirm }: {title: s
     <div className="dialog-actions"><Button autoFocus onClick={onClose}>Anuluj</Button><Button variant="primary" onClick={onConfirm}>Przywróć</Button></div>
   </dialog>
 }
+
+export function SettingsSection({title,children}:{title:string;children:ReactNode}){return <details className="settings-section"><summary><span>{title}</span><span aria-hidden="true" className="settings-chevron">›</span></summary><div className="settings-section-body">{children}</div></details>}

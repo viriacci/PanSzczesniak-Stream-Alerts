@@ -1,9 +1,10 @@
 export const pages = ['dashboard','activity','analytics','queue','alerts','rewards','studio','library','profiles','integrations','settings','diagnostics','documentation'] as const
 export type PageId = typeof pages[number]
+export const sidebarPages=pages.filter(p=>p!=='settings')
 export type NavNode={kind:'page';id:PageId}|{kind:'group';id:string;name:string;collapsed:boolean;children:NavNode[]}
 export interface Navigation {nodes:NavNode[];hidden:PageId[]}
 const group=(id:string,name:string,ids:PageId[]):NavNode=>({kind:'group',id,name,collapsed:false,children:ids.map(id=>({kind:'page',id}))})
-export const defaultNavigation:Navigation={nodes:[group('live','Centrum transmisji',['dashboard','activity','analytics']),group('alerts-group','Alerty',['queue','alerts','rewards','studio']),group('assets','Zasoby',['library','profiles']),group('system','System',['integrations','settings','diagnostics','documentation'])],hidden:[]}
+export const defaultNavigation:Navigation={nodes:[group('live','Centrum transmisji',['dashboard','activity','analytics']),group('alerts-group','Alerty',['queue','alerts','rewards','studio']),group('assets','Zasoby',['library','profiles']),group('system','System',['integrations','diagnostics','documentation'])],hidden:[]}
 export interface LayoutPreferences {page:PageId;sidebarWidth:number;collapsed:boolean;inspectorWidth:number;inspectorOpen:boolean;navigation:Navigation}
 export const defaultLayout:LayoutPreferences={page:'dashboard',sidebarWidth:248,collapsed:false,inspectorWidth:300,inspectorOpen:false,navigation:defaultNavigation}
 export const bounds={sidebar:[208,320],inspector:[240,420]} as const
@@ -13,19 +14,20 @@ export function parseNavigation(value:unknown):Navigation{
  const v=value as Record<string,unknown>,ids=new Set<string>(),found=new Set<PageId>();let count=0
  function read(raw:unknown,depth:number):NavNode[]{
   if(!Array.isArray(raw)||raw.length>45)throw Error('Invalid navigation list')
-  return raw.map(item=>{
+  return raw.flatMap((item):NavNode[]=>{
    if(!item||typeof item!=='object'||++count>45)throw Error('Invalid navigation node')
    const n=item as Record<string,unknown>
    if(typeof n.id!=='string'||ids.has(n.id))throw Error('Duplicate navigation node')
    ids.add(n.id)
-   if(n.kind==='page'&&pages.includes(n.id as PageId)){found.add(n.id as PageId);return {kind:'page',id:n.id as PageId}}
+   if(n.kind==='page'&&n.id==='settings')return [] // migrate RC.7 menu; page itself remains accessible
+   if(n.kind==='page'&&pages.includes(n.id as PageId)){found.add(n.id as PageId);return [{kind:'page',id:n.id as PageId}]}
    if(n.kind!=='group'||depth>=2||!/^[a-zA-Z0-9_-]{1,64}$/.test(n.id)||pages.includes(n.id as PageId)||typeof n.name!=='string'||!n.name.trim()||n.name.length>60||typeof n.collapsed!=='boolean')throw Error('Invalid category')
-   return {kind:'group',id:n.id,name:n.name.trim(),collapsed:n.collapsed,children:read(n.children,depth+1)}
+   return [{kind:'group',id:n.id,name:n.name.trim(),collapsed:n.collapsed,children:read(n.children,depth+1)}]
   })
  }
  const nodes=read(v.nodes,0)
- if(found.size!==pages.length||!Array.isArray(v.hidden)||v.hidden.length>pages.length||v.hidden.some(p=>!pages.includes(p as PageId))||new Set(v.hidden).size!==v.hidden.length)throw Error('Invalid page inventory')
- return {nodes,hidden:[...v.hidden] as PageId[]}
+ if(found.size!==sidebarPages.length||!Array.isArray(v.hidden)||v.hidden.length>pages.length||v.hidden.some(p=>!pages.includes(p as PageId))||new Set(v.hidden).size!==v.hidden.length)throw Error('Invalid page inventory')
+ return {nodes,hidden:v.hidden.filter(p=>p!=='settings') as PageId[]}
 }
 export function parseLayout(value:unknown):LayoutPreferences{
  if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('Invalid layout')

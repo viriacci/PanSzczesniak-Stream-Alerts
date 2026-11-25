@@ -12,12 +12,12 @@ import type {LiveState} from '../../../shared/live'
 import {ObsPage} from './obs'
 import type {ObsState,AgentState} from '../../../shared/obs'
 import { QueuePage } from './queue'
-import { AlertsPage, TwitchPage, MigrationPanel } from './alerts'
+import { AlertsPage, TwitchPage, MigrationPanel, AdvancedTwitchLogin } from './alerts'
 import type { AlertState } from '../../../shared/alerts'
 import type { SystemStatus } from '../../../shared/contracts'
 import type { LayoutPreferences } from '../../../shared/layout'
 import type { NavItem } from '../navigation'
-import { Button, Empty, Panel, Status } from '../components/ui'
+import { Button, Empty, Panel, Status, SettingsSection } from '../components/ui'
 import { Icon, type IconName } from '../components/icons'
 const MemoAnalytics=memo(AnalyticsPage),MemoLibrary=memo(LibraryPage),MemoStudio=memo(StudioPage),MemoQueue=memo(QueuePage),MemoDiagnostics=memo(DiagnosticsPage)
 type Props={runtime?:RuntimePreferences;saveRuntime:(p:RuntimePreferences)=>Promise<RuntimePreferences>;live?:LiveState;obs?:ObsState;agent?:AgentState;alertState?:AlertState;item:NavItem;status?:SystemStatus;layout:LayoutPreferences;busy:boolean;onCompact:()=>void;onReset:()=>void;onLayout:(v:Partial<LayoutPreferences>)=>void;onNavigation:(v:Navigation)=>void;editingMenu:boolean;onEditMenu:()=>void;onIntegrations:()=>void}
@@ -29,13 +29,14 @@ export function PageContent({runtime,saveRuntime,live,obs,agent,alertState,item,
  if(item.id==='studio')return <MemoStudio state={alertState}/>
  if(item.id==='settings')return <>
   <NavigationSettings navigation={layout.navigation} onChange={onNavigation} editing={editingMenu} onEdit={onEditMenu}/>
-  <Panel title="Wygląd i układ" detail="Preferencje są zapisywane lokalnie w SQLite.">
+  <SettingsSection title="Wygląd i układ">
    <div className="setting-row"><div><h3>Tryb kompaktowy</h3><p>Mniejsza ilość wolnej przestrzeni między elementami.</p></div><Button role="switch" aria-checked={status?.compact??false} disabled={!status||busy} onClick={onCompact}>{status?.compact?'Włączony':'Wyłączony'}</Button></div>
    <div className="setting-row"><div><h3>Inspektor</h3><p>Prawy panel kontekstowy.</p></div><Button role="switch" aria-checked={layout.inspectorOpen} disabled={busy} onClick={()=>onLayout({inspectorOpen:!layout.inspectorOpen})}>{layout.inspectorOpen?'Włączony':'Wyłączony'}</Button></div>
    <div className="setting-row"><div><h3>Rozmiar paneli</h3><p>Menu: {layout.sidebarWidth}px · Inspektor: {layout.inspectorWidth}px</p></div><Button disabled={busy} onClick={onReset}>Przywróć układ</Button></div>
-  </Panel>
+  </SettingsSection>
   {runtime&&<RuntimeSettings runtime={runtime} save={saveRuntime}/>}
-  {runtime&&<Panel title="Skórki aplikacji" detail="Wygląd nie zmienia alertów ani ustawień Twitcha."><div className="theme-grid">{themeIds.map(id=>{const t=themes[id];return <button type="button" className="theme-choice" key={id} aria-pressed={runtime.theme===id} disabled={busy} onClick={()=>void saveRuntime({...runtime,theme:id}).catch(()=>window.alert('Nie udało się zapisać skórki.'))}><div className="theme-preview" data-preview={id} style={{background:t.colors[0],color:id==='vivionyx'?'#f2efed':t.colors[2],borderColor:id==='vivionyx'?t.colors[1]:t.colors[2]}}><span className="theme-mark">{t.symbol}</span><strong>{t.name}</strong><small>{t.subtitle}</small><div className="theme-swatches">{t.colors.map(c=><i key={c} style={{background:c}}/>)}</div></div><span>{t.description}</span><strong>{runtime.theme===id?'Aktywna':'Wybierz'}</strong></button>})}</div></Panel>}
+  {runtime&&<SettingsSection title="Skórki aplikacji"><div className="theme-grid">{themeIds.map(id=>{const t=themes[id];return <button type="button" className="theme-choice" key={id} aria-pressed={runtime.theme===id} disabled={busy} onClick={()=>void saveRuntime({...runtime,theme:id}).catch(()=>window.alert('Nie udało się zapisać skórki.'))}><div className="theme-preview" data-preview={id} style={{background:t.colors[0],color:id==='vivionyx'?'#f2efed':t.colors[2],borderColor:id==='vivionyx'?t.colors[1]:t.colors[2]}}><span className="theme-mark">{t.symbol}</span><strong>{t.name}</strong><small>{t.subtitle}</small><div className="theme-swatches">{t.colors.map(c=><i key={c} style={{background:c}}/>)}</div></div><span>{t.description}</span><strong>{runtime.theme===id?'Aktywna':'Wybierz'}</strong></button>})}</div></SettingsSection>}
+  <SettingsSection title="Logowanie zaawansowane"><AdvancedTwitchLogin state={alertState}/></SettingsSection>
  </>
  if(item.id==='diagnostics')return <MemoDiagnostics/>
  if(item.id==='documentation')return <><Panel title="Skróty klawiaturowe"><dl className="details"><dt>Ctrl + B</dt><dd>Zwiń / rozwiń menu</dd><dt>Ctrl + I</dt><dd>Inspektor</dd><dt>Ctrl + ,</dt><dd>Ustawienia</dd><dt>Strzałki / Home / End</dt><dd>Zmiana szerokości aktywnego separatora</dd><dt>Esc</dt><dd>Zamknij okno dialogowe</dd></dl></Panel><Panel title="Przewodnik po projekcie"><p>Dokumentacja techniczna i materiały do nauki znajdują się w katalogu docs repozytorium PSSA.</p></Panel></>

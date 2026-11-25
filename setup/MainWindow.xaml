@@ -16,7 +16,7 @@
        </Border>
        <TextBlock Text="PAN SZCZESNIAK" Foreground="#F0D28D" FontSize="17" FontWeight="SemiBold" Margin="0,22,0,0" TextAlignment="Center"/>
        <TextBlock Text="S T R E A M   A L E R T S" Foreground="#E4DFD2" FontSize="10" Margin="0,8,0,0" TextAlignment="Center"/>
-       <TextBlock Text="PSSA  /  2.0 RC.7" Foreground="#A9A198" FontSize="11" Margin="0,35,0,0" TextAlignment="Center"/>
+       <TextBlock Text="PSSA  /  2.0 RC.8" Foreground="#A9A198" FontSize="11" Margin="0,35,0,0" TextAlignment="Center"/>
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,26"><Ellipse x:Name="Dot0" Fill="#E5BD57" Width="9" Height="9" Margin="4"/><Ellipse x:Name="Dot1" Fill="#49443D" Width="9" Height="9" Margin="4"/><Ellipse x:Name="Dot2" Fill="#49443D" Width="9" Height="9" Margin="4"/><Ellipse x:Name="Dot3" Fill="#49443D" Width="9" Height="9" Margin="4"/></StackPanel>
      </Grid>

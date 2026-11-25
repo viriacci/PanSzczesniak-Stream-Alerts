@@ -163,6 +163,33 @@ async function start(): Promise<void> {
     const revisionCheck=await activeWindow.webContents.executeJavaScript('window.pssa.alertPoll(-1).then(async first=>!!first.state&&(await window.pssa.alertPoll(first.revision)).state===null)')
     if(revisionCheck!==true)throw Error('Alert snapshot revision smoke failed')
     if(!(await activeWindow.webContents.executeJavaScript('window.pssa.alertState().then(s=>s.twitch.publicLogin===true)')))throw Error('Public Twitch client missing in build')
+    // Exercise React handlers in Chromium, not just the underlying moveNode helper.
+    const navSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const until=async fn=>{for(let i=0;i<100;i++){const result=await fn();if(result)return result;await sleep(50)}throw Error('Navigation UI timeout')};
+      await until(()=>document.querySelector('[data-nav-id="studio"]')&&!document.querySelector('[data-nav-id="studio"]').disabled);
+      const local=[...document.querySelectorAll('button')].find(b=>b.textContent==='Uruchom bez logowania');local?.click();
+      await until(()=>!document.querySelector('.runtime-modal'));
+      if(document.querySelector('[data-nav-id="settings"]'))throw Error('Settings still in sidebar');
+      const source=document.querySelector('[data-nav-id="studio"]'),target=document.querySelector('[data-nav-id="assets"]');
+      if(!source.draggable||!target.draggable)throw Error('Drag disabled outside edit mode');
+      const dataTransfer=new DataTransfer();
+      source.dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer}));
+      const rect=target.getBoundingClientRect();
+      target.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer,clientY:rect.top+rect.height/2}));
+      target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer,clientY:rect.top+rect.height/2}));
+      await until(async()=> (await window.pssa.getLayout()).navigation.nodes.find(n=>n.id==='assets')?.children.some(n=>n.id==='studio'));
+      document.querySelector('.sidebar-bottom button[aria-label="Ustawienia"]').click();
+      await until(()=>document.querySelector('.settings-section'));
+      const sections=[...document.querySelectorAll('.settings-section')];
+      if(sections.length!==8||sections.some(s=>s.open)||!sections[0].textContent.includes('Ukryj zakładki'))throw Error('Settings not collapsed');
+      sections[0].querySelector('summary').click();if(!sections[0].open)throw Error('Settings disclosure failed');
+      if(!sections.some(s=>s.querySelector('summary').textContent==='Logowanie zaawansowane'))throw Error('Advanced login missing');
+      document.querySelector('[data-nav-id="integrations"]').click();
+      await until(()=>document.querySelector('.page-header h1')?.textContent==='Konfiguracja');
+      return !document.querySelector('input[type="password"][autocomplete="off"][required]');
+    })()`);
+    if(navSmoke!==true)throw Error('Navigation renderer smoke failed');
     const passed = await activeWindow.webContents.executeJavaScript(
       'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 5 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 5)'
     )

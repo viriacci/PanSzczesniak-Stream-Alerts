@@ -11,22 +11,26 @@ export function useAlerts(slow=false){
  return state
 }
 export function TwitchPage({state}:{state?:AlertState}){
- const [id,setId]=useState(''),[secret,setSecret]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('')
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState('')
  const t=state?.twitch
  async function run(action:()=>Promise<unknown>,success:string){setBusy(true);setMessage('');try{await action();if(success)setMessage(success)}catch{setMessage('Operacja nie powiodła się. Sprawdź status i konfigurację.')}finally{setBusy(false)}}
- function login(e:FormEvent){e.preventDefault();const value=secret;setSecret('');void run(()=>window.pssa.twitchLogin(id.trim(),value),'Autoryzacja zakończona.')}
  return <>
   <Panel title="Twitch" action={<Status tone={t?.phase==='connected'?'ready':t?.phase==='error'?'warning':'neutral'}>{t?.phase??'Inicjalizacja'}</Status>}>
    <p>{t?.login?'Kanał: '+t.login:'Zaloguj się na Twitch, aby odbierać zdarzenia i nagrody kanału.'}</p><p>{t?.detail}</p>
    <div className="alert-actions"><Button variant="primary" disabled={busy||!t?.publicLogin||t.phase==='authorizing'} onClick={()=>void run(()=>window.pssa.twitchDeviceLogin(),'Autoryzacja zakończona.')}>Zaloguj się przez Twitch</Button><Button disabled={busy||!t?.login} onClick={()=>void run(()=>window.pssa.twitchConnect(),'Rozpoczęto ponowne połączenie.')}>Połącz ponownie</Button><Button disabled={!t?.login&&t?.phase!=='authorizing'} onClick={()=>void window.pssa.twitchLogout().catch(()=>setMessage('Nie udało się anulować.'))}>Wyloguj / anuluj</Button></div>
    {t?.deviceCode&&<p>Kod autoryzacji: <strong>{t.deviceCode}</strong>. Zatwierdź go w przeglądarce.</p>}
-   {t&&!t.publicLogin&&<p className="muted">Logowanie uproszczone oczekuje na rejestrację aplikacji PSSA. Tymczasowo możesz skorzystać z własnej aplikacji Twitch.</p>}
-   <details className="advanced-integrations"><summary>Logowanie zaawansowane (własna aplikacja)</summary>
-   <form className="alert-form" onSubmit={login}><label>Client ID<input required autoComplete="off" value={id} onChange={e=>setId(e.target.value)}/></label><label>Client Secret<input type="password" required autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)}/></label><p className="muted">OAuth Redirect URL: http://localhost:3000. Tokeny i secret szyfrowane lokalnie.</p><div className="alert-actions"><Button type="submit" variant="primary" disabled={busy||t?.phase==='authorizing'}>Połącz z Twitch</Button></div></form></details>
+   {t&&!t.publicLogin&&<p className="muted">Logowanie uproszczone oczekuje na rejestrację aplikacji PSSA. Logowanie własną aplikacją jest dostępne w ustawieniach.</p>}
+
   </Panel>
   <Panel title="Nakładka OBS" detail="Dodaj jako źródło przeglądarkowe 1920x1080"><label className="alert-form">Adres lokalny<input readOnly value={t?.overlayUrl??''} onFocus={e=>e.target.select()}/></label></Panel>
   {message&&<p role="status">{message}</p>}
  </>
+}
+export function AdvancedTwitchLogin({state}:{state?:AlertState}){
+ const [id,setId]=useState(''),[secret,setSecret]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('')
+ const t=state?.twitch
+ function login(e:FormEvent){e.preventDefault();const value=secret;setSecret('');setBusy(true);setMessage('');void window.pssa.twitchLogin(id.trim(),value).then(()=>setMessage('Autoryzacja zakończona.')).catch(()=>setMessage('Logowanie nie powiodło się.')).finally(()=>setBusy(false))}
+ return <><p>Opcjonalne logowanie przy użyciu własnej aplikacji Twitch Developer Console.</p><form className="alert-form" onSubmit={login}><label>Client ID<input required autoComplete="off" value={id} onChange={e=>setId(e.target.value)}/></label><label>Client Secret<input type="password" required autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)}/></label><p className="muted">OAuth Redirect URL: http://localhost:3000. Tokeny i secret szyfrowane lokalnie.</p><div className="alert-actions"><Button type="submit" variant="primary" disabled={busy||t?.phase==='authorizing'}>Połącz z Twitch</Button></div></form><Button disabled={t?.phase!=='authorizing'} onClick={()=>void window.pssa.twitchLogout().catch(()=>setMessage('Nie udało się anulować.'))}>Anuluj logowanie</Button>{message&&<p role="status">{message}</p>}</>
 }
 export function MigrationPanel(){
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('')

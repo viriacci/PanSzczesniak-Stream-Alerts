@@ -15,7 +15,7 @@ export const groups: {label:string;items:NavItem[]}[] = [
  {id:'library',label:'Biblioteka',icon:'folder',stage:8,description:'Zarządzanie obrazami, wideo i dźwiękami.'},
  {id:'profiles',label:'Profile i szablony',icon:'layers',stage:8,description:'Zestawy alertów oraz warianty przypisane do profili.'}]},
  {label:'System',items:[
- {id:'integrations',label:'Integracje',icon:'plug',stage:3,description:'Połączenie z Twitchem i OBS.'},
+ {id:'integrations',label:'Konfiguracja',icon:'plug',stage:3,description:'Połączenie z Twitchem i OBS.'},
  {id:'settings',label:'Ustawienia',icon:'settings',stage:2,description:'Dopasuj aplikację do swojego stanowiska.'},
  {id:'diagnostics',label:'Diagnostyka',icon:'shield',stage:2,description:'Stan bazy danych oraz wersja aplikacji.'},
  {id:'documentation',label:'Dokumentacja',icon:'book',stage:2,description:'Informacje o projekcie i skróty klawiaturowe.'}]}

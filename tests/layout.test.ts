@@ -49,3 +49,13 @@ test('old layout hides inspector; navigation supports nested moving and preserve
  assert.throws(()=>parseNavigation({...navigation,nodes:[]}))
  assert.throws(()=>parseNavigation({...navigation,hidden:['studio','studio']}))
 })
+
+test('RC.7 menu migrates settings out without changing custom layout',()=>{
+ const n=parseNavigation({...defaultLayout.navigation,nodes:[...defaultLayout.navigation.nodes,{kind:'page',id:'settings'}],hidden:['settings','studio']})
+ assert.equal(findNode(n.nodes,'settings'),undefined);assert.deepEqual(n.hidden,['studio'])
+ assert.equal(parseLayout({...defaultLayout,page:'settings',navigation:n}).page,'settings')
+ const moved=moveNode(n,'analytics','alerts','after')
+ const group=findNode(moved.nodes,'alerts-group')
+ assert.ok(group?.kind==='group');assert.equal(group.children[2]?.id,'analytics')
+ assert.equal(moveNode(moved,'analytics',null,'after').nodes.at(-1)?.id,'analytics')
+})
