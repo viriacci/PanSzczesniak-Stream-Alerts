@@ -1,0 +1,40 @@
+appId: pl.panszczesniak.pssa.dev
+productName: PSSA
+directories:
+  output: dist
+files:
+  - out/**/*
+  - '!out/**/*.map'
+  - package.json
+extraResources:
+  - from: build/obs-dock
+    to: obs-dock
+    filter:
+      - pssa-control-dock.dll
+      - COPYING
+asar: true
+asarUnpack:
+  - out/main/**/*
+npmRebuild: false
+win:
+  target: nsis
+  executableName: PSSA 2 Dev
+  icon: build/branding/pssa.ico
+  artifactName: PSSA-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  shortcutName: PSSA
+  uninstallDisplayName: PSSA
+  include: build/installer.nsh
+  installerIcon: build/branding/pssa.ico
+  uninstallerIcon: build/branding/pssa.ico
+  installerHeaderIcon: build/branding/pssa.ico
+  installerHeader: build/branding/header.bmp
+  installerSidebar: build/branding/sidebar.bmp
+  uninstallerSidebar: build/branding/sidebar.bmp
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: false

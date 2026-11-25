@@ -1,0 +1,304 @@
+name: PSSA v2 Windows verification
+on:
+  push:
+    branches: [develop/v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pssa-v2-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: Dependency advisory report
+        shell: pwsh
+        run: |
+          npm audit --json | Set-Content -Encoding utf8 npm-audit.json
+          $auditExit = $LASTEXITCODE
+          if ($auditExit -ne 0) { Write-Warning "npm audit returned $auditExit; report requires triage" }
+          exit 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pssa-npm-audit
+          path: npm-audit.json
+          if-no-files-found: error
+      - name: Require clean npm audit
+        shell: pwsh
+        run: |
+          $r = Get-Content npm-audit.json -Raw | ConvertFrom-Json
+          if ($null -eq $r.metadata.vulnerabilities.total -or $r.metadata.vulnerabilities.total -ne 0) { throw 'Dependency audit failed' }
+      - name: Complete source and dependency inventory
+        run: node scripts/audit-inventory.mjs
+      - name: Source-line security and lifecycle triage
+        run: node scripts/audit-source-lines.mjs
+      - name: Check audit patch whitespace
+        run: git diff --check 2af0e04098d0f73c68e0542553cd300973b8b5e2 HEAD
+      - name: SBOM
+        shell: pwsh
+        run: npm sbom --package-lock-only --sbom-format cyclonedx | Set-Content -Encoding utf8 sbom.json
+      - name: Compare synthetic CPU and SQL workload with beta.2
+        shell: pwsh
+        run: |
+          git worktree add --detach baseline f19ab6417ca0fe17edde0ab02bb88dd1e6f5a9fe
+          node --experimental-strip-types scripts/performance.mjs baseline | Set-Content -Encoding utf8 perf-before.json
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline benchmark failed' }
+          node --experimental-strip-types scripts/performance.mjs . | Set-Content -Encoding utf8 perf-after.json
+          if ($LASTEXITCODE -ne 0) { throw 'Current benchmark failed' }
+          git worktree remove baseline
+          git worktree add --detach baseline-rc22 2af0e04098d0f73c68e0542553cd300973b8b5e2
+          node --experimental-strip-types scripts/performance.mjs baseline-rc22 | Set-Content -Encoding utf8 perf-rc22-before.json
+          if ($LASTEXITCODE -ne 0) { throw 'RC.22 benchmark failed' }
+          git worktree remove baseline-rc22
+          $before = Get-Content perf-rc22-before.json -Raw | ConvertFrom-Json
+          $after = Get-Content perf-after.json -Raw | ConvertFrom-Json
+          foreach ($item in $before.results) {
+            $current = $after.results | Where-Object name -eq $item.name
+            if ($null -eq $current -or $current.sqlPrepares -gt $item.sqlPrepares) { throw "SQL regression: $($item.name)" }
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pssa-technical-audit
+          path: |
+            audit-inventory.json
+            audit-source-lines.json
+            sbom.json
+            perf-before.json
+            perf-after.json
+            perf-rc22-before.json
+          if-no-files-found: error
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          PSSA_TWITCH_CLIENT_ID: ${{ vars.PSSA_TWITCH_CLIENT_ID }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pssa-debug-source-maps
+          path: out/**/*.map
+          if-no-files-found: error
+      - name: Run Electron UI smoke with failure diagnostics
+        shell: pwsh
+        run: |
+          npm run smoke
+          $code = $LASTEXITCODE
+          if ($code -ne 0 -and (Test-Path 'pssa-smoke-failure.txt')) { Get-Content 'pssa-smoke-failure.txt' }
+          exit $code
+      - name: Generate installer branding
+        shell: powershell
+        run: .\scripts\installer-assets.ps1
+      - name: Build native OBS Control Dock (Windows x64)
+        shell: pwsh
+        run: .\scripts\build-obs-dock.ps1
+      - run: npx electron-builder --win nsis --x64 --publish never
+      - name: Verify native dock is packaged
+        shell: pwsh
+        run: |
+          $dll = 'dist/win-unpacked/resources/obs-dock/pssa-control-dock.dll'
+          if (-not (Test-Path $dll)) { throw 'Native dock missing from package' }
+          if ((Get-FileHash $dll).Hash -ne (Get-FileHash 'build/obs-dock/pssa-control-dock.dll').Hash) { throw 'Native dock mismatch' }
+      - name: Smoke test packaged executable
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'dist/win-unpacked/PSSA 2 Dev.exe'
+          if (-not (Test-Path $exe)) { throw 'Packaged executable missing' }
+          $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Packaged smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Packaged smoke exit $($p.ExitCode)" }
+      - name: Verify real background process restart and reconnection
+        run: node scripts/dock-restart-smoke.mjs "dist/win-unpacked/PSSA 2 Dev.exe"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: PSSA-2-Dev-Windows
+          run-id: 45574281592
+          github-token: ${{ github.token }}
+          path: previous-beta
+      - name: Verify clean NSIS installation
+        shell: pwsh
+        run: |
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-x64.exe' -File)
+          if ($setup.Count -ne 1) { throw 'Expected exactly one setup executable' }
+          $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
+          if (Test-Path $dir) { throw 'Install path already exists' }
+          $p = Start-Process -FilePath $setup[0].FullName -ArgumentList "/S /PSSA-NODESKTOP /PSSA-NOSTART /D=$dir" -PassThru
+          if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw 'Installer timeout' }
+          if ($p.ExitCode -ne 0) { throw "Installer exit $($p.ExitCode)" }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk')) { throw 'Desktop opt-out failed' }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk')) { throw 'Start menu opt-out failed' }
+          $exe = Join-Path $dir 'PSSA 2 Dev.exe'
+          if (-not (Test-Path $exe)) { throw 'Installed executable missing' }
+          $p = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw 'Installed smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Installed smoke exit $($p.ExitCode)" }
+      - name: Verify upgrade and retained data on uninstall
+        shell: pwsh
+        run: |
+          $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
+          $new = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-x64.exe' -File)
+          if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Installer missing' }
+          $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
+          $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
+          if ($uninstaller.Count -ne 1) { throw 'Uninstaller missing' }
+          $data = Join-Path $env:APPDATA 'PSSA 2 Dev'
+          New-Item -ItemType Directory -Path $data -Force | Out-Null
+          $marker = Join-Path $data 'ci-retention-marker.txt'
+          Set-Content -LiteralPath $marker -Value 'preserve'
+          function Run-Installer($path, $arguments) {
+            $p = Start-Process -FilePath $path -ArgumentList $arguments -PassThru
+            if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw 'Install operation timeout' }
+            if ($p.ExitCode -ne 0) { throw "Install operation exit $($p.ExitCode)" }
+          }
+          Run-Installer $uninstaller[0].FullName '/S'
+          if (-not (Test-Path $marker)) { throw 'Uninstall removed app data' }
+          Run-Installer $old[0].FullName "/S /D=$dir"
+          Run-Installer $new[0].FullName "/S /D=$dir"
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk'))) { throw 'Desktop shortcut missing' }
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk'))) { throw 'Start menu shortcut missing' }
+          if ((Get-Content -LiteralPath $marker -Raw).Trim() -ne 'preserve') { throw 'Upgrade removed app data' }
+          Run-Installer (Join-Path $dir 'PSSA 2 Dev.exe') '--smoke-test'
+          $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
+          if ($uninstaller.Count -ne 1) { throw 'Uninstaller missing after upgrade' }
+          Run-Installer $uninstaller[0].FullName '/S'
+          if (-not (Test-Path $marker)) { throw 'Uninstall removed data after upgrade' }
+      - name: Build custom WPF installer
+        shell: pwsh
+        run: .\scripts\publish-setup.ps1
+      - name: Render actual WPF preview
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-x64.exe').Path
+          $preview = Join-Path $PWD 'dist/setup-preview.png'
+          $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
+          if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
+          if ((Get-Item $preview).Length -lt 10000) { throw 'WPF preview is unexpectedly small' }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pssa-setup-preview
+          path: dist/setup-preview.png
+          if-no-files-found: error
+      - name: Verify updater self-cleanup after installer exit
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path 'dist/PSSA-Setup-2.0.0-x64.exe').Path
+          $folder = Join-Path $env:TEMP ('PSSA-update-' + [Guid]::NewGuid().ToString('N').Substring(0,6))
+          New-Item -ItemType Directory -Path $folder | Out-Null
+          $copy = Join-Path $folder (Split-Path $source -Leaf)
+          Copy-Item -LiteralPath $source -Destination $copy
+          $preview = Join-Path $env:RUNNER_TEMP 'pssa-cleanup-preview.png'
+          $p = Start-Process -FilePath $copy -ArgumentList "--preview `"$preview`"" -PassThru
+          if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0) { throw 'Cleanup preview failed' }
+          for ($i=0; $i -lt 40 -and (Test-Path $folder); $i++) { Start-Sleep -Seconds 1 }
+          if (Test-Path $folder) { throw 'Updater temporary folder was not removed' }
+          if (-not (Test-Path $source)) { throw 'Original installer was removed' }
+      - name: Verify custom wrapper, shortcuts, upgrade and uninstall
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.0.0-x64.exe').Path
+          $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
+          function Run-Setup($path, $arguments) {
+            Write-Host "Running $(Split-Path $path -Leaf) $arguments"
+            $p = Start-Process -FilePath $path -ArgumentList $arguments -PassThru
+            if (-not $p.WaitForExit(240000)) { Stop-Process -Id $p.Id -Force; throw 'Setup timeout' }
+            if ($p.ExitCode -ne 0) {
+              $log = Join-Path $env:TEMP 'PSSA-setup-error.log'
+              if (Test-Path $log) { Get-Content $log }
+              throw "Setup exit $($p.ExitCode)"
+            }
+          }
+          $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
+          Run-Setup $old[0].FullName "/S /D=$dir"
+          Run-Setup $exe "--install --directory `"$dir`" --no-desktop --no-start"
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk')) { throw 'Custom desktop opt-out failed' }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk')) { throw 'Custom Start opt-out failed' }
+          Run-Setup (Join-Path $dir 'PSSA 2 Dev.exe') '--smoke-test'
+          Run-Setup $exe '--uninstall'
+          if (Test-Path (Join-Path $dir 'PSSA 2 Dev.exe')) { throw 'Custom uninstall failed' }
+          if (-not (Test-Path (Join-Path $env:APPDATA 'PSSA 2 Dev/ci-retention-marker.txt'))) { throw 'Custom uninstall removed data' }
+          Run-Setup $exe "--install --directory `"$dir`""
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk'))) { throw 'Custom desktop missing' }
+          if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk'))) { throw 'Custom Start missing' }
+          Run-Setup $exe '--uninstall'
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PSSA-Setup-Windows
+          path: |
+            dist/PSSA-Setup-2.0.0-x64.exe
+            dist/SHA256SUMS.txt
+            dist/setup-preview.png
+          if-no-files-found: error
+      - name: Print setup diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:TEMP 'PSSA-setup-error.log'
+          if (Test-Path $log) { Get-Content $log }
+      - name: Hash verified installer
+        shell: pwsh
+        run: |
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.0.0-x64.exe' -File)
+          if ($setup.Count -ne 1) { throw 'Expected exactly one installer' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup[0].FullName).Hash.ToLowerInvariant()
+          "$hash  $($setup[0].Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: PSSA-2-Dev-Windows
+          path: |
+            dist/PSSA-2.0.0-x64.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish-beta:
+    name: Publish verified Beta channel release
+    needs: windows
+    if: success() && github.ref == 'refs/heads/develop/v2' && !contains(github.event.head_commit.message || '', '[audit-only]') && !contains(github.event.head_commit.message || '', '[release-stable]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: PSSA-Setup-Windows
+          path: release-package
+      - name: Publish verified prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/publish-beta.sh
+
+  publish-stable:
+    name: Publish PSSA 2.0.0
+    needs: windows
+    if: success() && github.ref == 'refs/heads/develop/v2' && github.event_name == 'push' && contains(github.event.head_commit.message || '', '[release-stable]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: PSSA-Setup-Windows
+          path: release-package
+      - name: Publish verified stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 53acf3554139df4f7be38af507de4818513c4bfa
+        run: bash scripts/publish-stable.sh
