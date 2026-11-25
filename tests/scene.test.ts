@@ -2,8 +2,8 @@ import {nextSceneFrame} from '../src/shared/scene-schedule.ts'
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {makeLayer,parseScene,resizeDuration,snap,type Scene} from '../src/shared/scene.ts'
-import {sceneForRule} from '../src/shared/scene-legacy.ts'
-import {defaultRule,parseRule} from '../src/shared/alerts.ts'
+import {sceneForRule,titleStyle} from '../src/shared/scene-legacy.ts'
+import {defaultRule,parseRule,normalizeLayout} from '../src/shared/alerts.ts'
 import {createScenePlayer} from '../src/shared/scene-player.ts'
 import {openDatabase} from '../src/main/database/index.ts'
 import {saveRule,rules,saveScene} from '../src/main/alerts/store.ts'
@@ -71,3 +71,5 @@ test('rules cache invalidates after update and does not retain rolled back profi
 import {sampleLayer,scaleMedia,fitMediaSize,retimeLayer} from '../src/shared/scene.ts'
 import {testEvent,renderText} from '../src/shared/alerts.ts'
 test('keyframes interpolate, move with timeline, retain image ratio, and validate crop',()=>{const l={...fixture().layers[0]!,crop:{top:10,right:5,bottom:0,left:0},keyframes:[{...sampleLayer(fixture().layers[0]!,0),time:0,easing:'linear' as const},{...sampleLayer(fixture().layers[0]!,0),x:90,time:1000,easing:'linear' as const}]};assert.equal(sampleLayer(l,500).x,70);assert.deepEqual(parseScene({...fixture(),layers:[l]}).layers[0],l);assert.equal(retimeLayer(l,500,5000,500).keyframes?.[0]?.time,500);assert.throws(()=>parseScene({...fixture(),layers:[{...l,crop:{top:0,bottom:0,left:60,right:60}}]}));const m=fitMediaSize(800,600,1920,1080),r=scaleMedia(m.width,m.height,10,2,true);assert.ok(Math.abs(r.width/r.height-m.width/m.height)<1e-9);const raid=defaultRule('raid');assert.match(renderText(raid.template,testEvent(raid,'test')),/25/);assert.equal(sceneForRule(raid).layers[0]?.backgroundOpacity,0)})
+
+test('default legacy layout gets modern title; custom saved scenes stay intact; explicit title style preserves identity and timeline',()=>{const raid=defaultRule('raid'),l=sceneForRule({...raid,layout:normalizeLayout({})}).layers[0]!;assert.equal(l.backgroundOpacity,0);assert.equal(l.fontWeight,700);const old={...fixture().layers[0]!,backgroundOpacity:90,background:'#843935',start:500};const scene={...fixture(),layers:[old]};assert.deepEqual(sceneForRule({...raid,scene}),scene);const styled=titleStyle(old,true);assert.equal(styled.id,old.id);assert.equal(styled.start,500);assert.equal(styled.backgroundOpacity,0);assert.equal(styled.accentColor,'#e3c048');assert.equal(parseScene({...scene,layers:[styled]}).layers[0]?.fontWeight,700)})

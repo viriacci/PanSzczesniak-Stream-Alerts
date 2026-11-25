@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-export type IconName = 'dashboard'|'activity'|'chart'|'queue'|'bell'|'gift'|'studio'|'folder'|'layers'|'plug'|'settings'|'shield'|'book'|'sidebar'|'inspector'|'chevron'|'clock'|'users'|'bolt'|'search'|'close'
+export type IconName = 'dashboard'|'activity'|'chart'|'queue'|'bell'|'gift'|'studio'|'folder'|'layers'|'plug'|'settings'|'shield'|'book'|'sidebar'|'inspector'|'chevron'|'clock'|'users'|'bolt'|'search'|'close'|'text'|'image'|'video'|'audio'|'shape'|'play'|'pause'|'stop'|'undo'|'redo'|'crop'|'save'
 const paths: Record<IconName, ReactNode> = {
  dashboard:<><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
  activity:<path d="M2 12h5l3-7 4 14 3-7h5"/>,
@@ -21,6 +21,14 @@ const paths: Record<IconName, ReactNode> = {
  users:<><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5"/></>,
  bolt:<path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z"/>,
  search:<><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></>,
- close:<path d="m6 6 12 12M18 6 6 18"/>
+ close:<path d="m6 6 12 12M18 6 6 18"/>,
+ text:<path d="M4 5h16M12 5v15M8 20h8M4 5v4M20 5v4"/>,
+ image:<><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m3 17 5-5 4 4 4-6 5 7"/></>,
+ video:<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3Z"/></>,
+ audio:<><path d="M9 18V5l11-2v13M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/></>,
+ shape:<><rect x="3" y="3" width="12" height="12" rx="2"/><circle cx="16" cy="16" r="5"/></>,
+ play:<path d="m8 4 13 8-13 8Z"/>,pause:<path d="M9 5v14M15 5v14"/>,stop:<rect x="6" y="6" width="12" height="12" rx="1"/>,
+ undo:<path d="m9 5-6 6 6 6M3 11h10a6 6 0 0 1 6 6"/>,redo:<path d="m15 5 6 6-6 6M21 11H11a6 6 0 0 0-6 6"/>,
+ crop:<path d="M6 2v16h16M2 6h16v16"/>,save:<><path d="M4 3h13l3 3v15H4Z"/><path d="M8 3v6h8V3M8 21v-8h8v8"/></>
 }
 export function Icon({name,size=18}: {name: IconName; size?: number}) {return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>}
