@@ -36,7 +36,6 @@
       <TextBlock Text="Folder instalacji" Margin="0,20,0,8" FontWeight="SemiBold"/>
       <DockPanel><Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Przeglądaj…" Margin="8,0,0,0" Click="BrowseClick"/><TextBox x:Name="Folder" AutomationProperties.Name="Folder instalacji"/></DockPanel>
       <CheckBox x:Name="DesktopBox" Content="Utwórz skrót na pulpicie" IsChecked="True" Margin="0,22,0,8"/><CheckBox x:Name="StartBox" Content="Utwórz skrót w menu Start" IsChecked="True"/>
-      <TextBlock x:Name="FolderHint" FontSize="12" Foreground="#B6B1AA" Margin="0,14,0,0"/>
       <Button x:Name="RemoveButton" Content="Odinstaluj PSSA…" HorizontalAlignment="Left" Foreground="#F1B2A8" Margin="0,16,0,0" Click="RemoveClick" Visibility="Collapsed"/>
      </StackPanel>
      <StackPanel x:Name="ConfirmPanel" Visibility="Collapsed">
@@ -44,7 +43,7 @@
      </StackPanel>
      <StackPanel x:Name="WorkPanel" Visibility="Collapsed" VerticalAlignment="Center">
       <TextBlock Text="PSSA SETUP  /  03" Foreground="#E5BD57" FontSize="11"/><TextBlock x:Name="WorkTitle" FontSize="30" FontWeight="SemiBold" Margin="0,12,0,14"/><TextBlock x:Name="WorkStatus" FontSize="14" Foreground="#B6B1AA" Margin="0,0,0,24"/>
-      <ProgressBar Height="7" IsIndeterminate="True" Foreground="#E5BD57" Background="#343033" BorderThickness="0"/><TextBlock Text="Postęp operacji jest nieokreślony. Nie zamykaj kreatora." Foreground="#B6B1AA" Margin="0,18,0,0" FontSize="12"/>
+      <ProgressBar Height="7" IsIndeterminate="True" Foreground="#E5BD57" Background="#343033" BorderThickness="0"/>
      </StackPanel>
      <StackPanel x:Name="FinishPanel" Visibility="Collapsed" VerticalAlignment="Center">
       <Border Width="64" Height="64" CornerRadius="32" BorderBrush="#E5BD57" BorderThickness="2" HorizontalAlignment="Left" Margin="0,0,0,18"><TextBlock x:Name="ResultMark" Text="✓" Foreground="#E5BD57" FontSize="37" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
@@ -52,7 +51,7 @@
      </StackPanel>
      <TextBlock x:Name="ErrorText" VerticalAlignment="Bottom" Foreground="#FFB1A7" FontSize="12" Visibility="Collapsed" Background="#141416"/>
     </Grid>
-    <Border Grid.Row="2" Grid.Column="1" Background="#1B1A1D" BorderBrush="#373230" BorderThickness="0,1,0,0" CornerRadius="0,0,17,0"><Grid Margin="24,0"><TextBlock x:Name="FooterText" Text="INSTALATOR OFFLINE" Foreground="#9F978B" FontSize="10" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button x:Name="BackButton" Content="Wstecz" Margin="0,0,8,0" Click="BackClick" Visibility="Collapsed"/><Button x:Name="CancelButton" Content="Anuluj" Margin="0,0,8,0" Click="CloseClick"/><Button x:Name="NextButton" Content="Dalej  →" Style="{StaticResource Primary}" MinWidth="126" Click="NextClick" IsDefault="True"/></StackPanel></Grid></Border>
+    <Border Grid.Row="2" Grid.Column="1" Background="#1B1A1D" BorderBrush="#373230" BorderThickness="0,1,0,0" CornerRadius="0,0,17,0"><Grid Margin="24,0"><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button x:Name="BackButton" Content="Wstecz" Margin="0,0,8,0" Click="BackClick" Visibility="Collapsed"/><Button x:Name="CancelButton" Content="Anuluj" Margin="0,0,8,0" Click="CloseClick"/><Button x:Name="NextButton" Content="Dalej  →" Style="{StaticResource Primary}" MinWidth="126" Click="NextClick" IsDefault="True"/></StackPanel></Grid></Border>
    </Grid>
   </Border>
  </Grid>

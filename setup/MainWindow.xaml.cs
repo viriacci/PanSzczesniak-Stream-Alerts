@@ -28,7 +28,6 @@ public partial class MainWindow : Window
         WelcomeStatus.Text=installed==null?"Gotowy do instalacji • aktualny użytkownik":"Wykryto PSSA "+installed.Version+" • aktualizacja lub dezinstalacja";
         OptionsTitle.Text=installed==null?"Opcje instalacji":"Zarządzaj instalacją";
         ScopeText.Text=installed?.Machine==true?"Instalacja dla wszystkich użytkowników (wymaga uprawnień).":"Instalacja dla bieżącego użytkownika.";
-        FolderHint.Text=installed==null?"Wybierz osobny, pusty katalog. Dane aplikacji są przechowywane oddzielnie.":"Aktualizacja zachowa folder programu oraz wszystkie dane.";
         RemoveButton.Visibility=installed==null?Visibility.Collapsed:Visibility.Visible;
         Closing+=(_,e)=>{if(busy)e.Cancel=true;};
         Closed+=(_,_)=>{Sparks.Stop();Application.Current.Shutdown();};
@@ -47,7 +46,6 @@ public partial class MainWindow : Window
         NextButton.Visibility=value==3?Visibility.Collapsed:Visibility.Visible;
         CloseButton.IsEnabled=value!=3;
         NextButton.Content=value switch {0=>"Dalej  →",1=>installed==null?"Zainstaluj":"Aktualizuj",2=>"Odinstaluj",4=>"Zakończ",_=>""};
-        FooterText.Text=value==3?"OPERACJA W TOKU":"INSTALATOR OFFLINE";
         var dot=value==0?0:value is 1 or 2?1:value==3?2:3;
         var dots=new[]{Dot0,Dot1,Dot2,Dot3};for(int i=0;i<dots.Length;i++)dots[i].Fill=i<=dot?gold:dim;
     }
