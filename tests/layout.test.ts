@@ -56,6 +56,16 @@ test('RC.7 menu migrates settings out without changing custom layout',()=>{
  assert.equal(parseLayout({...defaultLayout,page:'settings',navigation:n}).page,'settings')
  const moved=moveNode(n,'analytics','alerts','after')
  const group=findNode(moved.nodes,'alerts-group')
- assert.ok(group?.kind==='group');assert.equal(group.children[2]?.id,'analytics')
+ assert.ok(group?.kind==='group');assert.equal(group.children[3]?.id,'analytics')
  assert.equal(moveNode(moved,'analytics',null,'after').nodes.at(-1)?.id,'analytics')
+})
+
+test('RC.8 defaults migrate while preserving custom layout and collapse state',()=>{
+ const g=(id:string,name:string,ids:string[],collapsed=false)=>({kind:'group',id,name,collapsed,children:ids.map(id=>({kind:'page',id}))})
+ const old={nodes:[g('live','Centrum transmisji',['dashboard','activity','analytics'],true),g('alerts-group','Alerty',['queue','alerts','rewards','studio']),g('assets','Zasoby',['library','profiles']),g('system','System',['integrations','diagnostics','documentation'])],hidden:[]}
+ const next=parseLayout({...defaultLayout,navigation:old,sidebarWidth:300,page:'dashboard'})
+ assert.deepEqual(next.navigation.nodes.map(n=>n.id),['alerts-group','assets','live','system'])
+ assert.equal((findNode(next.navigation.nodes,'live') as any).collapsed,true);assert.equal(next.sidebarWidth,300);assert.equal(next.page,'dashboard')
+ const custom={...old,hidden:['studio']};assert.deepEqual(parseLayout({...defaultLayout,navigation:custom}).navigation,custom)
+ assert.equal(defaultLayout.page,'queue');assert.equal((defaultLayout.navigation.nodes[0] as any).children[1].id,'rewards')
 })

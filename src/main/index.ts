@@ -94,7 +94,7 @@ async function start(): Promise<void> {
   function createWindow(){
    const state=readWindowState(activeDb,screen.getAllDisplays().map(d=>d.workArea))
    const w=new BrowserWindow({
-    title:BRAND+' 2',...state.bounds,minWidth:700,minHeight:500,
+    title:BRAND+' 2',...state.bounds,minWidth:700,minHeight:440,
     titleBarStyle:'hidden',titleBarOverlay:{color:'#111114',symbolColor:'#e8e7eb',height:36},
     show:false,backgroundColor:'#101012',
     webPreferences:{preload:join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,webviewTag:false,devTools:!app.isPackaged}
@@ -190,8 +190,23 @@ async function start(): Promise<void> {
       return !document.querySelector('input[type="password"][autocomplete="off"][required]');
     })()`);
     if(navSmoke!==true)throw Error('Navigation renderer smoke failed');
+    const originalSize=activeWindow.getSize();
+    activeWindow.setSize(710,440);
+    const queueSmoke=await activeWindow.webContents.executeJavaScript(`(async()=>{
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));const until=async fn=>{for(let i=0;i<100;i++){if(await fn())return;await sleep(50)}throw Error('Queue UI timeout')};
+      document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page .panel'));
+      const titles=()=>[...document.querySelectorAll('.queue-page .panel-heading h2')].map(e=>e.textContent);
+      if(titles()[0]!=='Aktualnie odtwarzany'||!titles()[1].startsWith('Oczekujące')||titles()[2]!=='Historia alertów'||titles()[3]!=='Działanie alertów')throw Error('Queue panel order');
+      const button=[...document.querySelectorAll('.queue-page button')].find(e=>e.textContent==='Dodaj testowy alert');button.click();await until(()=>document.querySelector('.queue-page .queue-row')?.textContent.includes('Testowy alert'));
+      if(!document.querySelector('.queue-page [role=status]')?.textContent.includes('oczekują'))throw Error('Offline queue message missing');
+      const fits=()=>[...document.querySelectorAll('.content,.queue-page,.queue-page .panel')].every(e=>e.scrollWidth<=e.clientWidth+1);
+      if(!fits())throw Error('Small queue overflow');return true;
+    })()`);
+    if(queueSmoke!==true)throw Error('Queue renderer smoke failed');
+    activeWindow.setSize(originalSize[0]!,originalSize[1]!);
+    if(!(await activeWindow.webContents.executeJavaScript('new Promise(r=>setTimeout(()=>r([...document.querySelectorAll(".content,.queue-page,.queue-page .panel")].every(e=>e.scrollWidth<=e.clientWidth+1)),150))')))throw Error('Large queue overflow');
     const passed = await activeWindow.webContents.executeJavaScript(
-      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 5 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && await window.pssa.testAlert("raid") === 1 && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 5)'
+      'window.pssa.getStatus().then(async s => s.database === "ready" && s.schemaVersion === 5 && await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact === true && (await window.pssa.setLayout({...await window.pssa.getLayout(), page:"settings", sidebarWidth:280})).page === "settings" && (await window.pssa.getLayout()).sidebarWidth === 280 && (await window.pssa.alertState()).rules.length >= 8 && (await window.pssa.alertState()).twitch.overlayUrl.startsWith("http://127.0.0.1:18766/") && (await window.pssa.alertState()).queue.pendingCount === 1 && (await window.pssa.obsState()).phase === "offline" && (await window.pssa.liveState()).phase === "disconnected" && (await window.pssa.analyticsChannels()).length === 0 && (await window.pssa.libraryState()).assets.length === 0 && (await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions === 0 && (await window.pssa.runtimeState()).mode === "studio" && (await window.pssa.diagnostics()).schema === 5)'
     )
     if (passed !== true) throw new Error('Smoke test failed')
     // Load the real served overlay in a separate isolated Chromium window and wait for ACK.

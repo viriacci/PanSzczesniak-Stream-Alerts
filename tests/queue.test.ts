@@ -150,3 +150,13 @@ test('queue only schedules work for pending online alerts, gap, active deadline 
   f.connect(true);f.advance(500);f.ack();f.advance(500);assert.equal(f.q.nextDelay(),null)
  }finally{f.q.stop();f.db.close()}
 })
+
+test('independent test waits offline and observes volume, mute, ACK and replay',()=>{
+ const f=fixture();try{
+  const pending=f.q.command({type:'test'});assert.equal(pending.pendingCount,1);assert.equal(pending.pending[0]?.title,'Testowy alert');assert.equal(pending.pending[0]?.source,'test');assert.equal(f.last(),undefined)
+  f.q.command({type:'settings',settings:{...defaultQueueSettings,paused:true,volume:40}});f.connect(true);f.q.tick();assert.equal(f.last(),undefined)
+  f.q.command({type:'settings',settings:{...defaultQueueSettings,volume:40}});assert.match(f.last()!.rule.audio,/^[a-f0-9]{64}\\.wav$/);assert.equal(f.last()!.volume,40)
+  f.q.command({type:'settings',settings:{...defaultQueueSettings,volume:40,muted:true}});assert.equal(f.volume(),0);f.ack();assert.equal(f.q.state().history[0]?.status,'done')
+  f.q.command({type:'replay',id:f.q.state().history[0]!.id});f.advance(500);assert.equal(f.last()!.volume,0);f.ack()
+ }finally{f.q.stop();f.db.close()}
+})

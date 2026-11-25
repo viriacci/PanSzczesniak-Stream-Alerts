@@ -34,3 +34,10 @@ test('media ranges support seeks and reject invalid requests',async()=>{
  const foreign=await fetch(overlay.url+'events',{headers:{Origin:'https://example.org'}});assert.equal(foreign.status,403)
  }finally{overlay.stop();await rm(root,{recursive:true,force:true})}
 })
+
+test('built-in tone is content-addressed WAV served only under overlay key',async()=>{
+ const {testTone,testToneName,queueTestRule}=await import('../src/main/alerts/test-tone.ts')
+ const {createHash}=await import('node:crypto');const root=await mkdtemp(join(tmpdir(),'pssa-tone-')),overlay=new Overlay(root,0)
+ try{await overlay.start();assert.equal(queueTestRule().audio,testToneName);assert.equal(testToneName,createHash('sha256').update(testTone).digest('hex')+'.wav');assert.equal(testTone.toString('ascii',0,4),'RIFF');assert.equal(testTone.readUInt32LE(40),36000);assert.ok(testTone.subarray(44).some(v=>v!==0));const res=await fetch(overlay.url+'media/'+testToneName);assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'audio/wav');assert.deepEqual(Buffer.from(await res.arrayBuffer()),testTone);const range=await fetch(overlay.url+'media/'+testToneName,{headers:{Range:'bytes=0-43'}});assert.equal(range.status,206);assert.deepEqual(Buffer.from(await range.arrayBuffer()),testTone.subarray(0,44));assert.equal((await fetch(new URL('/media/'+testToneName,overlay.url))).status,404)
+ }finally{overlay.stop();await rm(root,{recursive:true,force:true})}
+})

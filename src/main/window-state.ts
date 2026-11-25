@@ -6,7 +6,7 @@ export function sanitizeWindowState(value: unknown, displays: Rect[]): State {
   if (!value || typeof value !== 'object') return fallback
   const { bounds, maximized } = value as { bounds?: Rect; maximized?: unknown }
   if (!bounds || ![bounds.x,bounds.y,bounds.width,bounds.height].every(Number.isSafeInteger) ||
-      bounds.width < 700 || bounds.height < 500 || bounds.width > 10000 || bounds.height > 10000) return fallback
+      bounds.width < 700 || bounds.height < 440 || bounds.width > 10000 || bounds.height > 10000) return fallback
   const visible = displays.some(d => Math.min(d.x+d.width,bounds.x+bounds.width)-Math.max(d.x,bounds.x)>=160 &&
     bounds.y >= d.y && bounds.y+36 <= d.y+d.height)
   return visible ? { bounds: {...bounds}, maximized: maximized === true } : fallback

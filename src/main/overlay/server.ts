@@ -1,3 +1,4 @@
+import {testTone,testToneName} from '../alerts/test-tone.ts'
 import {nextSceneFrame} from '../../shared/scene-schedule.ts'
 import { createServer,type Server,type ServerResponse,type IncomingMessage } from 'node:http'
 import { randomBytes } from 'node:crypto'
@@ -77,6 +78,7 @@ export class Overlay {
   if(path==='events'){if(req.headers.origin&&req.headers.origin!=='http://127.0.0.1:'+this.boundPort){res.writeHead(403);res.end();return}if(this.streams.size>=10){res.writeHead(503);res.end();return}res.writeHead(200,{'Content-Type':'text/event-stream','Connection':'keep-alive'});res.write(': connected\n\n');this.streams.add(res);this.onClientsChanged();res.on('drain',()=>this.onClientsChanged());res.on('close',()=>this.removeStream(res));res.on('error',()=>{this.removeStream(res);res.destroy()});return}
   if(path.startsWith('media/')){
    const name=path.slice(6),type=mediaTypes[extname(name).toLowerCase()]
+   if(name===testToneName){const size=testTone.length,range=mediaRange(req.headers.range,size);if(range===false){res.writeHead(416,{'Content-Range':'bytes */'+size});res.end();return}const headers:Record<string,string|number>={'Content-Type':'audio/wav','Content-Length':range?range.end-range.start+1:size,'Accept-Ranges':'bytes'};if(range)headers['Content-Range']='bytes '+range.start+'-'+range.end+'/'+size;res.setHeader('Cache-Control','private, max-age=86400, immutable');res.writeHead(range?206:200,headers);res.end(range?testTone.subarray(range.start,range.end+1):testTone);return}
    if(name&&validMedia(name)&&type){const root=await realpath(this.media),file=await realpath(join(root,name)),rel=relative(root,file);if(rel.startsWith('..')||isAbsolute(rel))throw Error('Invalid path');const st=await stat(file);if(!st.isFile()||st.size>50*1024*1024)throw Error('Invalid file');res.setHeader('Cache-Control','private, max-age=86400, immutable');const range=mediaRange(req.headers.range,st.size);if(range===false){res.writeHead(416,{'Content-Range':'bytes */'+st.size});res.end();return}const headers:Record<string,string|number>={'Content-Type':type,'Content-Length':range?range.end-range.start+1:st.size,'Accept-Ranges':'bytes'};if(range)headers['Content-Range']='bytes '+range.start+'-'+range.end+'/'+st.size;res.writeHead(range?206:200,headers);const stream=createReadStream(file,range||undefined);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);return}
   }
   res.writeHead(404);res.end()

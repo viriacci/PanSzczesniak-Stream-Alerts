@@ -1,3 +1,4 @@
+import {queueTestRule} from './test-tone.ts'
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { parseRule, renderText, type AlertEvent, type AlertRule } from '../../shared/alerts.ts'
@@ -122,6 +123,11 @@ export class AlertQueue {
  }
  command(input:unknown){
   const command=parseQueueCommand(input)
+  if(command.type==='test'){
+   const rule=queueTestRule()
+   if(!this.enqueue({id:randomUUID(),kind:'redemption',user:'Test PSSA'},rule,'test'))throw Error('Queue is full')
+   return this.state()
+  }
   if(command.type==='settings'){
    this.db.prepare("INSERT INTO settings(key,value) VALUES ('queue.v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(command.settings))
    this.settings=command.settings

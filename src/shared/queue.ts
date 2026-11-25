@@ -6,7 +6,7 @@ export interface QueueSettings {paused:boolean;muted:boolean;volume:number;gapMs
 export type QueueSummary=Omit<QueueItem,'rule'>
 export interface QueueState {settings:QueueSettings;current:QueueSummary|null;pending:QueueSummary[];pendingCount:number;history:QueueSummary[];online:boolean}
 export interface Playback {attempt:string;rule:AlertRule;text:string;volume:number}
-export type QueueCommand={type:'settings';settings:QueueSettings}|{type:'skip'|'replay';id:number}|{type:'move';id:number;direction:-1|1}|{type:'priority';id:number;priority:number}
+export type QueueCommand={type:'test'}|{type:'settings';settings:QueueSettings}|{type:'skip'|'replay';id:number}|{type:'move';id:number;direction:-1|1}|{type:'priority';id:number;priority:number}
 export const defaultQueueSettings:QueueSettings={paused:false,muted:false,volume:100,gapMs:500}
 export function intRange(v:unknown,min:number,max:number):v is number{return typeof v==='number'&&Number.isInteger(v)&&v>=min&&v<=max}
 export function parseQueueSettings(v:unknown):QueueSettings{
@@ -18,6 +18,7 @@ export function parseQueueSettings(v:unknown):QueueSettings{
 export function parseQueueCommand(v:unknown):QueueCommand{
  if(!v||typeof v!=='object')throw Error('Invalid queue command')
  const x=v as Record<string,unknown>
+ if(x.type==='test')return {type:'test'}
  if(x.type==='settings')return {type:'settings',settings:parseQueueSettings(x.settings)}
  if(!intRange(x.id,1,Number.MAX_SAFE_INTEGER))throw Error('Invalid queue id')
  if(x.type==='skip'||x.type==='replay')return {type:x.type,id:x.id}

@@ -4,9 +4,15 @@ export const sidebarPages=pages.filter(p=>p!=='settings')
 export type NavNode={kind:'page';id:PageId}|{kind:'group';id:string;name:string;collapsed:boolean;children:NavNode[]}
 export interface Navigation {nodes:NavNode[];hidden:PageId[]}
 const group=(id:string,name:string,ids:PageId[]):NavNode=>({kind:'group',id,name,collapsed:false,children:ids.map(id=>({kind:'page',id}))})
-export const defaultNavigation:Navigation={nodes:[group('live','Centrum transmisji',['dashboard','activity','analytics']),group('alerts-group','Alerty',['queue','alerts','rewards','studio']),group('assets','Zasoby',['library','profiles']),group('system','System',['integrations','diagnostics','documentation'])],hidden:[]}
+const previousNavigation:Navigation={nodes:[group('live','Centrum transmisji',['dashboard','activity','analytics']),group('alerts-group','Alerty',['queue','alerts','rewards','studio']),group('assets','Zasoby',['library','profiles']),group('system','System',['integrations','diagnostics','documentation'])],hidden:[]}
+export const defaultNavigation:Navigation={nodes:[group('alerts-group','Główne',['queue','rewards','alerts','studio']),group('assets','Dodatkowe',['profiles','library','dashboard']),group('live','Analiza',['activity','analytics']),group('system','Ustawienia',['integrations','diagnostics','documentation'])],hidden:[]}
+function migrateDefault(nav:Navigation):Navigation{
+ const structure=(n:NavNode):unknown=>n.kind==='group'?{id:n.id,name:n.name,children:n.children.map(structure)}:{id:n.id}
+ if(nav.hidden.length||JSON.stringify(nav.nodes.map(structure))!==JSON.stringify(previousNavigation.nodes.map(structure)))return nav
+ return {...defaultNavigation,nodes:defaultNavigation.nodes.map(n=>{const old=nav.nodes.find(p=>p.id===n.id);return n.kind==='group'&&old?.kind==='group'?{...n,collapsed:old.collapsed}:n})}
+}
 export interface LayoutPreferences {page:PageId;sidebarWidth:number;collapsed:boolean;inspectorWidth:number;inspectorOpen:boolean;navigation:Navigation}
-export const defaultLayout:LayoutPreferences={page:'dashboard',sidebarWidth:248,collapsed:false,inspectorWidth:300,inspectorOpen:false,navigation:defaultNavigation}
+export const defaultLayout:LayoutPreferences={page:'queue',sidebarWidth:248,collapsed:false,inspectorWidth:300,inspectorOpen:false,navigation:defaultNavigation}
 export const bounds={sidebar:[208,320],inspector:[240,420]} as const
 export function clampWidth(value:number,range:readonly [number,number]):number{return Math.min(range[1],Math.max(range[0],Math.round(value)))}
 export function parseNavigation(value:unknown):Navigation{
@@ -35,7 +41,7 @@ export function parseLayout(value:unknown):LayoutPreferences{
  const validWidth=(n:unknown,range:readonly [number,number]):n is number=>typeof n==='number'&&Number.isInteger(n)&&n>=range[0]&&n<=range[1]
  if(typeof v.page!=='string'||!pages.includes(v.page as PageId)||!validWidth(v.sidebarWidth,bounds.sidebar)||!validWidth(v.inspectorWidth,bounds.inspector)||typeof v.collapsed!=='boolean'||typeof v.inspectorOpen!=='boolean')throw new TypeError('Invalid layout')
  const old=v.navigation===undefined
- return {page:v.page as PageId,sidebarWidth:v.sidebarWidth,collapsed:v.collapsed,inspectorWidth:v.inspectorWidth,inspectorOpen:old?false:v.inspectorOpen,navigation:old?parseNavigation(defaultNavigation):parseNavigation(v.navigation)}
+ return {page:v.page as PageId,sidebarWidth:v.sidebarWidth,collapsed:v.collapsed,inspectorWidth:v.inspectorWidth,inspectorOpen:old?false:v.inspectorOpen,navigation:old?parseNavigation(defaultNavigation):migrateDefault(parseNavigation(v.navigation))}
 }
 export function findNode(nodes:NavNode[],id:string):NavNode|undefined{for(const n of nodes){if(n.id===id)return n;if(n.kind==='group'){const child=findNode(n.children,id);if(child)return child}}}
 export function mapNodes(nodes:NavNode[],id:string,fn:(n:NavNode)=>NavNode):NavNode[]{return nodes.map(n=>n.id===id?fn(n):n.kind==='group'?{...n,children:mapNodes(n.children,id,fn)}:n)}
