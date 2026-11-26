@@ -3,7 +3,7 @@ import {randomBytes,timingSafeEqual} from 'node:crypto'
 import {writeFileSync,renameSync,rmSync} from 'node:fs'
 import {join} from 'node:path'
 
-export interface DockState {version:string;volume:number;muted:boolean;pending:number;twitch:string;overlayUrl:string}
+export interface DockState {version:string;volume:number;muted:boolean;pending:number;twitch:string;overlayUrl:string;overlayClients?:number}
 export interface DockHandlers {state:()=>DockState;volume:(value:number)=>void;mute:(value:boolean)=>void;test:()=>void;reload:()=>void;show:()=>void;quit:()=>void;restart:()=>void}
 export interface DockDescriptor {exe:string;pipe:string;token:string;pid:number}
 export function dispatchDock(value:unknown,token:string,handlers:DockHandlers):DockState{

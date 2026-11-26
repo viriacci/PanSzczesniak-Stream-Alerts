@@ -29,7 +29,7 @@ export const tours:Record<TourPage,TourStep[]>={
   {target:'queue-current',title:'Aktualny alert',body:'Tutaj widać bieżący alert. Dodaj testowy alert pozwala sprawdzić nakładkę i dźwięk, gdy OBS jest połączony.'},
   {target:'queue-pending',title:'Oczekujące',body:'Wyższy priorytet jest odtwarzany pierwszy. Strzałki zmieniają kolejność w obrębie priorytetu.'},
   {target:'queue-history',title:'Historia',body:'Ostatnie 100 zakończonych lub odfiltrowanych zdarzeń. Ukrycie pozycji z historii nie usuwa bazowego zdarzenia ani statystyk.'},
-  {target:'queue-engine',title:'Działanie alertów',body:'Wstrzymaj odtwarzanie po bieżącym alercie lub wycisz je natychmiast. Stan nakładki informuje o połączeniu z OBS.'},
+  {target:'queue-playback',fallback:'queue-engine',title:'Działanie alertów',body:'W górnej części kolejki wstrzymaj odtwarzanie po bieżącym alercie, wznów je lub wycisz natychmiast. Stan nakładki informuje o połączeniu z OBS.'},
   {target:'queue-volume',fallback:'queue-engine',title:'Głośność i odstęp',body:'Ustaw globalną głośność oraz przerwę między alertami. Testowy alert ma dźwięk.'}],
  analytics:[
   {target:'analytics-filter',title:'Zakres dat',body:'Wybierz 7, 14, 30 lub 180 dni albo własny zakres. Daty są liczone w UTC, data końcowa jest włączona. Poprzedni okres ma taką samą długość.'},

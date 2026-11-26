@@ -162,7 +162,7 @@ async function start(): Promise<void> {
   let dockDescriptor:DockDescriptor|undefined
   {
    dockControl=new DockControl(directory,process.execPath,{
-    state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl}},
+    state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl,overlayClients:a.twitch.clients}},
     volume:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,volume:value}})},
     mute:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,muted:value}})},
     test:()=>{activeAlerts.queueCommand({type:'test'})},reload:()=>{activeAlerts.reloadOverlay()},show:()=>reveal(),quit:()=>dockExit(false),restart:()=>dockExit(true)
@@ -228,6 +228,11 @@ async function start(): Promise<void> {
       document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page .queue-row')?.textContent.includes('DługiAlert'));
       const titles=()=>[...document.querySelectorAll('.queue-page .panel-heading h2')].map(e=>e.textContent);
       if(titles()[0]!=='Aktualnie odtwarzany'||!titles()[1].startsWith('Oczekujące')||titles()[2]!=='Historia alertów'||titles()[3]!=='Działanie alertów')throw Error('Queue panel order');
+      const toggleQueue=()=>document.querySelector('[data-queue-toggle]');
+      if(!toggleQueue()||toggleQueue().getBoundingClientRect().top>document.querySelector('.queue-board').getBoundingClientRect().top)throw Error('Queue toggle must be above the board');
+      if((await window.pssa.alertState()).queue.settings.paused){toggleQueue().click();await until(async()=>!(await window.pssa.alertState()).queue.settings.paused)}
+      toggleQueue().click();await until(async()=> (await window.pssa.alertState()).queue.settings.paused&&toggleQueue().textContent.includes('Wznów'));
+      toggleQueue().click();await until(async()=> !(await window.pssa.alertState()).queue.settings.paused&&toggleQueue().textContent.includes('Pauza'));
       const button=[...document.querySelectorAll('.queue-page button')].find(e=>e.textContent==='Dodaj testowy alert');button.click();await until(()=>[...document.querySelectorAll('.queue-page .queue-row')].some(e=>e.textContent.includes('Testowy alert')));
       if(!document.querySelector('.queue-page [role=status]')?.textContent.includes('oczekują'))throw Error('Offline queue message missing');
       const fits=()=>[...document.querySelectorAll('.content,.queue-page,.queue-page .panel')].every(e=>e.scrollWidth<=e.clientWidth+1);
