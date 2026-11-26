@@ -203,9 +203,9 @@ async function start(): Promise<void> {
       target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer,clientY:rect.top+rect.height/2}));
       await until(async()=> (await window.pssa.getLayout()).navigation.nodes.find(n=>n.id==='assets')?.children.some(n=>n.id==='studio'));
       document.querySelector('.sidebar-bottom button[aria-label="Ustawienia"]').click();
-      await until(()=>document.querySelectorAll('.settings-section').length===8);
+      await until(()=>document.querySelectorAll('.settings-section').length===9);
       const sections=[...document.querySelectorAll('.settings-section')];
-      if(sections.length!==8||sections.some(s=>s.open)||!sections[0].textContent.includes('Ukryj zakładki'))throw Error('Settings not collapsed');
+      if(sections.length!==9||sections.some(s=>s.open)||!sections[0].textContent.includes('Ukryj zakładki'))throw Error('Settings not collapsed');
       sections[0].querySelector('summary').click();if(!sections[0].open)throw Error('Settings disclosure failed');
       if(!sections.some(s=>s.querySelector('summary span').textContent==='Logowanie zaawansowane'))throw Error('Advanced login missing');
       const updates=sections.find(s=>s.querySelector('summary span').textContent==='Aktualizacje');if(!updates)throw Error('Update settings missing');updates.querySelector('summary').click();
@@ -251,7 +251,7 @@ async function start(): Promise<void> {
       const select=document.querySelector('[data-language-select]');select.closest('details').open=true;
       const switchTo=async(code,title)=>{const input=document.querySelector('[data-language-select]');input.value=code;input.dispatchEvent(new Event('change',{bubbles:true}));await wait(async()=>document.documentElement.lang===code&&document.querySelector('.page-header h1')?.textContent===title&&(await window.pssa.runtimeState()).language===code,'language '+code)};
       await switchTo('en','Settings');await switchTo('de','Einstellungen');
-      document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.page-header h1')?.textContent==='Warteschlange'&&document.querySelector('[data-queue-toggle]')?.textContent.includes('pausieren'),'German queue');
+      document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.page-header h1')?.textContent==='Warteschlange'&&/pausieren|fortsetzen/.test(document.querySelector('[data-queue-toggle]')?.textContent??''),'German queue');
       document.querySelector('.sidebar-bottom button[aria-label="Einstellungen"]').click();await wait(()=>document.querySelector('[data-language-select]'),'return to settings');
       await switchTo('pl','Ustawienia');
       document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.page-header h1')?.textContent==='Kolejka','return to queue');
