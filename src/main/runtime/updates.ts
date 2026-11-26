@@ -38,3 +38,5 @@ export function installerAllowed(trust:'trusted'|'unsigned'|'untrusted',version:
  const parsed=parseVersion(version)
  return !!parsed&&(trust==='trusted'||trust==='unsigned'&&(parsed.rank===1||parsed.rank===2))
 }
+
+export function installerManualOnly(trust:'trusted'|'unsigned'|'untrusted',version:string):boolean{return trust==='unsigned'&&parseVersion(version)?.rank===3}

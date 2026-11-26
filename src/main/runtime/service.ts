@@ -14,9 +14,9 @@ import {join} from 'node:path'
 import {statSync,existsSync} from 'node:fs'
 import {createBackup,stageRestore} from './backup'
 import {preferences,savePreferences} from './preferences'
-import {checkRelease,compareVersions,installerAllowed} from './updates'
+import {checkRelease,compareVersions,installerAllowed,installerManualOnly} from './updates'
 import {cleanUpdateFiles} from './update-cleanup'
-import {downloadRelease} from './update-download'
+import {downloadRelease,saveManualInstaller} from './update-download'
 import {execFile} from 'node:child_process'
 import {promisify} from 'node:util'
 import {mkdtemp,rm} from 'node:fs/promises'
@@ -134,6 +134,15 @@ export class RuntimeService{
    dir=await mkdtemp(join(tmpdir(),'PSSA-update-'))
    const file=await downloadRelease(info.asset,dir)
    const trusted=await this.trustedInstaller(file)
+   if(installerManualOnly(trusted,info.version)){
+    assertCurrent()
+    const consent=await dialog.showMessageBox(this.requireWindow(),{type:'warning',title:'Niepodpisany instalator Stable',message:'Zapisać zweryfikowany instalator do folderu Pobrane?',detail:'Suma SHA256 jest zgodna z oficjalnym wydaniem GitHub. Instalator nie ma podpisu cyfrowego, więc PSSA nie uruchomi go automatycznie. Po zapisaniu zamknij PSSA i uruchom plik ręcznie. Windows może wyświetlić ostrzeżenie.',buttons:['Anuluj','Zapisz instalator'],defaultId:0,cancelId:0})
+    if(consent.response!==1)return 'cancelled'
+    assertCurrent()
+    const saved=await saveManualInstaller(file,app.getPath('downloads'),info.asset)
+    if(alsoDock)this.db.prepare("INSERT INTO settings(key,value) VALUES ('update.obs.reminder',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(info.version)
+    shell.showItemInFolder(saved);return 'manual'
+   }
    if(!installerAllowed(trusted,info.version))throw Error('Nie można potwierdzić podpisu instalatora. Automatyczne uruchomienie zablokowane. Sprawdź wydanie na GitHubie.')
    assertCurrent()
    await this.updateSafe()

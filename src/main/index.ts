@@ -212,7 +212,7 @@ async function start(): Promise<void> {
       updates.querySelectorAll('button')[0].click();
       const updateButton=await until(()=>[...updates.querySelectorAll('button')].find(b=>b.textContent==='Aktualizuj PSSA'&&!b.disabled));
       if(!document.querySelector('.update-banner'))throw Error('Manual check did not update global banner');
-      updateButton.click();const popup=await until(()=>document.querySelector('.update-dialog[open]'));if(!popup.textContent.includes('2.0.0-rc.999')||!popup.textContent.includes('Test aktualizacji')||![...popup.querySelectorAll('button')].some(b=>b.textContent==='Pobierz i zainstaluj'))throw Error('Update popup incomplete');popup.querySelector('[aria-label="Zamknij"]').click();await until(()=>!document.querySelector('.update-dialog[open]'));
+      updateButton.click();const popup=await until(()=>document.querySelector('.update-dialog[open]'));if(!popup.textContent.includes('2.0.0-rc.999')||!popup.textContent.includes('Test aktualizacji')||![...popup.querySelectorAll('button')].some(b=>b.textContent==='Pobierz aktualizację'))throw Error('Update popup incomplete');popup.querySelector('[aria-label="Zamknij"]').click();await until(()=>!document.querySelector('.update-dialog[open]'));
       document.querySelector('[data-nav-id="integrations"]').click();
       await until(()=>document.querySelector('.page-header h1')?.textContent==='Konfiguracja');
       return !document.querySelector('input[type="password"][autocomplete="off"][required]');
