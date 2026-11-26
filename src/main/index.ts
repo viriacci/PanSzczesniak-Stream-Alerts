@@ -250,10 +250,17 @@ async function start(): Promise<void> {
       await wait(()=>document.querySelector('[data-language-select]'),'language selector');
       const select=document.querySelector('[data-language-select]');select.closest('details').open=true;
       const switchTo=async(code,title)=>{const input=document.querySelector('[data-language-select]');input.value=code;input.dispatchEvent(new Event('change',{bubbles:true}));await wait(async()=>document.documentElement.lang===code&&document.querySelector('.page-header h1')?.textContent===title&&(await window.pssa.runtimeState()).language===code,'language '+code)};
-      await switchTo('en','Settings');await switchTo('de','Einstellungen');
+      await switchTo('en','Settings');
+      const setRegion=async(code,preview)=>{await wait(()=>!document.querySelector('[data-region-select]')?.disabled,'region enabled');const input=document.querySelector('[data-region-select]');input.value=code;input.dispatchEvent(new Event('change',{bubbles:true}));await wait(async()=>document.querySelector('[data-region-preview]')?.textContent.includes(preview)&&(await window.pssa.runtimeState()).region===code,'region '+code)};
+      await setRegion('de-DE','1.234,56');
+      if(document.documentElement.lang!=='en')throw Error('Region changed UI language');
+      await switchTo('de','Einstellungen');
+      await wait(async()=>document.querySelector('[data-region-select]')?.value==='de-DE'&&(await window.pssa.runtimeState()).region==='de-DE','region retained');
+      await setRegion('auto','1.234,56');
       document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.page-header h1')?.textContent==='Warteschlange'&&/pausieren|fortsetzen/.test(document.querySelector('[data-queue-toggle]')?.textContent??''),'German queue');
       document.querySelector('.sidebar-bottom button[aria-label="Einstellungen"]').click();await wait(()=>document.querySelector('[data-language-select]'),'return to settings');
       await switchTo('pl','Ustawienia');
+      document.querySelector('[data-nav-id="analytics"]').click();await wait(()=>document.querySelector('[data-tour="analytics-filter"]')?.textContent.includes('Analityka historyczna'),'Polish analytics');
       document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.page-header h1')?.textContent==='Kolejka','return to queue');
       return true;
     })()`);

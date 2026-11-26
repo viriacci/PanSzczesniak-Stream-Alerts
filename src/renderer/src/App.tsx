@@ -20,7 +20,7 @@ import { PageContent } from './features/pages'
 import { HelpCenter, GuidedTour } from './features/help'
 import type { TourPage } from './features/help-content'
 
-export function App(){const state=useRuntime();return <LocaleProvider language={state.runtime?.language??"pl"}><Workspace {...state}/></LocaleProvider>}
+export function App(){const state=useRuntime();return <LocaleProvider language={state.runtime?.language??"pl"} region={state.runtime?.region}><Workspace {...state}/></LocaleProvider>}
 function Workspace({runtime,saveRuntime}:ReturnType<typeof useRuntime>) {
  const {t}=useLocale()
  const theme=themes[runtime?.theme??'pssa']

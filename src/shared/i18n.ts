@@ -13,3 +13,10 @@ export function validateCatalog(value:unknown,code:Language):LocaleCatalog{
  for(const [key,text] of Object.entries(c.translations))if(!/^[a-zA-Z][a-zA-Z0-9_.-]{0,150}$/.test(key)||['__proto__','constructor','prototype'].includes(key)||typeof text!=='string'||!text.trim()||text.length>16000)throw Error('Invalid translation')
  return c
 }
+
+export const regions=['auto','pl-PL','en-US','en-GB','de-DE'] as const
+export type Region=typeof regions[number]
+export const isRegion=(value:unknown):value is Region=>typeof value==='string'&&(regions as readonly string[]).includes(value)
+export function resolveRegion(language:Language,region:Region='auto'):Exclude<Region,'auto'>{return region==='auto'?({pl:'pl-PL',en:'en-US',de:'de-DE'} as const)[language]:region}
+export function regionalNumber(region:Exclude<Region,'auto'>,value:number|null,options:Intl.NumberFormatOptions={}):string{return value===null?'—':new Intl.NumberFormat(region,options).format(value)}
+export function regionalDate(region:Exclude<Region,'auto'>,value:number|string,options:Intl.DateTimeFormatOptions={}):string{const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat(region,options).format(date):'—'}

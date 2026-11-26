@@ -21,3 +21,6 @@ Lokalizacja ekranów alertów, nagród Twitch, edytora reguł i wskazówek zmien
 
 ## dev.4
 Lokalizacja Kreatora Alertów: toolbar, warstwy, właściwości, animacje, geometria, timeline, keyframe’y, biblioteka fontów, edytor zmiennych i komunikaty. Wartości enum, klucze zmiennych, zapisane nazwy i geometria scen pozostają bez zmian; nowe nazwy warstw i kopii są lokalizowane. Rozszerzono test Electron o zmianę języka i zachowanie szkicu oraz keyframe’ów. Nie zmieniano silnika scen, renderera nakładki, IPC zapisu scen ani schematu bazy. Pełny CI wymagany przed dalszą dystrybucją.
+
+## dev.5
+Lokalizacja analityki historycznej, wykresów, heatmapy i zestawień. Niezależny format regionalny (automatyczny, PL, US, GB, DE), zapis w ustawieniach runtime i podgląd w UI. Kolejka, liczba punktów nagród i prezentacja danych analityki używają regionu. Zakresy raportów, grupowanie UTC, źródła, obliczenia i eksport nie zostały zmienione; natywne kontrolki dat mogą używać ustawień systemu. Dodano testy formatu i zachowania języka po zmianie regionu. Oddzielono kolejki CI według SHA, by nie anulować wcześniejszych testów.
