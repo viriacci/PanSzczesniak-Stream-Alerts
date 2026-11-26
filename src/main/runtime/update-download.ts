@@ -1,6 +1,7 @@
 import type {UpdateAsset} from '../../shared/runtime.ts'
 import {createHash} from 'node:crypto'
-import {open,rename,rm} from 'node:fs/promises'
+import {open,rename,rm,mkdtemp,copyFile,writeFile,stat} from 'node:fs/promises'
+import {constants,createReadStream} from 'node:fs'
 import {join} from 'node:path'
 
 export function safeReleaseRedirect(value:string):boolean{
@@ -26,4 +27,17 @@ export async function downloadRelease(asset:UpdateAsset,directory:string,request
  }finally{await file.close();if(!success)await rm(partial,{force:true})}
  try{await rename(partial,target)}catch(e){await rm(partial,{force:true});throw e}
  return target
+}
+
+export async function saveManualInstaller(source:string,downloads:string,asset:UpdateAsset){
+ if(!/^PSSA-Setup-\d+\.\d+\.\d+-x64\.exe$/.test(asset.name)||!/^[a-f0-9]{64}$/.test(asset.sha256)||!Number.isSafeInteger(asset.size)||asset.size<1024||asset.size>500*1024*1024)throw Error('Nieprawidłowe metadane instalatora Stable.')
+ const dir=await mkdtemp(join(downloads,'PSSA-')),target=join(dir,asset.name)
+ try{
+  await copyFile(source,target,constants.COPYFILE_EXCL)
+  if((await stat(target)).size!==asset.size)throw Error('Nieprawidłowy rozmiar instalatora.')
+  const hash=createHash('sha256');for await(const chunk of createReadStream(target))hash.update(chunk)
+  if(hash.digest('hex')!==asset.sha256)throw Error('Suma SHA256 instalatora jest niezgodna.')
+  if(process.platform==='win32')await writeFile(target+':Zone.Identifier','[ZoneTransfer]\r\nZoneId=3\r\n',{encoding:'ascii'})
+  return target
+ }catch(e){await rm(dir,{recursive:true,force:true}).catch(()=>{});throw e}
 }

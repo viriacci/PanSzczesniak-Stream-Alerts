@@ -1,5 +1,8 @@
 # Historia zmian
 
+## 2.0.3
+- Aktualizator zapisuje zweryfikowany, niepodpisany instalator Stable w folderze Pobrane zamiast usuwać go po sprawdzeniu podpisu. Ręczne uruchomienie; nieprawidłowy podpis nadal blokuje aktualizację.
+
 ## 2.0.2
 - Obsługa alternatywnych portów nakładki w Control Dock i rzeczywiste przeładowanie źródeł OBS.
 - Widoczne sterowanie kolejką na górze zakładki oraz osobna informacja o połączeniu nakładki.

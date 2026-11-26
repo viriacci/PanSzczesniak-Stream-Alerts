@@ -9,7 +9,7 @@ import {DatabaseSync} from 'node:sqlite'
 import {openDatabase,setCompact,getCompact} from '../src/main/database/index.ts'
 import {createBackup,validateBackup,restoreBackup,stageRestore,pendingRestore} from '../src/main/runtime/backup.ts'
 import {preferences,savePreferences} from '../src/main/runtime/preferences.ts'
-import {compareVersions,selectRelease,checkRelease,installerAllowed} from '../src/main/runtime/updates.ts'
+import {compareVersions,selectRelease,checkRelease,installerAllowed,installerManualOnly} from '../src/main/runtime/updates.ts'
 import {defaultRule} from '../src/shared/alerts.ts'
 import {saveRule,rules} from '../src/main/alerts/store.ts'
 const tmp=()=>mkdtempSync(join(tmpdir(),'pssa-runtime-'))
@@ -129,4 +129,13 @@ test('unsigned installer consent is limited to beta and RC versions',()=>{
  assert.equal(installerAllowed('untrusted','2.0.0-rc.22'),false)
  assert.equal(installerAllowed('trusted','2.0.0'),true)
  assert.equal(installerAllowed('trusted','invalid'),false)
+})
+
+import {saveManualInstaller} from '../src/main/runtime/update-download.ts'
+test('unsigned stable can be saved for manual execution but invalid signatures cannot',async()=>{
+ assert.equal(installerManualOnly('unsigned','2.0.3'),true);assert.equal(installerAllowed('unsigned','2.0.3'),false)
+ for(const trust of ['trusted','untrusted'] as const)assert.equal(installerManualOnly(trust,'2.0.3'),false)
+ assert.equal(installerManualOnly('unsigned','2.0.3-rc.1'),false)
+ const root=tmp(),bytes=Buffer.alloc(2048,7),source=join(root,'download.exe'),asset={name:'PSSA-Setup-2.0.3-x64.exe',url:'',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}
+ try{writeFileSync(source,bytes);const saved=await saveManualInstaller(source,root,asset);assert.deepEqual(readFileSync(saved),bytes);if(process.platform==='win32')assert.match(readFileSync(saved+':Zone.Identifier','utf8'),/ZoneId=3/);const before=readdirSync(root);await assert.rejects(()=>saveManualInstaller(source,root,{...asset,sha256:'0'.repeat(64)}),/SHA256/);assert.deepEqual(readdirSync(root),before)}finally{rmSync(root,{recursive:true,force:true})}
 })
