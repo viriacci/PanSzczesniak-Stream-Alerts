@@ -18,3 +18,6 @@ Dodano lokalizację kolejki (statusy, przyczyny, sterowanie, daty), ustawień wy
 
 ## dev.3
 Lokalizacja ekranów alertów, nagród Twitch, edytora reguł i wskazówek zmiennych, logowania i migracji, biblioteki mediów, profili, szablonów i wariantów. Zapisane treści i nazwy użytkownika pozostają bez zmian. Poprawiono test nawigacji (9 sekcji ustawień zamiast 8) oraz test sprzątania aktualizacji (nazwa RC zgodna z produkcyjną polityką). Nadal do wykonania: komunikaty backendu, domyślne alerty według osobnego języka, kreator, dashboard transmisji, analityka, aktualizator, dock i pomoc. Nie publikować jako Stable przed pełnym CI.
+
+## dev.4
+Lokalizacja Kreatora Alertów: toolbar, warstwy, właściwości, animacje, geometria, timeline, keyframe’y, biblioteka fontów, edytor zmiennych i komunikaty. Wartości enum, klucze zmiennych, zapisane nazwy i geometria scen pozostają bez zmian; nowe nazwy warstw i kopii są lokalizowane. Rozszerzono test Electron o zmianę języka i zachowanie szkicu oraz keyframe’ów. Nie zmieniano silnika scen, renderera nakładki, IPC zapisu scen ani schematu bazy. Pełny CI wymagany przed dalszą dystrybucją.
