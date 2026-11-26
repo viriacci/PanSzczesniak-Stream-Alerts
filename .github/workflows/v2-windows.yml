@@ -128,7 +128,7 @@ jobs:
       - name: Verify clean NSIS installation
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.5-x64.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.6-x64.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one setup executable' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           if (Test-Path $dir) { throw 'Install path already exists' }
@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
-          $new = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.5-x64.exe' -File)
+          $new = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.6-x64.exe' -File)
           if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Installer missing' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
@@ -178,20 +178,26 @@ jobs:
       - name: Render actual WPF preview
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.5-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
           $preview = Join-Path $PWD 'dist/setup-preview.png'
           $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
           if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
           if ((Get-Item $preview).Length -lt 10000) { throw 'WPF preview is unexpectedly small' }
+          foreach ($lang in @('pl','en','de')) {
+            $localized = Join-Path $PWD "dist/setup-preview-$lang.png"
+            $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$localized`" $lang" -PassThru
+            if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $localized)) { throw "WPF preview failed: $lang" }
+            if ((Get-Item $localized).Length -lt 10000) { throw "WPF preview too small: $lang" }
+          }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pssa-setup-preview
-          path: dist/setup-preview.png
+          path: dist/setup-preview*.png
           if-no-files-found: error
       - name: Verify updater self-cleanup after installer exit
         shell: pwsh
         run: |
-          $source = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.5-x64.exe').Path
+          $source = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
           $folder = Join-Path $env:TEMP ('PSSA-update-' + [Guid]::NewGuid().ToString('N').Substring(0,6))
           New-Item -ItemType Directory -Path $folder | Out-Null
           $copy = Join-Path $folder 'PSSA-Setup-2.1.0-rc.1-x64.exe'
@@ -205,7 +211,7 @@ jobs:
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.5-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
           function Run-Setup($path, $arguments) {
             Write-Host "Running $(Split-Path $path -Leaf) $arguments"
@@ -219,7 +225,14 @@ jobs:
           }
           $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
           Run-Setup $old[0].FullName "/S /D=$dir"
+          $languageFile = Join-Path $env:APPDATA 'PSSA 2 Dev/language.json'
+          '{"language":"de"}' | Set-Content -LiteralPath $languageFile -Encoding utf8
           Run-Setup $exe "--install --directory `"$dir`" --no-desktop --no-start"
+          if ((Get-Content -LiteralPath $languageFile -Raw | ConvertFrom-Json).language -ne 'de') { throw 'Upgrade lost saved language' }
+          foreach ($lang in @('pl','en','de')) {
+            if (-not (Test-Path (Join-Path $dir "resources/locales/$lang.json"))) { throw "Missing installed language: $lang" }
+          }
+          '{"language":"pl"}' | Set-Content -LiteralPath $languageFile -Encoding utf8
           if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'PSSA.lnk')) { throw 'Custom desktop opt-out failed' }
           if (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'PSSA.lnk')) { throw 'Custom Start opt-out failed' }
           Run-Setup (Join-Path $dir 'PSSA 2 Dev.exe') '--smoke-test'
@@ -233,7 +246,7 @@ jobs:
       - name: Verify shared registry entry does not hijack per-user setup
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.5-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
           $shared = Join-Path $env:RUNNER_TEMP 'PSSA-shared-fixture'
           $local = Join-Path $env:RUNNER_TEMP 'PSSA-independent-fixture'
           $reg = 'HKLM:\Software\1d52d779-24b9-566f-8b55-c659c5b0b6e2'
@@ -261,7 +274,7 @@ jobs:
         with:
           name: PSSA-Setup-Windows
           path: |
-            dist/PSSA-Setup-2.1.0-dev.5-x64.exe
+            dist/PSSA-Setup-2.1.0-dev.6-x64.exe
             dist/SHA256SUMS.txt
             dist/setup-preview.png
           if-no-files-found: error
@@ -274,7 +287,7 @@ jobs:
       - name: Hash verified installer
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.5-x64.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.6-x64.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one installer' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup[0].FullName).Hash.ToLowerInvariant()
           "$hash  $($setup[0].Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
@@ -282,6 +295,6 @@ jobs:
         with:
           name: PSSA-2-Dev-Windows
           path: |
-            dist/PSSA-2.1.0-dev.5-x64.exe
+            dist/PSSA-2.1.0-dev.6-x64.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error

@@ -16,9 +16,10 @@ public partial class App : Application
                 Shutdown(0);return;
             }
             if(e.Args.Length==1&&e.Args[0]=="--uninstall"){await InstallEngine.Remove();Shutdown(0);return;}
+            if(e.Args.Length==3&&e.Args[0]=="--preview"&&new[]{"pl","en","de"}.Contains(e.Args[2]))L.Set(e.Args[2]);
             var window=new MainWindow();
             MainWindow=window;
-            if(e.Args.Length==2&&e.Args[0]=="--preview"){
+            if((e.Args.Length==2||e.Args.Length==3)&&e.Args[0]=="--preview"){
                 window.Show(); await window.SavePreview(e.Args[1]); Shutdown(0);return;
             }
             window.Show();

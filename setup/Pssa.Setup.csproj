@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><AssemblyName>PSSA.Setup</AssemblyName>
-    <ApplicationIcon>../build/branding/pssa.ico</ApplicationIcon><Version>2.1.0-dev.5</Version><FileVersion>2.1.0.5</FileVersion>
+    <ApplicationIcon>../build/branding/pssa.ico</ApplicationIcon><Version>2.1.0-dev.6</Version><FileVersion>2.1.0.6</FileVersion>
     <Company>Pan Szczesniak</Company><Product>PSSA Setup</Product>
   </PropertyGroup>
   <ItemGroup>

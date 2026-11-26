@@ -18,5 +18,11 @@ export const regions=['auto','pl-PL','en-US','en-GB','de-DE'] as const
 export type Region=typeof regions[number]
 export const isRegion=(value:unknown):value is Region=>typeof value==='string'&&(regions as readonly string[]).includes(value)
 export function resolveRegion(language:Language,region:Region='auto'):Exclude<Region,'auto'>{return region==='auto'?({pl:'pl-PL',en:'en-US',de:'de-DE'} as const)[language]:region}
-export function regionalNumber(region:Exclude<Region,'auto'>,value:number|null,options:Intl.NumberFormatOptions={}):string{return value===null?'—':new Intl.NumberFormat(region,options).format(value)}
-export function regionalDate(region:Exclude<Region,'auto'>,value:number|string,options:Intl.DateTimeFormatOptions={}):string{const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat(region,options).format(date):'—'}
+// Bounded formatter caches avoid repeated Intl construction for queue rows and heatmaps.
+const numberFormats=new Map<string,Intl.NumberFormat>(),dateFormats=new Map<string,Intl.DateTimeFormat>()
+function cached<T>(cache:Map<string,T>,key:string,create:()=>T):T{
+ const existing=cache.get(key);if(existing!==undefined)return existing
+ const value=create();if(cache.size>=64)cache.delete(cache.keys().next().value!);cache.set(key,value);return value
+}
+export function regionalNumber(region:Exclude<Region,'auto'>,value:number|null,options:Intl.NumberFormatOptions={}):string{return value===null?'—':cached(numberFormats,region+JSON.stringify(options),()=>new Intl.NumberFormat(region,options)).format(value)}
+export function regionalDate(region:Exclude<Region,'auto'>,value:number|string,options:Intl.DateTimeFormatOptions={}):string{const date=new Date(value);return Number.isFinite(date.getTime())?cached(dateFormats,region+JSON.stringify(options),()=>new Intl.DateTimeFormat(region,options)).format(date):'—'}

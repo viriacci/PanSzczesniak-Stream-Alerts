@@ -6,6 +6,7 @@ files:
   - out/**/*
   - '!out/**/*.map'
   - package.json
+  - locales/*.json
 extraResources:
   - from: locales
     to: locales

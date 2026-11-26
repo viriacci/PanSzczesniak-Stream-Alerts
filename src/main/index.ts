@@ -306,6 +306,8 @@ async function start(): Promise<void> {
       await settings('de','Einstellungen');await studio();await wait(()=>document.querySelector('.studio-timeline h2')?.textContent==='Zeitleiste','German timeline');
       if(JSON.stringify(before)!==JSON.stringify([...document.querySelectorAll('.studio-layer button:first-child span')].map(e=>e.textContent))||keys!==document.querySelectorAll('.studio-key').length)throw Error('Studio draft changed after language switch');
       if(![...document.querySelectorAll('.studio-add button')].some(b=>b.textContent.includes('Partikel')))throw Error('German layer types missing');
+      const fits=()=>[...document.querySelectorAll('.studio-add button,.studio-tabs button,.studio-workspace>.panel')].every(e=>e.scrollWidth<=e.clientWidth+2);
+      await wait(fits,'German studio horizontal fit');
       await settings('en','Settings');await studio();await wait(()=>document.querySelector('.studio-timeline h2')?.textContent==='Timeline','English timeline');
       await settings('pl','Ustawienia');document.querySelector('[data-nav-id="queue"]').click();await wait(()=>document.querySelector('.queue-page'),'queue');return true;
     })()`);

@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtempSync,rmSync,writeFileSync} from 'node:fs'
+import {mkdtempSync,rmSync,writeFileSync,mkdirSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {readLanguage,writeLanguage,loadCatalogs} from '../src/main/runtime/language.ts'
@@ -24,4 +24,21 @@ test('regional format is independent of UI language and UTC analytics dates',()=
  assert.equal(parseRuntime({...defaults,region:'en-GB'}).region,'en-GB')
  assert.equal(parseRuntime({...defaults,region:'../../bad'}).region,undefined)
  assert.equal(isRegion('auto'),true)
+})
+
+test('corrupt external catalog cannot block UI and missing or invalid overrides fall back to shipped text',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'pssa-locales-'))
+ try{
+  mkdirSync(join(dir,'locales'))
+  const shipped=loadCatalogs(process.cwd())
+  writeFileSync(join(dir,'locales','de.json'),'{broken')
+  writeFileSync(join(dir,'locales','en.json'),JSON.stringify({...shipped.en,translations:{'nav.queue':'Custom queue','setup.detected':'Missing placeholder','unexpected.key':'unknown'}}))
+  const loaded=loadCatalogs(dir,process.cwd())
+  assert.equal(loaded.de.translations['nav.queue'],shipped.de.translations['nav.queue'])
+  assert.equal(loaded.en.translations['nav.queue'],'Custom queue')
+  assert.equal(loaded.en.translations['setup.detected'],shipped.en.translations['setup.detected'])
+  assert.equal(loaded.en.translations['nav.alerts'],shipped.en.translations['nav.alerts'])
+  assert.equal(Object.hasOwn(loaded.en.translations,'unexpected.key'),false)
+  assert.deepEqual(loaded.pl,shipped.pl)
+ }finally{rmSync(dir,{recursive:true,force:true})}
 })

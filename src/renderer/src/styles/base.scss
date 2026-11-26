@@ -353,3 +353,9 @@ svg { flex:none; }
 .app[data-theme="shiroe"] .studio-guides{background:linear-gradient(90deg,transparent calc(50% - .5px),#dfc49c99 50%,transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),#dfc49c99 50%,transparent calc(50% + .5px))}
 .theme-preview[data-preview="shiroe"]{background-image:radial-gradient(ellipse at 50% 28%,#6b534077,transparent 66%)}
 .theme-preview[data-preview="shiroe"] strong{font-family:"Palatino Linotype","Book Antiqua",Georgia,serif;font-size:16px;letter-spacing:.035em}
+
+/* Longer localized labels must not widen the queue or Studio panels. */
+html[lang="de"] .studio-add .button,html[lang="en"] .studio-add .button{min-width:0;white-space:normal;overflow-wrap:anywhere;flex-wrap:wrap;line-height:1.2;text-align:center}
+html[lang="de"] .studio-tabs button,html[lang="en"] .studio-tabs button{min-width:0;overflow-wrap:anywhere}
+html[lang="de"] .studio-fieldset label,html[lang="en"] .studio-fieldset label{min-width:0;overflow-wrap:anywhere}
+.settings-section-body select{max-width:100%;min-width:0}
