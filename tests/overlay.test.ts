@@ -41,3 +41,18 @@ test('built-in tone is content-addressed WAV served only under overlay key',asyn
  try{await overlay.start();assert.equal(queueTestRule().audio,testToneName);assert.equal(testToneName,createHash('sha256').update(testTone).digest('hex')+'.wav');assert.equal(testTone.toString('ascii',0,4),'RIFF');assert.equal(testTone.readUInt32LE(40),36000);assert.ok(testTone.subarray(44).some(v=>v!==0));const res=await fetch(overlay.url+'media/'+testToneName);assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'audio/wav');assert.deepEqual(Buffer.from(await res.arrayBuffer()),testTone);const range=await fetch(overlay.url+'media/'+testToneName,{headers:{Range:'bytes=0-43'}});assert.equal(range.status,206);assert.deepEqual(Buffer.from(await range.arrayBuffer()),testTone.subarray(0,44));assert.equal((await fetch(new URL('/media/'+testToneName,overlay.url))).status,404)
  }finally{overlay.stop();await rm(root,{recursive:true,force:true})}
 })
+
+test('another profile can bind a different loopback port without sharing media or keys',async()=>{
+ const a=await mkdtemp(join(tmpdir(),'pssa-user-a-')),b=await mkdtemp(join(tmpdir(),'pssa-user-b-')),one=new Overlay(a,0),two=new Overlay(b,0),name='a'.repeat(64)+'.wav'
+ try{
+  await writeFile(join(a,name),'user-a');await writeFile(join(b,name),'user-b')
+  await one.start();const occupied=Number(new URL(one.url).port)
+  await assert.rejects(()=>two.start(undefined,occupied),{code:'EADDRINUSE'})
+  await two.start(undefined,0)
+  assert.notEqual(new URL(one.url).port,new URL(two.url).port)
+  assert.equal(await (await fetch(one.url+'media/'+name)).text(),'user-a')
+  assert.equal(await (await fetch(two.url+'media/'+name)).text(),'user-b')
+  const wrong=new URL(two.url);wrong.pathname=new URL(one.url).pathname+'media/'+name
+  assert.equal((await fetch(wrong)).status,404)
+ }finally{one.stop();two.stop();await rm(a,{recursive:true,force:true});await rm(b,{recursive:true,force:true})}
+})

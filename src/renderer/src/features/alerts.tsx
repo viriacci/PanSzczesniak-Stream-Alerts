@@ -1,3 +1,5 @@
+import {assignRuleMedia,ruleMedia} from '../../../shared/scene-legacy'
+import type {Asset} from '../../../shared/library'
 import {useEffect,useRef,useState,type FormEvent} from 'react'
 import {defaultRule,alertVariableHints,type AlertRule,type AlertState} from '../../../shared/alerts'
 import {Button,Panel,Status} from '../components/ui'
@@ -40,6 +42,9 @@ export function MigrationPanel(){
 }
 function RuleEditor({initial,onClose,profile}:{initial:AlertRule;onClose:()=>void;profile:string}){
  const [rule,setRule]=useState(initial),[busy,setBusy]=useState(false),[message,setMessage]=useState('')
+ const [assets,setAssets]=useState<Asset[]>([]),[libraryError,setLibraryError]=useState(false)
+ async function refreshAssets(){try{setAssets((await window.pssa.libraryState()).assets);setLibraryError(false)}catch{setLibraryError(true)}}
+ useEffect(()=>{void refreshAssets()},[])
  const dialog=useRef<HTMLDialogElement>(null)
  useEffect(()=>{const d=dialog.current;const previous=document.activeElement;d?.showModal();return()=>{if(d?.open)d.close();if(previous instanceof HTMLElement)previous.focus()}},[])
  const patch=(p:Partial<AlertRule>)=>setRule(v=>({...v,...p}))
@@ -47,9 +52,10 @@ function RuleEditor({initial,onClose,profile}:{initial:AlertRule;onClose:()=>voi
  return <dialog ref={dialog} className="rule-dialog" aria-labelledby="rule-dialog-title" onCancel={e=>{e.preventDefault();if(!busy)onClose()}}><header className="rule-dialog-header"><h2 id="rule-dialog-title">{labels[rule.key]??rule.title}</h2><Button disabled={busy} onClick={onClose} aria-label="Zamknij edycję"><Icon name="close"/></Button></header><form className="alert-form rule-dialog-form" onSubmit={e=>{e.preventDefault();void run(async()=>{await window.pssa.saveAlert(rule,profile);setMessage('Zapisano.')})}}>
   <div className="rule-dialog-body"><label className="alert-checkbox"><input type="checkbox" checked={rule.enabled} onChange={e=>patch({enabled:e.target.checked})}/> Włącz alert</label>
   <label>Treść alertu<input maxLength={500} value={rule.template} onChange={e=>patch({template:e.target.value})}/></label><p className="muted" data-variable-hints>Zmienne: {alertVariableHints(rule.key).map(v=>'{'+v.key+'} ('+v.label+')').join(', ')}</p>
-  {rule.scene?<p className="muted">Czas i multimedia tej sceny edytuj w Kreatorze Alertów.</p>:<label>Czas wyświetlania (s)<input type="number" min={1} max={120} step={0.5} value={rule.duration} onChange={e=>patch({duration:Number(e.target.value)})}/></label>}
+  {rule.scene?<p className="muted">Czas i pozostałe warstwy sceny edytuj w Kreatorze Alertów.</p>:<label>Czas wyświetlania (s)<input type="number" min={1} max={120} step={0.5} value={rule.duration} onChange={e=>patch({duration:Number(e.target.value)})}/></label>}
   <div className="queue-fields">{([{key:'priority',label:'Priorytet',max:10},{key:'cooldown',label:'Cooldown (s)',max:3600},{key:'volume',label:'Głośność (%)',max:100},{key:'minCount',label:'Minimalna liczba (Bits/widzowie/prezenty/miesiące)',max:1000000}] as const).map(field=><label key={field.key}>{field.label}<input type="number" min={0} max={field.max} step={1} value={rule[field.key]} onChange={e=>patch({[field.key]:Number(e.target.value)})}/></label>)}</div>
-  {!rule.scene&&(['image','audio'] as const).map(kind=><div className="setting-row" key={kind}><div><h3>{kind==='image'?'Grafika / GIF':'Dźwięk'}</h3><p>{rule[kind]?'Plik przypisany':'Nie wybrano'}</p></div><div className="alert-actions"><Button disabled={busy} onClick={()=>void run(async()=>{const file=await window.pssa.chooseMedia(kind);if(file)patch({[kind]:file})})}>Wybierz</Button><Button disabled={busy||!rule[kind]} onClick={()=>patch({[kind]:''})}>Usuń</Button></div></div>)}
+  {(['image','audio'] as const).map(kind=>{const id=ruleMedia(rule,kind),choices=assets.filter(a=>a.kind===kind&&!a.missing),blocked=!!rule.scene&&!rule.scene.layers.some(l=>l.kind===kind&&!l.locked)&&(rule.scene.layers.some(l=>l.kind===kind)||rule.scene.layers.length>=32);return <div className="alert-form" key={kind}><h3>{kind==='image'?'Grafika / GIF':'Dźwięk'}</h3><label>Biblioteka – {kind==='image'?'grafika':'dźwięk'}<select aria-label={'Biblioteka '+kind} value={id} disabled={busy||blocked} onChange={e=>{try{setRule(assignRuleMedia(rule,kind,e.target.value))}catch{setMessage('Nie można zmienić tej warstwy.')}}}><option value="">Brak</option>{id&&!choices.some(a=>a.id===id)&&<option value={id}>{assets.find(a=>a.id===id)?.name??'Bieżący plik'}</option>}{choices.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><div className="alert-actions"><Button disabled={busy||blocked} onClick={()=>void run(async()=>{const file=await window.pssa.chooseMedia(kind);if(file){setRule(assignRuleMedia(rule,kind,file));await refreshAssets()}})}>Wybierz z dysku</Button><Button disabled={busy||blocked||!id} onClick={()=>setRule(assignRuleMedia(rule,kind,''))}>Usuń</Button></div>{blocked&&<p className="muted">Warstwa zablokowana lub limit warstw.</p>}</div>})}
+  <Button disabled={busy} onClick={()=>void refreshAssets()}>Odśwież bibliotekę</Button>{libraryError&&<p role="status">Nie udało się odczytać biblioteki. Spróbuj odświeżyć.</p>}
   </div><footer className="rule-dialog-footer"><div className="alert-actions"><Button type="submit" variant="primary" disabled={busy}>Zapisz</Button><Button disabled={busy} onClick={()=>void run(async()=>{await window.pssa.saveAlert(rule,profile);const n=await window.pssa.testAlert(rule.key);setMessage(n?'Test dodany do kolejki.':'Kolejka jest pełna.')})}>Zapisz i testuj</Button></div>
   {message&&<p role="status">{message}</p>}</footer>
  </form></dialog>

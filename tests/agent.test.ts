@@ -5,7 +5,7 @@ import type {ChildProcess} from 'node:child_process'
 import {mkdtemp,rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-import {AgentController,serveAgent} from '../src/main/agent/server.ts'
+import {AgentController,serveAgent,agentPort,saveAgentPort,AGENT_PORT} from '../src/main/agent/server.ts'
 const child=()=>new EventEmitter() as unknown as ChildProcess
 test('agent starts, gracefully restarts and rate limits crashed children',()=>{
  let time=100000;const children:ChildProcess[]=[]
@@ -47,4 +47,9 @@ test('agent retains commands until acknowledgment and ignores stale closing hear
  a.command('restart');assert.equal(a.heartbeat('old')?.action,'restart')
  a.closing('old');assert.equal(a.heartbeat('old'),null);assert.equal(a.running(),false)
  time+=3000;a.heartbeat('new');a.closing('old');assert.equal(a.running(),true)
+})
+
+test('each Windows profile keeps an independent agent port descriptor',async()=>{
+ const a=await mkdtemp(join(tmpdir(),'pssa-agent-a-')),b=await mkdtemp(join(tmpdir(),'pssa-agent-b-'))
+ try{assert.equal(agentPort(a),AGENT_PORT);saveAgentPort(a,19201);saveAgentPort(b,19202);assert.equal(agentPort(a),19201);assert.equal(agentPort(b),19202);saveAgentPort(a,19203);assert.equal(agentPort(a),19203)}finally{await rm(a,{recursive:true,force:true});await rm(b,{recursive:true,force:true})}
 })

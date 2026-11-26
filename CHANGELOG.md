@@ -1,5 +1,12 @@
 # Historia zmian
 
+## 2.0.1
+- Instalacja i dezinstalacja ograniczone do bieżącego użytkownika Windows; niezależne porty nakładki i Agenta.
+- Animacja instalatora powtarzana po pięciu sekundach zatrzymania.
+- Wybór plików z biblioteki w edycji alertów, odświeżanie listy w kreatorze.
+- Otwieranie lokalizacji zaimportowanych plików w Eksploratorze.
+- Poprawione przygotowanie i odtwarzanie warstw audio.
+
 ## 2.0.0
 - Optymalizacja samouczków, renderowania scen, importu mediów i kolejki.
 - Poprawki autoryzacji oraz bezpieczeństwa aktualizatora.

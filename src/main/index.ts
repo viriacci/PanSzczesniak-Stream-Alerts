@@ -1,3 +1,6 @@
+import {copyMedia} from './alerts/media'
+import {rememberAsset} from './library/store'
+import {testTone} from './alerts/test-tone'
 import {createConnection} from 'node:net'
 import {DockControl,type DockDescriptor} from './obs/dock-control'
 import {CrashLog} from './runtime/crashes'
@@ -102,7 +105,7 @@ async function start(): Promise<void> {
     title:BRAND+' 2',...state.bounds,minWidth:700,minHeight:440,
     titleBarStyle:'hidden',titleBarOverlay:{color:'#111114',symbolColor:'#e8e7eb',height:36},
     show:false,backgroundColor:'#101012',
-    webPreferences:{preload:join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,webviewTag:false,devTools:!app.isPackaged}
+    webPreferences:{autoplayPolicy:'no-user-gesture-required',preload:join(__dirname,'../preload/index.js'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,webviewTag:false,devTools:!app.isPackaged}
    })
    window=w
    w.webContents.setWindowOpenHandler(()=>({action:'deny'}))
@@ -281,7 +284,7 @@ async function start(): Promise<void> {
     })()`);
     if(!checks||Object.values(checks).some(v=>v!==true))throw Error('IPC/database smoke failed: '+JSON.stringify(checks))
     // Load the real served overlay in a separate isolated Chromium window and wait for ACK.
-    const preview=new BrowserWindow({show:false,width:640,height:360,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
+    const preview=new BrowserWindow({show:false,width:640,height:360,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}})
     preview.webContents.setWindowOpenHandler(()=>({action:'deny'}))
     preview.webContents.on('will-navigate',event=>event.preventDefault())
     try{
@@ -301,19 +304,25 @@ async function start(): Promise<void> {
       const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGN8fMCDgRTARJLqUQ2jGoaUBgAQ3wILGYFI4wAAAABJRU5ErkJggg==','base64')
       const asset=createHash('sha256').update(png).digest('hex')+'.png'
       mkdirSync(join(directory,'media'),{recursive:true});writeFileSync(join(directory,'media',asset),png)
-      const scene:Scene={version:1,width:1920,height:1080,duration:1500,layers:[{...makeLayer('image','smoke-image',1500),asset,crop:{top:10,right:5,bottom:0,left:0},keyframes:[{...sampleLayer(makeLayer('image','k1',1500),0),time:0,easing:'linear'},{...sampleLayer(makeLayer('image','k2',1500),0),x:90,time:1200,easing:'linear'}]},{...makeLayer('text','smoke-text',1500),text:'Multi-layer smoke'}]}
+      const wav=Buffer.from(testTone);wav.writeInt16LE(42,44)
+      const input=join(directory,'smoke-import.wav');writeFileSync(input,wav)
+      const audio=await copyMedia(input,join(directory,'media'),'audio');rememberAsset(activeDb,audio,'Smoke sound.wav');rememberAsset(activeDb,asset,'Smoke image.png')
+      const selection=await activeWindow.webContents.executeJavaScript(`(async()=>{const wait=async(f,label)=>{for(let i=0;i<120;i++){const v=f();if(v)return v;await new Promise(r=>setTimeout(r,50))}throw Error('Library smoke timeout: '+label)};document.querySelector('[data-nav-id="alerts"]').click();const tile=await wait(()=>[...document.querySelectorAll('.rule-tile')].find(b=>b.querySelector('strong')?.textContent==='Follow'),'alert');tile.click();const audio=await wait(()=>document.querySelector('[aria-label="Biblioteka audio"] option[value="${audio}"]')?.parentElement,'audio');const image=await wait(()=>document.querySelector('[aria-label="Biblioteka image"] option[value="${asset}"]')?.parentElement,'image');audio.value='${audio}';audio.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,30));image.value='${asset}';image.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,30));document.querySelector('.rule-dialog button[type=submit]').click();await wait(()=>document.querySelector('.rule-dialog [role=status]')?.textContent==='Zapisano.','save');document.querySelector('.rule-dialog [aria-label="Zamknij edycję"]').click();const rule=(await window.pssa.alertState()).rules.find(r=>r.key==='follow');return rule.audio==='${audio}'&&rule.image==='${asset}'})()`)
+      if(!selection)throw Error('Library assignment smoke failed')
+      const scene:Scene={version:1,width:1920,height:1080,duration:1500,layers:[{...makeLayer('image','smoke-image',1500),asset,crop:{top:10,right:5,bottom:0,left:0},keyframes:[{...sampleLayer(makeLayer('image','k1',1500),0),time:0,easing:'linear'},{...sampleLayer(makeLayer('image','k2',1500),0),x:90,time:1200,easing:'linear'}]},{...makeLayer('text','smoke-text',1500),text:'Multi-layer smoke'},{...makeLayer('audio','smoke-audio',1500),asset:audio,volume:70}]}
       const exercise=async(value:Scene,expected:'done'|'failed')=>{
         const previous=new Set(activeAlerts.state().queue.history.map(x=>x.id))
         const saved=await activeWindow.webContents.executeJavaScript('window.pssa.saveScene("raid",'+JSON.stringify(value)+',"Raid","default")')
         if(!saved?.scene||activeAlerts.test('raid')!==1)throw Error('Scene smoke setup failed')
-        const until=Date.now()+12000;let rendered=false
+        const until=Date.now()+12000;let rendered=false,sound=false
         while(Date.now()<until){
           const completed=activeAlerts.state().queue.history.find(x=>x.source==='test'&&!previous.has(x.id))
           if(completed){
-            if(completed.status!==expected||expected==='failed'&&completed.reason!=='media-error'||expected==='done'&&!rendered)throw Error('Scene media smoke failed')
+            if(completed.status!==expected||expected==='failed'&&completed.reason!=='media-error'||expected==='done'&&(!rendered||!sound))throw Error('Scene media smoke failed')
             return
           }
           if(expected==='done'&&await preview.webContents.executeJavaScript('(()=>{const i=document.querySelector("#stage img");return !!i&&i.naturalWidth===16&&i.parentElement.style.display!=="none"&&i.parentElement.style.clipPath.startsWith("inset(10% 5%")&&parseFloat(i.parentElement.style.left)>50&&document.getElementById("stage").textContent.includes("Multi-layer smoke")})()'))rendered=true
+          if(expected==='done'&&await preview.webContents.executeJavaScript('(()=>{const a=document.querySelector("#stage audio");return !!a&&!a.paused&&a.currentTime>0&&Math.abs(a.volume-.7)<.01})()'))sound=true
           await new Promise(resolve=>setTimeout(resolve,80))
         }
         throw Error('Scene media smoke timeout')

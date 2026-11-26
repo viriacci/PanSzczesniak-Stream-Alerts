@@ -44,3 +44,12 @@ export async function legacyMedia(root:string,url:unknown,target:string,kind:'im
  if(rel.startsWith('..')||isAbsolute(rel))throw Error('Plik poza katalogiem')
  return copyMedia(source,target,kind)
 }
+
+export async function resolveLibraryFile(dir:string,id:unknown){
+ if(typeof id!=='string'||!(/^[a-f0-9]{64}\.[a-z0-9]+$/i.test(id))||!Object.hasOwn(mediaTypes,extname(id).toLowerCase()))throw Error('Invalid media id')
+ const root=await realpath(dir),candidate=join(root,id),entry=await lstat(candidate)
+ if(!entry.isFile()||entry.isSymbolicLink())throw Error('Invalid media file')
+ const file=await realpath(candidate),rel=relative(root,file)
+ if(rel!==id||isAbsolute(rel))throw Error('Invalid media path')
+ return file
+}

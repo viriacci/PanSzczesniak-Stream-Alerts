@@ -6,7 +6,7 @@
 
 PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łączy alerty, nagrody za punkty kanału, edycję scen i statystyki transmisji w jednym programie na Windows. Dane są przechowywane lokalnie.
 
-**PSSA 2.0.0** · [Pobierz instalator](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0) · [Zgłoś błąd](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/issues)
+**PSSA 2.0.1** · [Pobierz instalator](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.1) · [Zgłoś błąd](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/issues)
 
 ## Możliwości
 
@@ -20,7 +20,7 @@ PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łącz
 
 ## Instalacja
 
-1. Pobierz plik `PSSA-Setup-2.0.0-x64.exe` z [wydania 2.0.0](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.0).
+1. Pobierz plik `PSSA-Setup-2.0.1-x64.exe` z [wydania 2.0.1](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.1).
 2. Sprawdź SHA-256 z plikiem `SHA256SUMS.txt`. Instalator nie ma podpisu cyfrowego. Pobierz go z oficjalnego wydania GitHub i uruchom ręcznie.
 3. Uruchom instalator, a następnie zaloguj się do Twitcha w PSSA.
 4. Skopiuj adres nakładki z Konfiguracji i dodaj go w OBS jako źródło przeglądarkowe (1920 × 1080). Opcjonalnie zainstaluj PSSA Control Dock w ustawieniach.
@@ -28,7 +28,7 @@ PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łącz
 
 Wymagany jest Windows x64. Wtyczka natywna jest przeznaczona dla standardowych instalacji OBS 31–33; tryb portable nie jest obsługiwany. Do zwykłych alertów wystarczy źródło przeglądarkowe.
 
-Przy aktualizacji zamknij PSSA, Agenta i OBS. Instalator zachowuje konfigurację i historię w `%APPDATA%\PSSA 2 Dev`. Przed aktualizacją warto wykonać kopię w ustawieniach programu. Nie udostępniaj adresów prywatnych nakładek ani kopii danych.
+Każdy profil Windows ma własną instalację, dane i port nakładki. Przy aktualizacji zamknij PSSA, Agenta i OBS w swoim profilu. Instalator zachowuje konfigurację i historię w `%APPDATA%\PSSA 2 Dev`. Przed aktualizacją warto wykonać kopię w ustawieniach programu. Nie udostępniaj adresów prywatnych nakładek ani kopii danych.
 
 ## Uruchomienie ze źródeł
 

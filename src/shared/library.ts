@@ -6,6 +6,7 @@ export interface SceneTemplate {id:string;name:string;scene:Scene}
 export interface LibraryState {assets:Asset[];profiles:Profile[];activeProfile:string;templates:SceneTemplate[]}
 export type LibraryAction=
  |{type:'asset-edit';id:string;name:string;folder:string;tags:string[]}
+ |{type:'asset-reveal';id:string}
  |{type:'profile-create';name:string;categoryId:string}
  |{type:'profile-activate'|'profile-delete';id:string}
  |{type:'profile-edit';id:string;name:string;categoryId:string}

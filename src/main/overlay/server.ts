@@ -36,12 +36,12 @@ export class Overlay {
  constructor(media:string,port=18766){this.media=media;this.port=port}
  get url(){return this.key?'http://127.0.0.1:'+this.boundPort+'/'+this.key+'/':''}
  get clients(){return this.streams.size}
- async start(key?:string){
+ async start(key?:string,port=this.port){
   if(this.server)return
   this.key=key&&/^[a-f0-9]{64}$/.test(key)?key:randomBytes(32).toString('hex')
   const server=createServer({headersTimeout:5000,requestTimeout:10000},(req,res)=>{void this.handle(req,res).catch(()=>{if(!res.headersSent)res.writeHead(404);res.end()})})
   this.server=server
-  try{await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(this.port,'127.0.0.1',()=>{server.removeListener('error',reject);const addr=server.address();if(addr&&typeof addr!=='string')this.boundPort=addr.port;resolve()})})}catch(e){this.server=undefined;this.key='';throw e}
+  try{await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',()=>{server.removeListener('error',reject);const addr=server.address();if(addr&&typeof addr!=='string')this.boundPort=addr.port;resolve()})})}catch(e){this.server=undefined;this.key='';throw e}
   server.on('error',()=>this.stop())
   this.heartbeat=setInterval(()=>{for(const s of this.streams){if(s.destroyed||s.writableLength>65536){s.destroy();this.removeStream(s)}else s.write(': keepalive\n\n')}},15000)
  }
