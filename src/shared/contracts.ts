@@ -1,3 +1,4 @@
+import type {Language,LocaleCatalog} from './i18n'
 import type {MeasurementState,CrashEntry} from './performance'
 import type {RuntimePreferences,Diagnostics,UpdateInfo} from './runtime'
 import type {AnalyticsFilter,AnalyticsReport,ImportResult} from './analytics'
@@ -21,6 +22,7 @@ export const IPC = {
   crashState:'pssa:crash:state',
   crashExport:'pssa:crash:export',
   rendererFault:'pssa:crash:renderer',
+  localeCatalogs:'pssa:locale:catalogs',
   runtimeState:'pssa:runtime:state',
   runtimeSave:'pssa:runtime:save',
   backupCreate:'pssa:backup:create',
@@ -81,6 +83,7 @@ export interface PssaApi {
   crashState():Promise<CrashEntry[]>
   crashExport():Promise<boolean>
   rendererFault(kind:'error'|'rejection'|'react',stack:string):Promise<void>
+  localeCatalogs():Promise<Record<Language,LocaleCatalog>>
   runtimeState():Promise<RuntimePreferences>
   runtimeSave(value:RuntimePreferences):Promise<RuntimePreferences>
   backupCreate():Promise<{media:number}|null>

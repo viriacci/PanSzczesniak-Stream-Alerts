@@ -1,3 +1,4 @@
+import {LocaleProvider,useLocale} from './i18n'
 import {SidebarNav} from './features/navigation'
 import type {Navigation} from '../../shared/layout'
 import {themes} from '../../shared/themes'
@@ -19,8 +20,9 @@ import { PageContent } from './features/pages'
 import { HelpCenter, GuidedTour } from './features/help'
 import type { TourPage } from './features/help-content'
 
-export function App() {
- const {runtime,saveRuntime}=useRuntime()
+export function App(){const state=useRuntime();return <LocaleProvider language={state.runtime?.language??"pl"}><Workspace {...state}/></LocaleProvider>}
+function Workspace({runtime,saveRuntime}:ReturnType<typeof useRuntime>) {
+ const {t}=useLocale()
  const theme=themes[runtime?.theme??'pssa']
  const slow=runtime?.mode==='streaming'
  const alertState=useAlerts(slow)
@@ -87,7 +89,8 @@ export function App() {
  const reset=()=>{patch({...defaultLayout,page:'settings'});setConfirm(false)}
  const updateAvailable=updateInfo?.state==='available'&&(layout.page==='settings'||!(dismissedUpdate?.version===updateInfo.version&&dismissedUpdate.until>Date.now()))
  const updateBlocked=live?.phase==='live'||live?.phase==='unknown'||!!obs?.metrics?.streaming||!!obs?.metrics?.recording
- const item=allPages.find(p=>p.id===(tourPage??layout.page))??allPages[0]!
+ const originalItem=allPages.find(p=>p.id===(tourPage??layout.page))??allPages[0]!
+ const item={...originalItem,label:t("nav."+originalItem.id),description:originalItem.description?t("nav.desc."+originalItem.id):""}
  const collapsed=layout.collapsed
  const inspector=layout.inspectorOpen&&!narrow
  const sidebarSize=collapsed?64:layout.sidebarWidth
@@ -95,12 +98,12 @@ export function App() {
  return <div className={`app ${status?.compact?'compact':''} ${slow?'streaming-mode':''}`} style={styles} data-theme={runtime?.theme??'pssa'}>
   <header className="titlebar"><div className="title-brand" title={BRAND+' / '+theme.name} aria-label={BRAND+' / '+theme.name}><ThemeLogo theme={runtime?.theme??'pssa'} className="brand-symbol"/><span>{runtime?.theme&&runtime.theme!=='pssa'?theme.name:'PSSA'} <small>STREAM ALERTS</small></span></div><span className="title-version">{status?.version??'2.0-dev'}</span></header>
   <div className={`workspace ${inspector?'has-inspector':''}`}>
-   <aside className={`sidebar ${collapsed?'collapsed':''}`} aria-label="Nawigacja główna">
-    <div className="sidebar-top"><Button variant="ghost" title="Zwiń / rozwiń menu (Ctrl+B)" aria-label="Zwiń / rozwiń menu" aria-expanded={!collapsed} disabled={!ready} onClick={()=>patch({collapsed:!collapsed})}><Icon name="sidebar"/></Button>{!collapsed&&<label className="nav-search"><Icon name="search" size={15}/><input aria-label="Szukaj modułu" placeholder="Szukaj modułu" value={query} onChange={e=>setQuery(e.target.value)}/></label>}</div>
+   <aside className={`sidebar ${collapsed?'collapsed':''}`} aria-label={t("shell.nav")}>
+    <div className="sidebar-top"><Button variant="ghost" title={t("shell.toggle")+" (Ctrl+B)"} aria-label={t("shell.toggle")} aria-expanded={!collapsed} disabled={!ready} onClick={()=>patch({collapsed:!collapsed})}><Icon name="sidebar"/></Button>{!collapsed&&<label className="nav-search"><Icon name="search" size={15}/><input aria-label={t("shell.search")} placeholder={t("shell.search")} value={query} onChange={e=>setQuery(e.target.value)}/></label>}</div>
     <SidebarNav navigation={layout.navigation} onChange={navChange} collapsed={collapsed} query={query} active={item.id} ready={ready} navigate={navigate} editing={editing}/>
-    <div className="sidebar-bottom"><Button variant="ghost" aria-label="Ustawienia" aria-pressed={item.id==='settings'} title="Ustawienia" onClick={()=>navigate('settings')}><Icon name="settings"/></Button><ThemeLogo theme={runtime?.theme??'pssa'} className="account-avatar"/>{!collapsed&&<div><strong>{twitch?.login||'Profil lokalny'}</strong><small>{twitch?.phase==='connected'?'Twitch połączony':'Twitch niepołączony'}</small></div>}</div>
+    <div className="sidebar-bottom"><Button variant="ghost" aria-label={t("nav.settings")} aria-pressed={item.id==='settings'} title={t("nav.settings")} onClick={()=>navigate('settings')}><Icon name="settings"/></Button><ThemeLogo theme={runtime?.theme??'pssa'} className="account-avatar"/>{!collapsed&&<div><strong>{twitch?.login||t('shell.local')}</strong><small>{twitch?.phase==='connected'?t('shell.twitchOn'):t('shell.twitchOff')}</small></div>}</div>
    </aside>
-   {!collapsed&&<ResizeHandle label="Szerokość menu" value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
+   {!collapsed&&<ResizeHandle label={t("shell.menuWidth")} value={layout.sidebarWidth} range={bounds.sidebar} onChange={n=>patch({sidebarWidth:n},false)} onCommit={n=>patch({sidebarWidth:n})}/>}
    <main className={'content '+(item.id==='studio'?'content--studio':'')} tabIndex={-1} ref={content} id="main-content">
     <header className="page-header" data-tour="page-header"><div><p className="eyebrow">PSSA / WORKSPACE</p><h1>{item.label}</h1>{item.description&&<p>{item.description}</p>}</div>{item.id==='settings'&&<Button disabled={!ready||busy||dockBusy||dockStatus==='unavailable'} onClick={()=>void installDock()}>{dockBusy?'Instalowanie…':dockStatus==='update'?'Aktualizuj wtyczkę OBS':dockStatus==='current'?'Zainstaluj ponownie wtyczkę OBS':'Dodaj wtyczkę do OBS'}</Button>}</header>
     {updateAvailable&&<div className="update-banner" role="status"><Icon name="bolt"/><div><strong>Nowa wersja PSSA: {updateInfo?.version}</strong><small>Aktualizacja dostępna</small></div><Button variant="primary" onClick={()=>setUpdateOpen(true)}>Aktualizuj PSSA</Button><Button variant="ghost" aria-label="Przypomnij później" onClick={()=>setDismissedUpdate({version:updateInfo!.version,until:Date.now()+21600000})}><Icon name="close"/></Button></div>}
@@ -109,8 +112,8 @@ export function App() {
    </main>
    {inspector&&<><ResizeHandle label="Szerokość inspektora" value={layout.inspectorWidth} direction={-1} range={bounds.inspector} onChange={n=>patch({inspectorWidth:n},false)} onCommit={n=>patch({inspectorWidth:n})}/><aside className="inspector" aria-label="Inspektor"><header><h2>Inspektor</h2><Button variant="ghost" aria-label="Ukryj inspektor" disabled={!ready} onClick={()=>patch({inspectorOpen:false})}><Icon name="close" size={16}/></Button></header><Panel title="Połączenia"><div className="connection"><span>Twitch</span><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase??'Offline'}</Status></div><div className="connection"><span>OBS Studio</span><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase??'Offline'}</Status></div><div className="connection"><span>SQLite</span><Status tone={status?'ready':'warning'}>{status?'Gotowa':'Oczekiwanie'}</Status></div></Panel><Panel title="Kontekst modułu"><h3>{item.label}</h3>{item.description&&<p>{item.description}</p>}<small className="muted">{item.stage>2?'Implementacja w etapie '+item.stage:'Interfejs lokalny'}</small></Panel></aside></>}
   </div>
-  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?'Baza lokalna gotowa':'Inicjalizacja'}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?'Twitch połączony':'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?'OBS połączony':'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">PSSA</span></footer>
-  <button type="button" className="help-launch" data-help-launch aria-label="Instrukcja i pomoc" title="Instrukcja i pomoc" disabled={!ready||!!(runtime&&!runtime.onboarded)} onClick={()=>setHelpOpen(true)}>?</button>
+  <footer className="statusbar"><Status tone={status?'ready':'warning'}>{status?t('shell.databaseReady'):t('shell.initializing')}</Status><span className="status-separator"/><Status tone={twitch?.phase==='connected'?'ready':'neutral'}>{twitch?.phase==='connected'?t('shell.twitchOn'):'Twitch '+(twitch?.phase??'offline')}</Status><Status tone={obs?.phase==='connected'?'ready':'neutral'}>{obs?.phase==='connected'?t('shell.obsOn'):'OBS '+(obs?.phase??'offline')}</Status><span className="footer-right">PSSA</span></footer>
+  <button type="button" className="help-launch" data-help-launch aria-label={t("shell.help")} title={t("shell.help")} disabled={!ready||!!(runtime&&!runtime.onboarded)} onClick={()=>setHelpOpen(true)}>?</button>
   {helpOpen&&<HelpCenter initial={item.id} onClose={()=>setHelpOpen(false)} onStart={page=>{setHelpOpen(false);setTourPage(page);content.current?.scrollTo({top:0})}}/>}
   {tourPage&&<GuidedTour key={tourPage} page={tourPage} onClose={()=>{setTourPage(undefined);content.current?.scrollTo({top:0})}}/>}
   {updateOpen&&updateInfo?.state==='available'&&<UpdatePopup info={updateInfo} current={status?.version??''} blocked={updateBlocked} onClose={()=>{setUpdateOpen(false);setDismissedUpdate({version:updateInfo.version,until:Date.now()+21600000})}}/>}

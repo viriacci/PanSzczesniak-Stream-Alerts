@@ -54,6 +54,7 @@ export function registerIpc(window: BrowserWindow, db: DatabaseSync, document: s
    [IPC.crashState,0,()=>runtime.crashState()],
    [IPC.crashExport,0,()=>runtime.crashExport()],
    [IPC.rendererFault,2,(kind,stack)=>runtime.rendererFault(kind,stack)],
+   [IPC.localeCatalogs,0,()=>runtime.localeCatalogs()],
    [IPC.runtimeState,0,()=>runtime.state()],
    [IPC.runtimeSave,1,value=>runtime.save(value)],
    [IPC.backupCreate,0,()=>runtime.backup()],

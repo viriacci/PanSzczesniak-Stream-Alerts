@@ -8,6 +8,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         try{
+            L.Set(L.Default(InstallEngine.Detect()!=null));
             if(e.Args.Length>0&&e.Args[0]=="--install"){
                 int i=Array.IndexOf(e.Args,"--directory");
                 if(i<0||i+1>=e.Args.Length)throw new ArgumentException("Missing --directory");

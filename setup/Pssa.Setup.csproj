@@ -4,10 +4,11 @@
     <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><AssemblyName>PSSA.Setup</AssemblyName>
-    <ApplicationIcon>../build/branding/pssa.ico</ApplicationIcon><Version>2.0.3</Version><FileVersion>2.0.3.0</FileVersion>
+    <ApplicationIcon>../build/branding/pssa.ico</ApplicationIcon><Version>2.1.0-dev.1</Version><FileVersion>2.1.0.1</FileVersion>
     <Company>Pan Szczesniak</Company><Product>PSSA Setup</Product>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../locales/*.json" LogicalName="PSSA.Locale.%(Filename)%(Extension)" />
     <EmbeddedResource Include="$(PayloadPath)" LogicalName="PSSA.Payload.exe" />
     <EmbeddedResource Include="$(PayloadHashPath)" LogicalName="PSSA.Payload.sha256" />
     <Resource Include="../build/branding/pssa-window.png" Link="pssa-window.png" />

@@ -13,6 +13,7 @@ const api: PssaApi = {
   crashState:()=>ipcRenderer.invoke(IPC.crashState),
   crashExport:()=>ipcRenderer.invoke(IPC.crashExport),
   rendererFault:(kind,stack)=>ipcRenderer.invoke(IPC.rendererFault,kind,stack),
+  localeCatalogs:()=>ipcRenderer.invoke(IPC.localeCatalogs),
   runtimeState:()=>ipcRenderer.invoke(IPC.runtimeState),
   runtimeSave:value=>ipcRenderer.invoke(IPC.runtimeSave,value),
   backupCreate:()=>ipcRenderer.invoke(IPC.backupCreate),

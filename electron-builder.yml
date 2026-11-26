@@ -7,6 +7,10 @@ files:
   - '!out/**/*.map'
   - package.json
 extraResources:
+  - from: locales
+    to: locales
+    filter:
+      - "*.json"
   - from: build/obs-dock
     to: obs-dock
     filter:

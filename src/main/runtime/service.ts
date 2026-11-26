@@ -1,3 +1,5 @@
+import {readLanguage,writeLanguage,loadCatalogs} from './language'
+import {isLanguage,type Language} from '../../shared/i18n'
 import {GpuSampler} from './gpu'
 import {Measurement} from './measurement'
 import {makeSampler} from './counters'
@@ -24,6 +26,7 @@ import {tmpdir} from 'node:os'
 import {type Diagnostics,type RuntimePreferences,type UpdateInfo,type UpdateChannel} from '../../shared/runtime'
 import {schemaVersion} from '../database'
 export class RuntimeService{
+ private language:Language
  private measurement:Measurement
  private gpu=new GpuSampler()
  private gpuEnabled=false
@@ -39,6 +42,7 @@ export class RuntimeService{
  private downloading=false
  private timer?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,private directory:string,private window:()=>BrowserWindow|undefined,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void,private lookupRelease=checkRelease){
+  this.language=readLanguage(directory)
   this.crashes=new CrashLog(directory,app.getVersion(),'main');this.agentCrashes=new CrashLog(directory,app.getVersion(),'agent')
   const sample=makeSampler(()=>app.getAppMetrics())
   this.measurement=new Measurement(join(directory,'measurements'),()=>({version:app.getVersion(),cores:cpus().length,ramMB:Math.round(totalmem()/1048576),platform:process.platform,arch:process.arch,gpuEnabled:this.gpuEnabled}),(late,reset):Sample=>{
@@ -57,8 +61,9 @@ export class RuntimeService{
  crashState(){return [...this.crashes.recent(),...this.agentCrashes.recent()].sort((a,b)=>b.at.localeCompare(a.at)).slice(0,100)}
  rendererFault(kind:unknown,stack:unknown){if(kind!=='error'&&kind!=='rejection'&&kind!=='react')throw Error('Invalid renderer fault');if(typeof stack!=='string'||stack.length>8192)throw Error('Invalid stack');if(Date.now()-this.lastRendererFault<1000)return;this.lastRendererFault=Date.now();this.crashes.write('renderer-'+kind,'',null,stack)}
  async crashExport(){this.guard();const data=JSON.stringify({version:app.getVersion(),diagnostics:this.diagnostics(),crashes:this.crashState()},null,2);const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-crashes.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath||this.stopped)return false;writeNew(this.outside(r.filePath),data);return true}
- state(){return preferences(this.db)}
- save(value:unknown){const old=this.state(),p=savePreferences(this.db,value);if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0;this.update=undefined}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
+ localeCatalogs(){return loadCatalogs(app.isPackaged?process.resourcesPath:app.getAppPath())}
+ state(){return {...preferences(this.db),language:this.language}}
+ save(value:unknown){const old=this.state();const language=(value as RuntimePreferences|null)?.language;if(language!==undefined&&!isLanguage(language))throw Error("Invalid language");const p=savePreferences(this.db,value);if(language!==undefined&&language!==old.language){writeLanguage(this.directory,language);this.language=language}if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0;this.update=undefined}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
  start(){void cleanUpdateFiles();let cleanupRetries=3;this.timer=setInterval(()=>{if(!this.downloading&&cleanupRetries>0){cleanupRetries--;void cleanUpdateFiles()}if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(failed=false){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown(failed);this.stopCollectors()}
  private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
