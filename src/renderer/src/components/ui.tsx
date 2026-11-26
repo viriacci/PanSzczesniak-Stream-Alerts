@@ -1,3 +1,4 @@
+import {useLocale} from '../i18n'
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
 export function Button({ children, variant = 'secondary', className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & {variant?: 'primary'|'secondary'|'ghost'}) {
@@ -13,6 +14,7 @@ export function Empty({ title, children }: {title: string; children?: ReactNode}
   return <div className="empty"><div className="empty-mark" aria-hidden="true">◇</div><h3>{title}</h3>{children&&<p>{children}</p>}</div>
 }
 export function ConfirmDialog({ title, children, onClose, onConfirm }: {title: string; children: ReactNode; onClose: () => void; onConfirm: () => void}) {
+  const {t}=useLocale()
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const dialog = ref.current
@@ -22,7 +24,7 @@ export function ConfirmDialog({ title, children, onClose, onConfirm }: {title: s
   }, [])
   return <dialog ref={ref} className="dialog" aria-labelledby="confirm-title" onCancel={e=>{e.preventDefault();onClose()}}>
     <h2 id="confirm-title">{title}</h2><div className="dialog-body">{children}</div>
-    <div className="dialog-actions"><Button autoFocus onClick={onClose}>Anuluj</Button><Button variant="primary" onClick={onConfirm}>Przywróć</Button></div>
+    <div className="dialog-actions"><Button autoFocus onClick={onClose}>{t("common.cancel")}</Button><Button variant="primary" onClick={onConfirm}>{t("common.restore")}</Button></div>
   </dialog>
 }
 
