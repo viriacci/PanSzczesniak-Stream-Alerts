@@ -1,5 +1,10 @@
 # Historia zmian
 
+## 2.0.2
+- Obsługa alternatywnych portów nakładki w Control Dock i rzeczywiste przeładowanie źródeł OBS.
+- Widoczne sterowanie kolejką na górze zakładki oraz osobna informacja o połączeniu nakładki.
+- Delikatny ruch iskier podczas pięciosekundowej przerwy animacji instalatora.
+
 ## 2.0.1
 - Instalacja i dezinstalacja ograniczone do bieżącego użytkownika Windows; niezależne porty nakładki i Agenta.
 - Animacja instalatora powtarzana po pięciu sekundach zatrzymania.

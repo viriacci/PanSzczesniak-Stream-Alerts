@@ -1,7 +1,7 @@
 import {copyMedia} from './alerts/media'
 import {rememberAsset} from './library/store'
 import {testTone} from './alerts/test-tone'
-import {createConnection} from 'node:net'
+import {createConnection,createServer as createTcpServer} from 'node:net'
 import {DockControl,type DockDescriptor} from './obs/dock-control'
 import {CrashLog} from './runtime/crashes'
 import {launchNodeAgent} from './agent/launch'
@@ -88,7 +88,10 @@ async function start(): Promise<void> {
   session.defaultSession.setPermissionCheckHandler(() => false)
   const activeDb=db
   alerts=new AlertsService(activeDb,directory,()=>window,app.getPath('documents'))
-  await alerts.start(!smoke)
+  // Exercise real Chromium playback with an occupied default overlay port in smoke runs.
+  const occupied=smoke?createTcpServer(socket=>socket.destroy()):undefined
+  if(occupied)await new Promise<void>((resolve,reject)=>{occupied.once('error',reject);occupied.listen(18766,'127.0.0.1',resolve)})
+  try{await alerts.start(!smoke)}finally{occupied?.close()}
   const activeAlerts=alerts
   const activeObs=new ObsService(activeDb,state=>{try{activeAlerts.observeObs(state)}catch{console.warn('PSSA: telemetry write failed')}})
   obs=activeObs
@@ -281,7 +284,7 @@ async function start(): Promise<void> {
       checks.compact=await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact===true;
       checks.layout=(await window.pssa.setLayout({...await window.pssa.getLayout(),page:"settings",sidebarWidth:280})).page==="settings"&&(await window.pssa.getLayout()).sidebarWidth===280;
       const alerts=await window.pssa.alertState();
-      checks.rules=alerts.rules.length>=8;checks.overlay=alerts.twitch.overlayUrl.startsWith("http://127.0.0.1:18766/");checks.pending=alerts.queue.pendingCount===1;
+      checks.rules=alerts.rules.length>=8;checks.overlay=new URL(alerts.twitch.overlayUrl).hostname==="127.0.0.1"&&new URL(alerts.twitch.overlayUrl).port!=="18766";checks.pending=alerts.queue.pendingCount===1;
       checks.obs=(await window.pssa.obsState()).phase==="offline";checks.live=(await window.pssa.liveState()).phase==="disconnected";checks.channels=(await window.pssa.analyticsChannels()).length===0;checks.assets=(await window.pssa.libraryState()).assets.length===0;
       checks.analytics=(await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions===0;
       checks.runtime=(await window.pssa.runtimeState()).mode==="studio";checks.diagnostics=(await window.pssa.diagnostics()).schema===expected;

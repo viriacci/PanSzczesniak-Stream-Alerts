@@ -75,8 +75,8 @@ static bool refreshBrowser(obs_source_t *source){
 }
 static bool repairManagedUrl(obs_source_t *source,const QByteArray &url){
  auto *s=obs_source_get_settings(source);if(!s)return false;
- const bool changed=url!=obs_data_get_string(s,"url")||obs_data_get_bool(s,"is_local_file");
- if(changed){obs_data_set_string(s,"url",url.constData());obs_data_set_bool(s,"is_local_file",false);obs_source_update(source,s);}
+ const bool changed=url!=obs_data_get_string(s,"url")||obs_data_get_bool(s,"is_local_file")||obs_data_get_bool(s,"shutdown")||obs_data_get_bool(s,"restart_when_active");
+ if(changed){obs_data_set_string(s,"url",url.constData());obs_data_set_bool(s,"is_local_file",false);obs_data_set_bool(s,"shutdown",false);obs_data_set_bool(s,"restart_when_active",false);obs_source_update(source,s);}
  obs_data_release(s);return changed;
 }
 static bool managed(obs_source_t *source){
@@ -132,7 +132,7 @@ class Dock final:public QWidget{
   if(!volume->isSliderDown()&&!volumeTimer.isActive()){QSignalBlocker b(volume);volume->setValue(v);volumeLabel->setText(QString::number(v)+"%");}
   {QSignalBlocker b(mute);mute->setChecked(data.value("muted").toBool());}
   if(phase==Phase::Idle)report(trp("Uruchomiony"));
-  details->setText(trp("Twitch: ")+data.value("twitch").toString()+trp("  |  Kolejka: ")+QString::number(data.value("pending").toInt())+trp("\nNakładka: ")+(data.contains("overlayClients")?(data.value("overlayClients").toInt()>0?trp("połączona"):trp("brak połączenia")):trp("brak danych")));
+  details->setText(trp("Twitch: ")+data.value("twitch").toString()+trp("  |  Kolejka: ")+QString::number(data.value("pending").toInt())+trp("\nNakładka: ")+(data.contains("overlayClients")?(data.value("overlayClients").toInt()>0?trp("połączona"):trp("brak połączenia")):trp("brak danych"))+trp("  |  Port: ")+(validOverlay(overlay)?QString::number(QUrl(overlay).port()):trp("—")));
   controls();
  }
  void offline(){
@@ -189,10 +189,10 @@ class Dock final:public QWidget{
   auto *sceneSource=targetScene();if(!sceneSource){result(trp("Brak aktywnej sceny"));return;}
   const QString sceneName=trp(obs_source_get_name(sceneSource));auto *scene=obs_scene_from_source(sceneSource);if(!scene){obs_source_release(sceneSource);return;}
   const QByteArray url=overlay.toUtf8();
-  struct Search {QByteArray url;obs_source_t *source=nullptr;};
+  struct Search {QByteArray url;obs_source_t *source=nullptr;obs_sceneitem_t *item=nullptr;};
   Search current{url};
-  obs_scene_enum_items(scene,[](obs_scene_t*,obs_sceneitem_t *item,void *data){auto &x=*static_cast<Search*>(data);auto *s=obs_sceneitem_get_source(item);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);return false;}return true;},&current);
-  if(current.source){const bool changed=managed(current.source)&&repairManagedUrl(current.source,url);if(!changed)refreshBrowser(current.source);if(changed)obs_frontend_save();obs_source_release(current.source);obs_source_release(sceneSource);result(trp("Sprawdzono źródło PSSA w scenie: ")+sceneName);return;}
+  obs_scene_enum_items(scene,[](obs_scene_t*,obs_sceneitem_t *item,void *data){auto &x=*static_cast<Search*>(data);auto *s=obs_sceneitem_get_source(item);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);x.item=item;return false;}return true;},&current);
+  if(current.source){const bool changed=managed(current.source)&&repairManagedUrl(current.source,url);const bool hidden=current.item&&!obs_sceneitem_visible(current.item);if(hidden)obs_sceneitem_set_visible(current.item,true);if(!changed)refreshBrowser(current.source);if(changed||hidden)obs_frontend_save();obs_source_release(current.source);obs_source_release(sceneSource);result(trp("Sprawdzono źródło PSSA w scenie: ")+sceneName);return;}
   Search global{url};
   obs_enum_sources([](void *data,obs_source_t *s){auto &x=*static_cast<Search*>(data);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);return false;}return true;},&global);
   auto *source=global.source;
