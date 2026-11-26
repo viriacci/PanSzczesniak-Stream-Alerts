@@ -128,7 +128,7 @@ jobs:
       - name: Verify clean NSIS installation
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.6-x64.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.7-x64.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one setup executable' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           if (Test-Path $dir) { throw 'Install path already exists' }
@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           $old = @(Get-ChildItem previous-beta -Filter '*.exe' -File)
-          $new = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.6-x64.exe' -File)
+          $new = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.7-x64.exe' -File)
           if ($old.Count -ne 1 -or $new.Count -ne 1) { throw 'Installer missing' }
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-install-smoke'
           $uninstaller = @(Get-ChildItem $dir -Filter 'Uninstall*.exe' -File)
@@ -178,7 +178,7 @@ jobs:
       - name: Render actual WPF preview
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.7-x64.exe').Path
           $preview = Join-Path $PWD 'dist/setup-preview.png'
           $p = Start-Process -FilePath $exe -ArgumentList "--preview `"$preview`"" -PassThru
           if (-not $p.WaitForExit(60000) -or $p.ExitCode -ne 0 -or -not (Test-Path $preview)) { throw 'WPF preview failed' }
@@ -197,7 +197,7 @@ jobs:
       - name: Verify updater self-cleanup after installer exit
         shell: pwsh
         run: |
-          $source = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
+          $source = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.7-x64.exe').Path
           $folder = Join-Path $env:TEMP ('PSSA-update-' + [Guid]::NewGuid().ToString('N').Substring(0,6))
           New-Item -ItemType Directory -Path $folder | Out-Null
           $copy = Join-Path $folder 'PSSA-Setup-2.1.0-rc.1-x64.exe'
@@ -211,7 +211,7 @@ jobs:
       - name: Verify custom wrapper, shortcuts, upgrade and uninstall
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.7-x64.exe').Path
           $dir = Join-Path $env:RUNNER_TEMP 'PSSA-custom-smoke'
           function Run-Setup($path, $arguments) {
             Write-Host "Running $(Split-Path $path -Leaf) $arguments"
@@ -246,7 +246,7 @@ jobs:
       - name: Verify shared registry entry does not hijack per-user setup
         shell: pwsh
         run: |
-          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.6-x64.exe').Path
+          $exe = (Resolve-Path 'dist/PSSA-Setup-2.1.0-dev.7-x64.exe').Path
           $shared = Join-Path $env:RUNNER_TEMP 'PSSA-shared-fixture'
           $local = Join-Path $env:RUNNER_TEMP 'PSSA-independent-fixture'
           $reg = 'HKLM:\Software\1d52d779-24b9-566f-8b55-c659c5b0b6e2'
@@ -274,7 +274,7 @@ jobs:
         with:
           name: PSSA-Setup-Windows
           path: |
-            dist/PSSA-Setup-2.1.0-dev.6-x64.exe
+            dist/PSSA-Setup-2.1.0-dev.7-x64.exe
             dist/SHA256SUMS.txt
             dist/setup-preview.png
           if-no-files-found: error
@@ -287,7 +287,7 @@ jobs:
       - name: Hash verified installer
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.6-x64.exe' -File)
+          $setup = @(Get-ChildItem dist -Filter 'PSSA-2.1.0-dev.7-x64.exe' -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one installer' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup[0].FullName).Hash.ToLowerInvariant()
           "$hash  $($setup[0].Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
@@ -295,6 +295,6 @@ jobs:
         with:
           name: PSSA-2-Dev-Windows
           path: |
-            dist/PSSA-2.1.0-dev.6-x64.exe
+            dist/PSSA-2.1.0-dev.7-x64.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error

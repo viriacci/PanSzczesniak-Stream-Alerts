@@ -177,7 +177,7 @@ async function start(): Promise<void> {
   if(!activeWindow)throw Error('Renderer unavailable')
   log('ready')
   if (smoke) {
-    const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true,app.getVersion())
+    const child=launchNodeAgent(join(directory,'agent-smoke'),process.execPath,[],__dirname,true,app.getVersion(),app.isPackaged?process.resourcesPath:app.getAppPath(),app.getAppPath())
     await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{child.kill();reject(Error('Node Agent smoke timeout'))},12000);child.once('error',e=>{clearTimeout(timer);reject(e)});child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(Error('Node Agent smoke failed'))})})
     // Exercise the actual preload and IPC bridge in the loaded renderer.
     const newFeatures=await activeWindow.webContents.executeJavaScript('window.pssa.runtimeState().then(async p=>(await window.pssa.runtimeSave({...p,theme:"vivionyx"})).theme==="vivionyx"&&(await window.pssa.runtimeSave({...p,theme:"pssa"})).theme==="pssa"&&!(await window.pssa.measurementState()).active&&Array.isArray(await window.pssa.crashState()))')
@@ -398,7 +398,7 @@ async function start(): Promise<void> {
 
 if(agentMode){
  const args=app.isPackaged?[]:[app.getAppPath()]
- const child=launchNodeAgent(directory,process.execPath,args,__dirname,false,app.getVersion())
+ const child=launchNodeAgent(directory,process.execPath,args,__dirname,false,app.getVersion(),app.isPackaged?process.resourcesPath:app.getAppPath(),app.getAppPath())
  child.once('error',()=>app.exit(1));child.once('spawn',()=>{child.unref();app.exit(0)})
 } else if (!app.requestSingleInstanceLock()) {
   app.quit()

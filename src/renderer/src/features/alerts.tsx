@@ -72,11 +72,11 @@ function RewardArt({reward,icon}:{reward?:Reward;icon:IconName}){
  return <span className="rule-tile-art" style={reward?.color?{backgroundColor:reward.color}:undefined}>{reward?.image&&!failed?<img src={reward.image} referrerPolicy="no-referrer" alt="" onError={()=>setFailed(true)} loading="lazy"/>:<Icon name={icon} size={30}/>}</span>
 }
 export function AlertsPage({state,rewards=false}:{state?:AlertState;rewards?:boolean}){
- const {t:tr,region}=useLocale()
+ const {t:tr,region,alertT}=useLocale()
  const [selected,setSelected]=useState<{rule:AlertRule;profile:string}>(),[busy,setBusy]=useState(false),[message,setMessage]=useState('')
  const rules=state?.rules??[]
  const rewardMap=new Map((state?.rewards??[]).map(r=>['reward:'+r.id,r]))
- const list=rewards?[...rules.filter(r=>r.key.startsWith('reward:')),...(state?.rewards??[]).filter(x=>!rules.some(r=>r.key==='reward:'+x.id)).map(x=>defaultRule('reward:'+x.id,x.title))]:rules.filter(r=>!r.key.startsWith('reward:'))
+ const list=rewards?[...rules.filter(r=>r.key.startsWith('reward:')),...(state?.rewards??[]).filter(x=>!rules.some(r=>r.key==='reward:'+x.id)).map(x=>defaultRule('reward:'+x.id,x.title,alertT))]:rules.filter(r=>!r.key.startsWith('reward:'))
 
  async function sync(){setBusy(true);try{await window.pssa.syncRewards();setMessage(tr("rewards.synced"))}catch{setMessage(tr("rewards.error"))}finally{setBusy(false)}}
  return <>{rewards&&<Panel tourId="rewards-sync" title={tr("rewards.title")} action={<Button disabled={busy||!state?.twitch.login} onClick={()=>void sync()}>{tr("rewards.sync")}</Button>}><p>{message||tr("rewards.detail")}</p></Panel>}<Panel tourId={rewards?'rewards-list':'alerts-list'} title={rewards?tr("rewards.assignments"):tr("alert.types")}>{!list.length&&<p>{tr("alert.noRules")}</p>}<div className="rule-grid" data-page={rewards?'rewards':'alerts'}>{list.map(rule=>{const reward=rewardMap.get(rule.key);return <button data-tour={rewards?'rewards-tile':'alerts-tile'} className="rule-tile" key={rule.key} type="button" onClick={()=>setSelected({rule,profile:state?.profileId??'default'})}><RewardArt reward={reward} icon={rewards?'gift':tileIcons[rule.key]??'bell'}/><strong>{reward?.title??(standardTypes.has(rule.key)?tr("alert.type."+rule.key):rule.title)}</strong>{reward&&<small>{tr("reward.points",{count:reward.cost.toLocaleString(region)})}</small>}<Status tone={rule.enabled?'ready':'neutral'}>{rule.enabled?tr("common.enabled"):tr("common.disabled")}</Status></button>})}</div></Panel>{selected&&<RuleEditor key={selected.rule.key} initial={selected.rule} profile={selected.profile} onClose={()=>setSelected(undefined)}/>}</>

@@ -119,9 +119,9 @@ function StudioEditor({rule,base,profile,choices,onChoose}:{rule:AlertRule;base:
  </div>
 }
 export function StudioPage({state}:{state?:AlertState}){
- const {t:tr}=useLocale()
+ const {t:tr,alertT}=useLocale()
  const [key,setKey]=useState('raid')
- const rules=state?.rules??[],list=[...rules,...(state?.rewards??[]).filter(r=>!rules.some(x=>x.key==='reward:'+r.id)).map(r=>defaultRule('reward:'+r.id,r.title))]
+ const rules=state?.rules??[],list=[...rules,...(state?.rewards??[]).filter(r=>!rules.some(x=>x.key==='reward:'+r.id)).map(r=>defaultRule('reward:'+r.id,r.title,alertT))]
  const rule=list.find(r=>r.key===key)??list[0]
  return rule?<StudioEditor key={(state?.profileId??'default')+':'+rule.key} profile={state?.profileId??'default'} rule={rule} base={state?.twitch.overlayUrl??''} choices={list} onChoose={setKey}/>:<Empty title={tr("studio.noAlerts")}>{tr("studio.waitData")}</Empty>
 }

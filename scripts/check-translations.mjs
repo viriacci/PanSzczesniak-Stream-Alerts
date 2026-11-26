@@ -33,6 +33,10 @@ const families={
  'region.':['auto','pl-PL','en-US','en-GB','de-DE'],
  'analytics.event.':['follows','subs','prime','resubs','gifts','bits','raids','raidViewers','rewards','points','messages','chatters'],
  'runtime.mode.':['studio','streaming','background'],
+ 'obs.phase.':['offline','connecting','connected','error'],
+ 'dock.twitch.':['disconnected','authorizing','connecting','connected','retrying','error'],
+ 'alert.default.':['redemption','raid','follow','sub','prime_sub','resub','gift','mass_gift','bits'],
+ 'agent.dock.':['unavailable','running','starting','offline','badKey','connecting','start','stop','restart','refresh'],
  'diag.':['version','schema','platform','arch','electron','chromium','node','processes','memoryMB','cpu','databaseBytes','queuePending','overlayClients','twitch','obs','agent','restoreStatus','uptime']
 }
 for(const [prefix,entries] of Object.entries(families))for(const suffix of entries)check(prefix+suffix,'dynamic family',0)
@@ -54,6 +58,10 @@ for(const path of walk('setup')){
  if(!/\.(cs|xaml)$/.test(path))continue
  const source=readFileSync(path,'utf8')
  for(const match of source.matchAll(/(?:L\.T\(\s*"([^"]+)"|\{DynamicResource ((?:setup|common)\.[\w.-]+)\})/g))check(match[1]??match[2],path,source.slice(0,match.index).split('\n').length)
+}
+for(const path of ['obs-dock/pssa-dock.cpp','src/main/runtime/service.ts','src/shared/messages.ts']){
+ const source=readFileSync(path,'utf8')
+ for(const m of source.matchAll(/(?:dtr\("([^"]+)"\)|updateText\('([^']+)'|"((?:message\.)[\w.-]+)")/g))check(m[1]??m[2]??m[3],path,source.slice(0,m.index).split('\n').length)
 }
 assert.deepEqual(missing,[],'Missing referenced translation keys')
 console.log('Validated '+keys.length+' keys in '+codes.length+' languages; '+used.size+' statically referenced or enumerated.')

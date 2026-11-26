@@ -22,7 +22,7 @@ export interface AlertState { profileId?:string; twitch:TwitchState; rules:Alert
 export const templates:Record<AlertKind,string>={redemption:'{user} odbiera {reward}',raid:'{user} najeżdża z {viewers} widzami!',follow:'{user} zaczyna obserwować!',sub:'{user} subskrybuje!',prime_sub:'{user} subskrybuje z Prime!',resub:'{user} odnawia subskrypcję ({months} mies.)!',gift:'{user} podarował subskrypcję!',mass_gift:'{user} podarował {count} subskrypcji!',bits:'{user} przekazuje {bits} Bits!'}
 export function validKey(key:string):boolean {return (kinds as readonly string[]).includes(key)||/^reward:[a-zA-Z0-9_-]{1,128}$/.test(key)}
 export function validMedia(name:string):boolean {return name===''||/^[a-f0-9]{64}\.(png|jpg|jpeg|gif|webp|mp3|wav|ogg|m4a|webm|mp4)$/i.test(name)}
-export function defaultRule(key:string,title=key):AlertRule {return {key,title,enabled:false,image:'',audio:'',duration:5,priority:5,cooldown:0,volume:100,minCount:0,template:templates[key.startsWith('reward:')?'redemption':key as AlertKind]??'{user}'}}
+export function defaultRule(key:string,title=key,translateDefault?:(key:string)=>string):AlertRule {const kind=key.startsWith("reward:")?"redemption":key as AlertKind;const translated=translateDefault?.("alert.default."+kind);return {key,title,enabled:false,image:'',audio:'',duration:5,priority:5,cooldown:0,volume:100,minCount:0,template:translated&&translated!=="alert.default."+kind?translated:templates[kind]??'{user}'}}
 const num=(v:unknown,d:number,min:number,max:number)=>typeof v==='number'&&Number.isFinite(v)?Math.max(min,Math.min(max,v)):d
 const color=(v:unknown,d:string)=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v:d
 export function normalizeLayout(value:unknown):AlertLayout|undefined {

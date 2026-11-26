@@ -2,11 +2,14 @@ import {parseScene} from '../../shared/scene.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import { defaultRule, kinds, parseRule, validKey, type AlertRule } from '../../shared/alerts.ts'
 const cache=new WeakMap<DatabaseSync,{raw:unknown;rules:AlertRule[]}>()
+const defaultTranslators=new WeakMap<DatabaseSync,(key:string)=>string>()
+export function setDefaultRuleTranslator(db:DatabaseSync,t:(key:string)=>string){defaultTranslators.set(db,t);cache.delete(db)}
+export function newDefaultRule(db:DatabaseSync,key:string,title=key){return defaultRule(key,title,defaultTranslators.get(db))}
 // Cached rules are immutable. Use saveRule/saveRules to edit.
 export function rules(db:DatabaseSync):AlertRule[]{
  const raw=db.prepare("SELECT value FROM settings WHERE key='alerts.v1'").get()?.value
  const previous=cache.get(db);if(previous&&previous.raw===raw)return previous.rules
- const map=new Map(kinds.filter(k=>k!=='redemption').map(k=>[k as string,defaultRule(k)]))
+ const map=new Map(kinds.filter(k=>k!=='redemption').map(k=>[k as string,newDefaultRule(db,k)]))
  if(typeof raw==='string'){
   let list:unknown;try{list=JSON.parse(raw)}catch{throw Error('Uszkodzona konfiguracja alertów')}
   if(!Array.isArray(list))throw Error('Uszkodzona konfiguracja alertów')
@@ -25,6 +28,6 @@ export function saveRule(db:DatabaseSync,value:unknown){
 
 export function saveScene(db:DatabaseSync,key:unknown,value:unknown,title:unknown){
  if(typeof key!=='string'||!validKey(key)||typeof title!=='string'||title.length>200)throw Error('Invalid scene key')
- const scene=parseScene(value),current=rules(db).find(r=>r.key===key)??defaultRule(key,title)
+ const scene=parseScene(value),current=rules(db).find(r=>r.key===key)??newDefaultRule(db,key,title)
  return saveRule(db,{...current,scene,duration:scene.duration/1000})
 }

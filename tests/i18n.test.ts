@@ -42,3 +42,21 @@ test('corrupt external catalog cannot block UI and missing or invalid overrides 
   assert.deepEqual(loaded.pl,shipped.pl)
  }finally{rmSync(dir,{recursive:true,force:true})}
 })
+
+import {openDatabase} from '../src/main/database.ts'
+import {rules,saveRule,setDefaultRuleTranslator,newDefaultRule} from '../src/main/alerts/store.ts'
+import {localizeMessage} from '../src/shared/messages.ts'
+test('default alert language affects unsaved rules only, preserving saved custom text',()=>{
+ const db=openDatabase(':memory:');try{
+  const c=loadCatalogs(process.cwd())
+  setDefaultRuleTranslator(db,key=>translate(c.en,c.pl,key))
+  assert.equal(rules(db).find(r=>r.key==='follow')?.template,'{user} is now following!')
+  const follow=rules(db).find(r=>r.key==='follow')!
+  saveRule(db,{...follow,template:'Custom {user}'})
+  setDefaultRuleTranslator(db,key=>translate(c.de,c.pl,key))
+  assert.equal(rules(db).find(r=>r.key==='follow')?.template,'Custom {user}')
+  assert.equal(newDefaultRule(db,'reward:123','My reward').template,'{user} löst {reward} ein')
+  assert.equal(parseRuntime({...defaults,alertLanguage:'de'}).alertLanguage,'de')
+  assert.equal(localizeMessage(key=>translate(c.en,c.pl,key),'Zamknij OBS przed aktualizacją PSSA.'),'Close OBS before updating PSSA.')
+ }finally{db.close()}
+})

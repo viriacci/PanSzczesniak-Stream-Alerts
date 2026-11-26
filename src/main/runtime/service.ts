@@ -1,3 +1,5 @@
+import {setDefaultRuleTranslator} from '../alerts/store'
+import {translate} from '../../shared/i18n'
 import {readLanguage,writeLanguage,loadCatalogs} from './language'
 import {isLanguage,type Language} from '../../shared/i18n'
 import {GpuSampler} from './gpu'
@@ -27,6 +29,7 @@ import {type Diagnostics,type RuntimePreferences,type UpdateInfo,type UpdateChan
 import {schemaVersion} from '../database'
 export class RuntimeService{
  private language:Language
+ private catalogs?:ReturnType<typeof loadCatalogs>
  private measurement:Measurement
  private gpu=new GpuSampler()
  private gpuEnabled=false
@@ -43,6 +46,7 @@ export class RuntimeService{
  private timer?:ReturnType<typeof setInterval>
  constructor(private db:DatabaseSync,private directory:string,private window:()=>BrowserWindow|undefined,private alerts:AlertsService,private obs:ObsService,private agent:AgentBridge|undefined,private restoreStatus:string,private onMode:(p:RuntimePreferences)=>void,private lookupRelease=checkRelease){
   this.language=readLanguage(directory)
+  this.applyAlertLanguage(preferences(db).alertLanguage??"pl")
   this.crashes=new CrashLog(directory,app.getVersion(),'main');this.agentCrashes=new CrashLog(directory,app.getVersion(),'agent')
   const sample=makeSampler(()=>app.getAppMetrics())
   this.measurement=new Measurement(join(directory,'measurements'),()=>({version:app.getVersion(),cores:cpus().length,ramMB:Math.round(totalmem()/1048576),platform:process.platform,arch:process.arch,gpuEnabled:this.gpuEnabled}),(late,reset):Sample=>{
@@ -61,9 +65,10 @@ export class RuntimeService{
  crashState(){return [...this.crashes.recent(),...this.agentCrashes.recent()].sort((a,b)=>b.at.localeCompare(a.at)).slice(0,100)}
  rendererFault(kind:unknown,stack:unknown){if(kind!=='error'&&kind!=='rejection'&&kind!=='react')throw Error('Invalid renderer fault');if(typeof stack!=='string'||stack.length>8192)throw Error('Invalid stack');if(Date.now()-this.lastRendererFault<1000)return;this.lastRendererFault=Date.now();this.crashes.write('renderer-'+kind,'',null,stack)}
  async crashExport(){this.guard();const data=JSON.stringify({version:app.getVersion(),diagnostics:this.diagnostics(),crashes:this.crashState()},null,2);const r=await dialog.showSaveDialog(this.requireWindow(),{defaultPath:'pssa-crashes.json',filters:[{name:'JSON',extensions:['json']}]});if(r.canceled||!r.filePath||this.stopped)return false;writeNew(this.outside(r.filePath),data);return true}
- localeCatalogs(){return loadCatalogs(app.isPackaged?process.resourcesPath:app.getAppPath(),app.getAppPath())}
+ localeCatalogs(){return this.catalogs??=loadCatalogs(app.isPackaged?process.resourcesPath:app.getAppPath(),app.getAppPath())}
+ private applyAlertLanguage(language:Language){try{const catalogs=this.localeCatalogs();setDefaultRuleTranslator(this.db,key=>translate(catalogs[language],catalogs.pl,key))}catch{setDefaultRuleTranslator(this.db,key=>key)}}
  state(){return {...preferences(this.db),language:this.language}}
- save(value:unknown){const old=this.state();const language=(value as RuntimePreferences|null)?.language;if(language!==undefined&&!isLanguage(language))throw Error("Invalid language");const p=savePreferences(this.db,value);if(language!==undefined&&language!==old.language){writeLanguage(this.directory,language);this.language=language}if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0;this.update=undefined}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
+ save(value:unknown){const old=this.state();const language=(value as RuntimePreferences|null)?.language;if(language!==undefined&&!isLanguage(language))throw Error("Invalid language");const p=savePreferences(this.db,value);if((old.alertLanguage??"pl")!==(p.alertLanguage??"pl"))this.applyAlertLanguage(p.alertLanguage??"pl");if(language!==undefined&&language!==old.language){writeLanguage(this.directory,language);this.language=language}if(old.updates!==p.updates){this.cached={state:'none',version:'',url:'',detail:'Zmieniono kanał aktualizacji.'};this.checkedAt=0;this.update=undefined}this.onMode(p);if(p.autoCheck&&(!old.autoCheck||old.updates!==p.updates))void this.check();return this.state()}
  start(){void cleanUpdateFiles();let cleanupRetries=3;this.timer=setInterval(()=>{if(!this.downloading&&cleanupRetries>0){cleanupRetries--;void cleanUpdateFiles()}if(this.state().autoCheck&&Date.now()-this.checkedAt>=21600000)void this.check()},60000);if(this.state().autoCheck)void this.check()}
  stop(failed=false){this.stopped=true;clearInterval(this.timer);this.measurement.shutdown(failed);this.stopCollectors()}
  private requireWindow(){const w=this.window();if(!w||w.isDestroyed())throw Error('Window unavailable');return w}
@@ -117,6 +122,7 @@ export class RuntimeService{
   if(this.stopped)throw Error('Aplikacja zamykana.')
   if(this.agent?.snapshot().online)throw Error('Zakończ niezależnego Agenta przed aktualizacją.')
  }
+ private updateText(key:string,values?:Record<string,string|number>){const catalogs=this.localeCatalogs();return translate(catalogs[this.language],catalogs.pl,key,values)}
  private async trustedInstaller(file:string){
   const quote=(v:string)=>"'"+v.replaceAll("'","''")+"'"
   const script="$ErrorActionPreference='Stop'; $a=Get-AuthenticodeSignature -LiteralPath "+quote(process.execPath)+"; $b=Get-AuthenticodeSignature -LiteralPath "+quote(file)+"; if($a.Status -eq 'Valid' -and $b.Status -eq 'Valid' -and $a.SignerCertificate.Thumbprint -eq $b.SignerCertificate.Thumbprint){'trusted'}elseif($b.Status -eq 'NotSigned'){'unsigned'}else{'untrusted'}"
@@ -133,7 +139,7 @@ export class RuntimeService{
   this.downloading=true;let dir='',keep=false
   try{
    await this.updateSafe()
-   const choice=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:'Aktualizacja PSSA',message:'Pobrać PSSA '+info.version+'?',detail:'Zapisz rozpoczętą edycję. PSSA sprawdzi sumę SHA256 oraz podpis instalatora. OBS musi pozostać zamknięty.',buttons:['Anuluj','Pobierz'],defaultId:0,cancelId:0})
+   const choice=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:this.updateText('update.dialog.title'),message:this.updateText('update.dialog.download',{version:info.version}),detail:this.updateText('update.dialog.detail'),buttons:[this.updateText('common.cancel'),this.updateText('update.dialog.get')],defaultId:0,cancelId:0})
    if(choice.response!==1)return 'cancelled'
    assertCurrent()
    dir=await mkdtemp(join(tmpdir(),'PSSA-update-'))
@@ -141,7 +147,7 @@ export class RuntimeService{
    const trusted=await this.trustedInstaller(file)
    if(installerManualOnly(trusted,info.version)){
     assertCurrent()
-    const consent=await dialog.showMessageBox(this.requireWindow(),{type:'warning',title:'Niepodpisany instalator Stable',message:'Zapisać zweryfikowany instalator do folderu Pobrane?',detail:'Suma SHA256 jest zgodna z oficjalnym wydaniem GitHub. Instalator nie ma podpisu cyfrowego, więc PSSA nie uruchomi go automatycznie. Po zapisaniu zamknij PSSA i uruchom plik ręcznie. Windows może wyświetlić ostrzeżenie.',buttons:['Anuluj','Zapisz instalator'],defaultId:0,cancelId:0})
+    const consent=await dialog.showMessageBox(this.requireWindow(),{type:'warning',title:this.updateText('update.dialog.unsignedStable'),message:this.updateText('update.dialog.saveQuestion'),detail:this.updateText('update.dialog.manualDetail'),buttons:[this.updateText('common.cancel'),this.updateText('update.dialog.save')],defaultId:0,cancelId:0})
     if(consent.response!==1)return 'cancelled'
     assertCurrent()
     const saved=await saveManualInstaller(file,app.getPath('downloads'),info.asset)
@@ -151,7 +157,7 @@ export class RuntimeService{
    if(!installerAllowed(trusted,info.version))throw Error('Nie można potwierdzić podpisu instalatora. Automatyczne uruchomienie zablokowane. Sprawdź wydanie na GitHubie.')
    assertCurrent()
    await this.updateSafe()
-   const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:trusted==='trusted'?'Instalator zweryfikowany':'Niepodpisany instalator Beta',message:'Uruchomić instalator i zakończyć PSSA?',detail:trusted==='trusted'?'Podpis i suma SHA256 są zgodne. Instalator zachowa istniejący katalog programu.':'SHA256 pobranego pliku jest zgodne z oficjalnym wydaniem GitHub, ale instalator nie ma podpisu cyfrowego. Uruchom tylko jeśli ufasz wydawcy. Windows może poprosić o dodatkowe potwierdzenie.',buttons:['Anuluj',trusted==='trusted'?'Zainstaluj':'Uruchom niepodpisany instalator'],defaultId:0,cancelId:0})
+   const confirm=await dialog.showMessageBox(this.requireWindow(),{type:'question',title:trusted==='trusted'?this.updateText('update.dialog.verified'):this.updateText('update.dialog.unsignedBeta'),message:this.updateText('update.dialog.run'),detail:trusted==='trusted'?this.updateText('update.dialog.trustedDetail'):this.updateText('update.dialog.unsignedDetail'),buttons:[this.updateText('common.cancel'),trusted==='trusted'?this.updateText('setup.install'):this.updateText('update.dialog.runUnsigned')],defaultId:0,cancelId:0})
    if(confirm.response!==1)return 'cancelled'
    await this.updateSafe()
    assertCurrent()

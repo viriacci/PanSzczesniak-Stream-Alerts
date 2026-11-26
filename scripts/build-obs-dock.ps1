@@ -13,6 +13,8 @@ try{
   $source=(Get-Content $cmake -Raw).Replace('Qt6 COMPONENTS Widgets Core','Qt6 REQUIRED COMPONENTS Widgets Core Network').Replace('Qt6::Core Qt6::Widgets','Qt6::Core Qt6::Widgets Qt6::Network').Replace('src/plugin-main.c','src/pssa-dock.cpp')
   Set-Content -LiteralPath $cmake -Value $source -Encoding utf8NoBOM
   Copy-Item -LiteralPath (Join-Path $repo 'obs-dock/pssa-dock.cpp') -Destination (Join-Path $temp 'src/pssa-dock.cpp')
+  node (Join-Path $repo 'scripts/generate-dock-locales.mjs') (Join-Path $temp 'src/pssa-locales.generated.h')
+  if($LASTEXITCODE -ne 0){throw 'Dock locale generation failed'}
   Push-Location $temp
   try{
     cmake --preset windows-x64 -DENABLE_FRONTEND_API=ON -DENABLE_QT=ON

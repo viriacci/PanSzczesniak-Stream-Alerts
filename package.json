@@ -1,7 +1,7 @@
 {
   "name": "pssa-v2",
   "productName": "PSSA",
-  "version": "2.1.0-dev.6",
+  "version": "2.1.0-dev.7",
   "private": true,
   "description": "Local Twitch streaming control center",
   "author": "PanSzczesniak",

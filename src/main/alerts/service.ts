@@ -21,10 +21,10 @@ import { Auth } from '../twitch/auth'
 import { EventSub } from '../twitch/eventsub'
 import { AlertQueue } from './queue'
 import { Overlay } from '../overlay/server'
-import { rules,saveRule,saveRules,saveScene } from './store'
+import { rules,saveRule,saveRules,saveScene,newDefaultRule } from './store'
 import { copyMedia,imageExt,audioExt,videoExt,resolveLibraryFile } from './media'
 import { importLegacy } from './import'
-import { testEvent,parseRewards,defaultRule,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
+import { testEvent,parseRewards,type AlertState,type AlertEvent,type TwitchState,type Reward,type AlertRule } from '../../shared/alerts'
 export class AlertsService {
  private auth:Auth
  private live:LiveService
@@ -147,6 +147,6 @@ export class AlertsService {
  observeObs(state:ObsState){this.live.obs(state)}
  reloadOverlay(){return this.overlay.reload()}
  queueCommand(command:unknown){return this.queue.command(command)}
- test(key:string){const rule=rules(this.db).find(x=>x.key===key)??defaultRule(key);const event=testEvent(rule,randomUUID());return this.queue.enqueue(event,rule,'test')?1:0}
- private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule){const category=rule.variants?.length?this.live.categoryId(): '',variant=pickVariant(rule.variants??[],event.count??0,event.months??0,category);this.queue.enqueue(event,variant?{...rule,scene:variant.scene,duration:variant.scene.duration/1000,variants:[]}:{...rule,variants:[]})}else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,defaultRule(key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}
+ test(key:string){const rule=rules(this.db).find(x=>x.key===key)??newDefaultRule(this.db,key);const event=testEvent(rule,randomUUID());return this.queue.enqueue(event,rule,'test')?1:0}
+ private dispatch(event:AlertEvent){if(this.stopped)return;try{const key=event.kind==='redemption'?'reward:'+event.rewardId:event.kind;const rule=rules(this.db).find(x=>x.key===key);if(rule){const category=rule.variants?.length?this.live.categoryId(): '',variant=pickVariant(rule.variants??[],event.count??0,event.months??0,category);this.queue.enqueue(event,variant?{...rule,scene:variant.scene,duration:variant.scene.duration/1000,variants:[]}:{...rule,variants:[]})}else if(event.kind==='redemption'&&event.rewardId)this.queue.enqueue(event,newDefaultRule(this.db,key,event.reward??key))}catch{this.detail='Błąd odczytu reguły alertu'}}
 }
