@@ -28,6 +28,7 @@
 #include <QDateTime>
 #include <QByteArray>
 #include <QStringList>
+#include <QUrl>
 #include <windows.h>
 
 OBS_DECLARE_MODULE()
@@ -58,7 +59,26 @@ static bool processAlive(int pid){
  HANDLE p=OpenProcess(SYNCHRONIZE,FALSE,static_cast<DWORD>(pid));if(!p)return GetLastError()==ERROR_ACCESS_DENIED;
  const bool alive=WaitForSingleObject(p,0)==WAIT_TIMEOUT;CloseHandle(p);return alive;
 }
-static bool isBrowser(obs_source_t *source){return source&&std::strcmp(obs_source_get_id(source),"browser_source")==0;}
+static bool isBrowser(obs_source_t *source){
+ const char *id=source?obs_source_get_id(source):nullptr;return id&&std::strcmp(id,"browser_source")==0;
+}
+static bool validOverlay(const QString &url){
+ const QUrl parsed(url);const int port=parsed.port();
+ return port>=1&&port<=65535&&QRegularExpression("^http://127\\.0\\.0\\.1:[0-9]{1,5}/[a-f0-9]{64}/$").match(url).hasMatch();
+}
+static bool refreshBrowser(obs_source_t *source){
+ auto *properties=obs_source_properties(source);if(!properties)return false;
+ auto *button=obs_properties_get(properties,"refreshnocache");
+ const bool found=button&&obs_property_get_type(button)==OBS_PROPERTY_BUTTON;
+ if(found)obs_property_button_clicked(button,source);
+ obs_properties_destroy(properties);return found;
+}
+static bool repairManagedUrl(obs_source_t *source,const QByteArray &url){
+ auto *s=obs_source_get_settings(source);if(!s)return false;
+ const bool changed=url!=obs_data_get_string(s,"url")||obs_data_get_bool(s,"is_local_file")||obs_data_get_bool(s,"shutdown")||obs_data_get_bool(s,"restart_when_active");
+ if(changed){obs_data_set_string(s,"url",url.constData());obs_data_set_bool(s,"is_local_file",false);obs_data_set_bool(s,"shutdown",false);obs_data_set_bool(s,"restart_when_active",false);obs_source_update(source,s);}
+ obs_data_release(s);return changed;
+}
 static bool managed(obs_source_t *source){
  if(!isBrowser(source))return false;
  auto *s=obs_source_get_settings(source);const bool result=obs_data_get_bool(s,"pssa_control_dock");obs_data_release(s);return result;
@@ -112,7 +132,7 @@ class Dock final:public QWidget{
   if(!volume->isSliderDown()&&!volumeTimer.isActive()){QSignalBlocker b(volume);volume->setValue(v);volumeLabel->setText(QString::number(v)+"%");}
   {QSignalBlocker b(mute);mute->setChecked(data.value("muted").toBool());}
   if(phase==Phase::Idle)report(trp("Uruchomiony"));
-  details->setText(trp("Twitch: ")+data.value("twitch").toString()+trp("  |  Kolejka: ")+QString::number(data.value("pending").toInt()));
+  details->setText(trp("Twitch: ")+data.value("twitch").toString()+trp("  |  Kolejka: ")+QString::number(data.value("pending").toInt())+trp("\nNakładka: ")+(data.contains("overlayClients")?(data.value("overlayClients").toInt()>0?trp("połączona"):trp("brak połączenia")):trp("brak danych"))+trp("  |  Port: ")+(validOverlay(overlay)?QString::number(QUrl(overlay).port()):trp("—")));
   controls();
  }
  void offline(){
@@ -165,14 +185,14 @@ class Dock final:public QWidget{
   result(QString());report(restart?trp("Restartowanie…"):trp("Zamykanie…"));controls();send(restart?"restart":"quit");
  }
  void addSource(){
-  if(!online||!QRegularExpression("^http://127\\.0\\.0\\.1:18766/[a-f0-9]{64}/$").match(overlay).hasMatch()){result(trp("Brak poprawnego adresu nakładki"));return;}
+  if(!online||!validOverlay(overlay)){result(trp("Brak poprawnego adresu nakładki"));return;}
   auto *sceneSource=targetScene();if(!sceneSource){result(trp("Brak aktywnej sceny"));return;}
   const QString sceneName=trp(obs_source_get_name(sceneSource));auto *scene=obs_scene_from_source(sceneSource);if(!scene){obs_source_release(sceneSource);return;}
   const QByteArray url=overlay.toUtf8();
-  struct Search {QByteArray url;obs_source_t *source=nullptr;};
+  struct Search {QByteArray url;obs_source_t *source=nullptr;obs_sceneitem_t *item=nullptr;};
   Search current{url};
-  obs_scene_enum_items(scene,[](obs_scene_t*,obs_sceneitem_t *item,void *data){auto &x=*static_cast<Search*>(data);auto *s=obs_sceneitem_get_source(item);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);return false;}return true;},&current);
-  if(current.source){if(managed(current.source)&&!urlMatches(current.source,url)){auto *s=obs_data_create();obs_data_set_string(s,"url",url.constData());obs_source_update(current.source,s);obs_data_release(s);}obs_source_release(current.source);obs_source_release(sceneSource);result(trp("Źródło PSSA już jest w scenie: ")+sceneName);return;}
+  obs_scene_enum_items(scene,[](obs_scene_t*,obs_sceneitem_t *item,void *data){auto &x=*static_cast<Search*>(data);auto *s=obs_sceneitem_get_source(item);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);x.item=item;return false;}return true;},&current);
+  if(current.source){const bool changed=managed(current.source)&&repairManagedUrl(current.source,url);const bool hidden=current.item&&!obs_sceneitem_visible(current.item);if(hidden)obs_sceneitem_set_visible(current.item,true);if(!changed)refreshBrowser(current.source);if(changed||hidden)obs_frontend_save();obs_source_release(current.source);obs_source_release(sceneSource);result(trp("Sprawdzono źródło PSSA w scenie: ")+sceneName);return;}
   Search global{url};
   obs_enum_sources([](void *data,obs_source_t *s){auto &x=*static_cast<Search*>(data);if(managed(s)||urlMatches(s,x.url)){x.source=obs_source_get_ref(s);return false;}return true;},&global);
   auto *source=global.source;
@@ -181,11 +201,24 @@ class Dock final:public QWidget{
    obs_data_set_bool(s,"is_local_file",false);obs_data_set_bool(s,"shutdown",false);obs_data_set_bool(s,"restart_when_active",false);obs_data_set_bool(s,"reroute_audio",true);obs_data_set_bool(s,"pssa_control_dock",true);
    QByteArray name="PSSA - Alerty";int i=2;while(auto *existing=obs_get_source_by_name(name.constData())){obs_source_release(existing);name="PSSA - Alerty "+QByteArray::number(i++);}
    source=obs_source_create("browser_source",name.constData(),s,nullptr);obs_data_release(s);
-  }else if(managed(source)&&!urlMatches(source,url)){auto *s=obs_data_create();obs_data_set_string(s,"url",url.constData());obs_source_update(source,s);obs_data_release(s);}
+  }else if(managed(source)){repairManagedUrl(source,url);}
   if(!source){obs_source_release(sceneSource);result(trp("Nie można utworzyć źródła przeglądarkowego"));return;}
   auto *item=obs_scene_add(scene,source);
   if(item){obs_video_info info{};if(obs_get_video_info(&info)){vec2 scale;const auto w=obs_source_get_width(source),h=obs_source_get_height(source);vec2_set(&scale,static_cast<float>(info.base_width)/static_cast<float>(w?w:1920),static_cast<float>(info.base_height)/static_cast<float>(h?h:1080));obs_sceneitem_set_scale(item,&scale);}obs_frontend_save();}
   obs_source_release(source);obs_source_release(sceneSource);result(item?trp("Dodano źródło PSSA do: ")+sceneName:trp("Nie udało się dodać źródła"));
+ }
+ void refreshSources(){
+  if(!online||!validOverlay(overlay)){result(trp("Brak poprawnego adresu nakładki"));return;}
+  struct Refresh {QByteArray url;int count=0;bool changed=false;};
+  Refresh r{overlay.toUtf8()};
+  obs_enum_sources([](void *data,obs_source_t *s){
+   auto &r=*static_cast<Refresh*>(data);
+   if(managed(s)){const bool changed=repairManagedUrl(s,r.url);r.changed|=changed;if(changed||refreshBrowser(s))r.count++;}
+   else if(urlMatches(s,r.url)&&refreshBrowser(s))r.count++;
+   return true;
+  },&r);
+  if(r.changed)obs_frontend_save();
+  result(r.count?trp("Przeładowano lub naprawiono źródła PSSA: ")+QString::number(r.count):trp("Nie znaleziono źródła PSSA. Dodaj je do sceny."));
  }
 public:
  Dock(){
@@ -210,7 +243,7 @@ public:
   extraScroll=new QScrollArea(this);extraScroll->setWidgetResizable(true);extraScroll->setFrameShape(QFrame::NoFrame);extraScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);extraScroll->setWidget(extra);extraScroll->setMinimumHeight(80);extraScroll->hide();layout->addWidget(extraScroll,1);
   connect(more,&QToolButton::toggled,this,[this](bool b){extraScroll->setVisible(b);more->setText(b?trp("Mniej"):trp("Więcej"));more->setArrowType(b?Qt::UpArrow:Qt::DownArrow);});
   connect(startButton,&QPushButton::clicked,this,[this](){launch();});connect(stopButton,&QPushButton::clicked,this,[this](){stop(false);});connect(restartButton,&QPushButton::clicked,this,[this](){stop(true);});connect(showButton,&QPushButton::clicked,this,[this](){send("show");});
-  connect(addButton,&QPushButton::clicked,this,[this](){addSource();});connect(refreshButton,&QPushButton::clicked,this,[this](){send("reload");});connect(testButton,&QPushButton::clicked,this,[this](){send("test");});
+  connect(addButton,&QPushButton::clicked,this,[this](){addSource();});connect(refreshButton,&QPushButton::clicked,this,[this](){refreshSources();});connect(testButton,&QPushButton::clicked,this,[this](){send("test");});
   volumeTimer.setSingleShot(true);volumeTimer.setInterval(160);connect(volume,&QSlider::valueChanged,this,[this](int v){volumeLabel->setText(QString::number(v)+"%");volumeTimer.start();});connect(&volumeTimer,&QTimer::timeout,this,[this](){send("volume",volume->value());});
   connect(mute,&QCheckBox::toggled,this,[this](bool v){send("mute",v);});
   connect(autoStart,&QCheckBox::toggled,this,[this](bool v){settings.setValue("autoStart",v);settings.sync();});connect(autoClose,&QCheckBox::toggled,this,[this](bool v){settings.setValue("autoClose",v);settings.sync();});

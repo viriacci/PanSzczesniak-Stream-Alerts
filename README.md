@@ -6,7 +6,7 @@
 
 PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łączy alerty, nagrody za punkty kanału, edycję scen i statystyki transmisji w jednym programie na Windows. Dane są przechowywane lokalnie.
 
-**PSSA 2.0.1** · [Pobierz instalator](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.1) · [Zgłoś błąd](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/issues)
+**PSSA 2.0.2** · [Pobierz instalator](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.2) · [Zgłoś błąd](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/issues)
 
 ## Możliwości
 
@@ -20,7 +20,7 @@ PSSA to aplikacja dla streamerów korzystających z Twitcha i OBS Studio. Łącz
 
 ## Instalacja
 
-1. Pobierz plik `PSSA-Setup-2.0.1-x64.exe` z [wydania 2.0.1](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.1).
+1. Pobierz plik `PSSA-Setup-2.0.2-x64.exe` z [wydania 2.0.2](https://github.com/viriacci/PanSzczesniak-Stream-Alerts/releases/tag/v2.0.2).
 2. Sprawdź SHA-256 z plikiem `SHA256SUMS.txt`. Instalator nie ma podpisu cyfrowego. Pobierz go z oficjalnego wydania GitHub i uruchom ręcznie.
 3. Uruchom instalator, a następnie zaloguj się do Twitcha w PSSA.
 4. Skopiuj adres nakładki z Konfiguracji i dodaj go w OBS jako źródło przeglądarkowe (1920 × 1080). Opcjonalnie zainstaluj PSSA Control Dock w ustawieniach.

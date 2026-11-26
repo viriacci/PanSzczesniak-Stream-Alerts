@@ -1,7 +1,7 @@
 import {copyMedia} from './alerts/media'
 import {rememberAsset} from './library/store'
 import {testTone} from './alerts/test-tone'
-import {createConnection} from 'node:net'
+import {createConnection,createServer as createTcpServer} from 'node:net'
 import {DockControl,type DockDescriptor} from './obs/dock-control'
 import {CrashLog} from './runtime/crashes'
 import {launchNodeAgent} from './agent/launch'
@@ -88,7 +88,10 @@ async function start(): Promise<void> {
   session.defaultSession.setPermissionCheckHandler(() => false)
   const activeDb=db
   alerts=new AlertsService(activeDb,directory,()=>window,app.getPath('documents'))
-  await alerts.start(!smoke)
+  // Exercise real Chromium playback with an occupied default overlay port in smoke runs.
+  const occupied=smoke?createTcpServer(socket=>socket.destroy()):undefined
+  if(occupied)await new Promise<void>((resolve,reject)=>{occupied.once('error',reject);occupied.listen(18766,'127.0.0.1',resolve)})
+  try{await alerts.start(!smoke)}finally{occupied?.close()}
   const activeAlerts=alerts
   const activeObs=new ObsService(activeDb,state=>{try{activeAlerts.observeObs(state)}catch{console.warn('PSSA: telemetry write failed')}})
   obs=activeObs
@@ -162,7 +165,7 @@ async function start(): Promise<void> {
   let dockDescriptor:DockDescriptor|undefined
   {
    dockControl=new DockControl(directory,process.execPath,{
-    state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl}},
+    state:()=>{const a=activeAlerts.state();return {version:app.getVersion(),volume:a.queue.settings.volume,muted:a.queue.settings.muted,pending:a.queue.pendingCount,twitch:a.twitch.phase,overlayUrl:a.twitch.overlayUrl,overlayClients:a.twitch.clients}},
     volume:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,volume:value}})},
     mute:value=>{activeAlerts.queueCommand({type:'settings',settings:{...activeAlerts.state().queue.settings,muted:value}})},
     test:()=>{activeAlerts.queueCommand({type:'test'})},reload:()=>{activeAlerts.reloadOverlay()},show:()=>reveal(),quit:()=>dockExit(false),restart:()=>dockExit(true)
@@ -228,6 +231,11 @@ async function start(): Promise<void> {
       document.querySelector('[data-nav-id="queue"]').click();await until(()=>document.querySelector('.queue-page .queue-row')?.textContent.includes('DługiAlert'));
       const titles=()=>[...document.querySelectorAll('.queue-page .panel-heading h2')].map(e=>e.textContent);
       if(titles()[0]!=='Aktualnie odtwarzany'||!titles()[1].startsWith('Oczekujące')||titles()[2]!=='Historia alertów'||titles()[3]!=='Działanie alertów')throw Error('Queue panel order');
+      const toggleQueue=()=>document.querySelector('[data-queue-toggle]');
+      if(!toggleQueue()||toggleQueue().getBoundingClientRect().top>document.querySelector('.queue-board').getBoundingClientRect().top)throw Error('Queue toggle must be above the board');
+      if((await window.pssa.alertState()).queue.settings.paused){toggleQueue().click();await until(async()=>!(await window.pssa.alertState()).queue.settings.paused)}
+      toggleQueue().click();await until(async()=> (await window.pssa.alertState()).queue.settings.paused&&toggleQueue().textContent.includes('Wznów'));
+      toggleQueue().click();await until(async()=> !(await window.pssa.alertState()).queue.settings.paused&&toggleQueue().textContent.includes('Pauza'));
       const button=[...document.querySelectorAll('.queue-page button')].find(e=>e.textContent==='Dodaj testowy alert');button.click();await until(()=>[...document.querySelectorAll('.queue-page .queue-row')].some(e=>e.textContent.includes('Testowy alert')));
       if(!document.querySelector('.queue-page [role=status]')?.textContent.includes('oczekują'))throw Error('Offline queue message missing');
       const fits=()=>[...document.querySelectorAll('.content,.queue-page,.queue-page .panel')].every(e=>e.scrollWidth<=e.clientWidth+1);
@@ -276,7 +284,7 @@ async function start(): Promise<void> {
       checks.compact=await window.pssa.setCompact(true) && (await window.pssa.getStatus()).compact===true;
       checks.layout=(await window.pssa.setLayout({...await window.pssa.getLayout(),page:"settings",sidebarWidth:280})).page==="settings"&&(await window.pssa.getLayout()).sidebarWidth===280;
       const alerts=await window.pssa.alertState();
-      checks.rules=alerts.rules.length>=8;checks.overlay=alerts.twitch.overlayUrl.startsWith("http://127.0.0.1:18766/");checks.pending=alerts.queue.pendingCount===1;
+      checks.rules=alerts.rules.length>=8;checks.overlay=new URL(alerts.twitch.overlayUrl).hostname==="127.0.0.1"&&new URL(alerts.twitch.overlayUrl).port!=="18766";checks.pending=alerts.queue.pendingCount===1;
       checks.obs=(await window.pssa.obsState()).phase==="offline";checks.live=(await window.pssa.liveState()).phase==="disconnected";checks.channels=(await window.pssa.analyticsChannels()).length===0;checks.assets=(await window.pssa.libraryState()).assets.length===0;
       checks.analytics=(await window.pssa.analyticsReport({channel:"42",from:1700000000000,to:1700604800000,category:"",source:"all"})).current.sessions===0;
       checks.runtime=(await window.pssa.runtimeState()).mode==="studio";checks.diagnostics=(await window.pssa.diagnostics()).schema===expected;

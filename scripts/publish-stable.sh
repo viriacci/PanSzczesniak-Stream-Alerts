@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 version="$(node -p "require('./package.json').version")"
-[[ "$version" == "2.0.1" && "$GITHUB_REF" == "refs/heads/develop/v2" ]]
+[[ "$version" == "2.0.2" && "$GITHUB_REF" == "refs/heads/develop/v2" ]]
 [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
 tag="v$version"
 exe="PSSA-Setup-$version-x64.exe"
@@ -38,7 +38,7 @@ jq -e --arg exe "$exe" --arg digest "sha256:$actual" --arg sumdigest "sha256:$su
 if [[ "$main_tree" != "$tree" ]]; then
   [[ "$(gh api "repos/$repo/git/ref/heads/main" --jq .object.sha)" == "$main" ]]
   jq -n --arg tree "$tree" --arg first "$main" --arg second "$GITHUB_SHA" \
-    '{message:"Release PSSA 2.0.1",tree:$tree,parents:[$first,$second]}' > promote.json
+    '{message:"Release PSSA 2.0.2",tree:$tree,parents:[$first,$second]}' > promote.json
   merge="$(gh api --method POST "repos/$repo/git/commits" --input promote.json --jq .sha)"
   gh api --method PATCH "repos/$repo/git/refs/heads/main" -f sha="$merge" -F force=false >/dev/null
   [[ "$(gh api "repos/$repo/git/ref/heads/main" --jq .object.sha)" == "$merge" ]]

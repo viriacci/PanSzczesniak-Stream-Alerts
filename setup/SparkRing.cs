@@ -8,6 +8,8 @@ public sealed class SparkRing : FrameworkElement
 {
     private readonly Stopwatch clock = new();
     private bool holding;
+    private double holdStart;
+    private const double TravelSeconds=2.1, HoldSeconds=5;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly SolidColorBrush[] colors = Enumerable.Range(0, 12).Select(i => {
         var b = new SolidColorBrush(Color.FromArgb((byte)(20+i*20), 249, 199, 94)); b.Freeze(); return b;
@@ -19,8 +21,8 @@ public sealed class SparkRing : FrameworkElement
         Loaded += (_,_) => { if(SystemParameters.ClientAreaAnimation) { holding=false; clock.Restart(); timer.Interval=TimeSpan.FromMilliseconds(33); timer.Start(); } else holding=true; InvalidateVisual(); };
         Unloaded += (_,_) => timer.Stop();
         timer.Tick += (_,_) => {
-            if(holding){holding=false;clock.Restart();timer.Interval=TimeSpan.FromMilliseconds(33);}
-            else if(clock.Elapsed.TotalSeconds>=2.1){holding=true;timer.Interval=TimeSpan.FromSeconds(5);}
+            if(holding){if(clock.Elapsed.TotalSeconds-holdStart>=HoldSeconds){holding=false;clock.Restart();timer.Interval=TimeSpan.FromMilliseconds(33);}}
+            else if(clock.Elapsed.TotalSeconds>=TravelSeconds){holding=true;holdStart=clock.Elapsed.TotalSeconds;timer.Interval=TimeSpan.FromMilliseconds(50);}
             InvalidateVisual();
         };
         ringPen.Freeze();
@@ -31,7 +33,8 @@ public sealed class SparkRing : FrameworkElement
         base.OnRender(dc);
         var w=ActualWidth; var h=ActualHeight; if(w<60||h<60) return;
         var rect=new Rect(16,16,w-32,h-32);
-        double t=holding||!clock.IsRunning?2.1:Math.Min(2.1,clock.Elapsed.TotalSeconds), progress=t/2.1;
+        double t=holding||!clock.IsRunning?TravelSeconds:Math.Min(TravelSeconds,clock.Elapsed.TotalSeconds), progress=t/TravelSeconds;
+        double tremble=holding&&timer.IsEnabled&&SystemParameters.ClientAreaAnimation?Math.Max(0,clock.Elapsed.TotalSeconds-holdStart):0;
         if(progress>=1) dc.DrawRoundedRectangle(null,ringPen,rect,24,24);
         // Clockwise rounded perimeter.
         var g=new RectangleGeometry(rect,24,24).GetFlattenedPathGeometry();
@@ -42,7 +45,9 @@ public sealed class SparkRing : FrameworkElement
             double fade=1-i/120.0;
             int index=Math.Clamp((int)(fade*11),0,11);
             var jitter=Math.Sin(i*31.7+t*8)*Math.Min(9,i*.12);
-            var q=new Point(p.X+tangent.Y*jitter,p.Y-tangent.X*jitter);
+            double drift=holding?Math.Sin(tremble*9+i*1.73)*.65*Math.Min(1,tremble*5):0;
+            double flutter=holding?Math.Sin(tremble*7+i*2.31)*.9*Math.Min(1,tremble*5):0;
+            var q=new Point(p.X+tangent.Y*(jitter+flutter)+tangent.X*drift,p.Y-tangent.X*(jitter+flutter)+tangent.Y*drift);
             double radius=1+2.0*fade;
             dc.DrawEllipse(colors[index],null,q,radius,radius*.8);
             if(i%11==0) dc.DrawEllipse(colors[Math.Max(0,index-4)],null,q,radius*2.5,radius*2.5);

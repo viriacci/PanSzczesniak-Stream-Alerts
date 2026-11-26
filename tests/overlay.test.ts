@@ -49,6 +49,9 @@ test('another profile can bind a different loopback port without sharing media o
   await one.start();const occupied=Number(new URL(one.url).port)
   await assert.rejects(()=>two.start(undefined,occupied),{code:'EADDRINUSE'})
   await two.start(undefined,0)
+  const page=await fetch(two.url);assert.equal(page.status,200);await page.text()
+  const stream=await fetch(two.url+'events',{signal:AbortSignal.timeout(5000)});assert.match(stream.headers.get('content-type')??'',/text\/event-stream/)
+  const reader=stream.body!.getReader();try{await reader.read();assert.equal(two.clients,1);assert.equal(one.clients,0);assert.equal(two.send({attempt:'fallback-port',rule:defaultRule('raid'),text:'Fallback playback',volume:100}),true);assert.match(new TextDecoder().decode((await reader.read()).value),/Fallback playback/)}finally{await reader.cancel()}
   assert.notEqual(new URL(one.url).port,new URL(two.url).port)
   assert.equal(await (await fetch(one.url+'media/'+name)).text(),'user-a')
   assert.equal(await (await fetch(two.url+'media/'+name)).text(),'user-b')
